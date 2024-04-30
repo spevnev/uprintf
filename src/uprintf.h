@@ -57,18 +57,31 @@ void uprintf(const char *fmt, ...);
 
 #define byte uint8_t
 
+typedef struct {
+    byte *file;
+    off_t file_size;
+
+    const Elf64_Shdr *info;
+    const Elf64_Shdr *abbrev;
+} _upf_dwarf;
+
 // See https://dwarfstd.org/doc/DWARF5.pdf for more details:
 // Section 7.6 contains description
 // Appendix C contains pseudo code implemented below
 // Converts `leb` to `result` and returns the number of bytes
 static size_t LEB128_to_uint64(uint64_t *result, const byte *leb) {
+    static const byte BITS_MASK = 0x7f;      // 01111111
+    static const byte CONTINUE_MASK = 0x80;  // 10000000
+
+
     size_t i = 0;
     int shift = 0;
 
+    *result = 0;
     while (1) {
         byte b = leb[i++];
-        *result |= (((uint64_t) (b & 0b01111111)) << shift);
-        if ((b & 0b10000000) == 0) break;
+        *result |= (((uint64_t) (b & BITS_MASK)) << shift);
+        if ((b & CONTINUE_MASK) == 0) break;
         shift += 7;
     }
 
@@ -151,7 +164,7 @@ static void _upf_parse_info(const byte *info, size_t length, const byte *abbrev)
     }
 }
 
-static void _upf_parse_dwarf() {
+static _upf_dwarf _upf_parse_elf() {
     static const char *self_file = "/proc/self/exe";
 
 
@@ -170,6 +183,9 @@ static void _upf_parse_dwarf() {
 
     const Elf64_Ehdr *header = (const Elf64_Ehdr *) file;
 
+    assert(memcmp(header->e_ident, ELFMAG, SELFMAG) == 0);
+    assert(header->e_ident[EI_CLASS] == ELFCLASS64);
+    assert(header->e_ident[EI_VERSION] == 1);
     assert(header->e_machine == EM_X86_64);
     assert(header->e_version == 1);
     assert(header->e_shentsize == sizeof(Elf64_Shdr));
@@ -177,27 +193,31 @@ static void _upf_parse_dwarf() {
     const Elf64_Shdr *string_section = (const Elf64_Shdr *) (file + header->e_shoff + header->e_shstrndx * header->e_shentsize);
     const char *string_table = (char *) (file + string_section->sh_offset);
 
-
-    const Elf64_Shdr *info = NULL;
-    const Elf64_Shdr *abbrev = NULL;
+    _upf_dwarf dwarf = {0};
+    dwarf.file = file;
+    dwarf.file_size = size;
 
     const Elf64_Shdr *section = (const Elf64_Shdr *) (file + header->e_shoff);
     for (size_t i = 0; i < header->e_shnum; i++) {
         const char *name = string_table + section->sh_name;
 
-        if (strcmp(name, ".debug_info") == 0) info = section;
-        else if (strcmp(name, ".debug_abbrev") == 0) abbrev = section;
+        if (strcmp(name, ".debug_info") == 0) dwarf.info = section;
+        else if (strcmp(name, ".debug_abbrev") == 0) dwarf.abbrev = section;
 
         section++;
     }
 
-    assert(info != NULL && abbrev != NULL);
-    _upf_parse_info(file + info->sh_offset, info->sh_size, file + abbrev->sh_offset);
-
-    munmap(file, size);
+    assert(dwarf.info != NULL && dwarf.abbrev != NULL);
+    return dwarf;
 }
 
-void uprintf(const char *fmt, ...) { _upf_parse_dwarf(); }
+void uprintf(const char *fmt, ...) {
+    _upf_dwarf dwarf = _upf_parse_elf();
+
+    _upf_parse_info(dwarf.file + dwarf.info->sh_offset, dwarf.info->sh_size, dwarf.file + dwarf.abbrev->sh_offset);
+
+    munmap(dwarf.file, dwarf.file_size);
+}
 
 #undef byte
 
