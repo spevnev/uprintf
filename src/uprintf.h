@@ -1,3 +1,5 @@
+// For usage and readme see https://github.com/spevnev/uprintf
+
 // MIT License
 //
 // Copyright (c) 2024 Serhii Pievniev
@@ -21,15 +23,9 @@
 // SOFTWARE.
 
 
-// Usage:
-// `#define UPRINTF_IMPLEMENTATION` before the include to include implementations.
-
-
-
 #ifndef __linux__
-#error ERROR: uprintf only works on Linux
+#error ERROR: uprintf only supports Linux
 #endif
-
 
 
 #ifndef UPRINTF_H
@@ -38,7 +34,6 @@
 void uprintf(const char *fmt, ...);
 
 #endif  // UPRINTF_H
-
 
 
 #ifdef UPRINTF_IMPLEMENTATION
@@ -65,14 +60,13 @@ typedef struct {
     const Elf64_Shdr *abbrev;
 } _upf_dwarf;
 
+// Converts LEB128 to uint64_t and returns number of bytes.
 // See https://dwarfstd.org/doc/DWARF5.pdf for more details:
 // Section 7.6 contains description
-// Appendix C contains pseudo code implemented below
-// Converts `leb` to `result` and returns the number of bytes
-static size_t LEB128_to_uint64(uint64_t *result, const byte *leb) {
+// Appendix C contains pseudo code of this implementation
+static size_t _upf_uLEB_to_uint64(uint64_t *result, const byte *leb) {
     static const byte BITS_MASK = 0x7f;      // 01111111
     static const byte CONTINUE_MASK = 0x80;  // 10000000
-
 
     size_t i = 0;
     int shift = 0;
@@ -92,16 +86,16 @@ static size_t LEB128_to_uint64(uint64_t *result, const byte *leb) {
 // https://dwarfstd.org/doc/DWARF5.pdf#subsection.D.1.1
 static void _upf_parse_cu(const byte *cu, const byte *abbrev) {
     uint64_t needed_code;
-    LEB128_to_uint64(&needed_code, cu);  // TODO: offset both in arg and return value
+    _upf_uLEB_to_uint64(&needed_code, cu);  // TODO: offset both in arg and return value
 
     uint64_t code, tag;
     size_t abbrev_offset = 0;
     while (1) {
-        abbrev_offset += LEB128_to_uint64(&code, abbrev + abbrev_offset);
+        abbrev_offset += _upf_uLEB_to_uint64(&code, abbrev + abbrev_offset);
 
         if (code == 0) return;
 
-        abbrev_offset += LEB128_to_uint64(&tag, abbrev + abbrev_offset);
+        abbrev_offset += _upf_uLEB_to_uint64(&tag, abbrev + abbrev_offset);
 
         printf("%d: %X\n", code, tag);
 
@@ -110,8 +104,8 @@ static void _upf_parse_cu(const byte *cu, const byte *abbrev) {
 
         while (1) {
             uint64_t attr_name, attr_form;
-            abbrev_offset += LEB128_to_uint64(&attr_name, abbrev + abbrev_offset);
-            abbrev_offset += LEB128_to_uint64(&attr_form, abbrev + abbrev_offset);
+            abbrev_offset += _upf_uLEB_to_uint64(&attr_name, abbrev + abbrev_offset);
+            abbrev_offset += _upf_uLEB_to_uint64(&attr_form, abbrev + abbrev_offset);
             if (attr_name == 0 && attr_form == 0) break;
         }
 
@@ -119,7 +113,6 @@ static void _upf_parse_cu(const byte *cu, const byte *abbrev) {
     }
 
     // TODO: parse current DIE given abbreviation table's info
-
 }
 
 static void _upf_parse_info(const byte *info, size_t length, const byte *abbrev) {

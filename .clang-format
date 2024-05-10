@@ -13,4 +13,4 @@ BreakBeforeTernaryOperators: true
 SpaceAfterCStyleCast: true
 SpaceBeforeRangeBasedForLoopColon: true
 AllowShortIfStatementsOnASingleLine: AllIfsAndElse
-MaxEmptyLinesToKeep: 3
+MaxEmptyLinesToKeep: 2
