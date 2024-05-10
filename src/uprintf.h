@@ -42,6 +42,7 @@ void uprintf(const char *fmt, ...);
 #include <dwarf.h>
 #include <elf.h>
 #include <fcntl.h>
+#include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -219,6 +220,34 @@ __attribute__((constructor)) void _upf_init(void) {
 __attribute__((destructor)) void _upf_fini(void) { munmap(_upf_dwarf.file, _upf_dwarf.file_size); }
 
 void uprintf(const char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+
+    for (const char *ch = fmt; *ch != '\0'; ch++) {
+        if (*ch != '%') {
+            // TODO: add to the buffer
+            continue;
+        }
+
+        char next = *(ch + 1);
+
+        if (next == '%') {
+            // TODO: add % to the buffer
+            ch++;
+        } else if (next == 'a') {
+            // void *s = va_arg(args, void *);
+            // TODO: print struct ^
+            ch++;
+        } else if (next == '\0') {
+            fprintf(stderr, "[ERROR] uprintf: unfinished format specifier at the end of string in '%s'!\n", fmt);
+            exit(1);
+        } else {
+            fprintf(stderr, "[ERROR] uprintf: unkown format type '%%%c' in '%s'!\n", next, fmt);
+            exit(1);
+        }
+    }
+
+    va_end(args);
 }
 
 
