@@ -52,13 +52,17 @@ void uprintf(const char *fmt, ...);
 
 #define byte uint8_t
 
-typedef struct {
+
+struct _upf_dwarf {
     byte *file;
     off_t file_size;
 
     const Elf64_Shdr *info;
     const Elf64_Shdr *abbrev;
-} _upf_dwarf;
+};
+
+static struct _upf_dwarf _upf_dwarf = {0};
+
 
 // Converts LEB128 to uint64_t and returns number of bytes.
 // See https://dwarfstd.org/doc/DWARF5.pdf for more details:
@@ -81,6 +85,7 @@ static size_t _upf_uLEB_to_uint64(uint64_t *result, const byte *leb) {
 
     return i;
 }
+
 
 // Visualization of Compilation Unit and Abbreviation Table:
 // https://dwarfstd.org/doc/DWARF5.pdf#subsection.D.1.1
@@ -157,7 +162,7 @@ static void _upf_parse_info(const byte *info, size_t length, const byte *abbrev)
     }
 }
 
-static _upf_dwarf _upf_parse_elf() {
+static struct _upf_dwarf _upf_parse_elf(void) {
     static const char *self_file = "/proc/self/exe";
 
 
@@ -186,7 +191,7 @@ static _upf_dwarf _upf_parse_elf() {
     const Elf64_Shdr *string_section = (const Elf64_Shdr *) (file + header->e_shoff + header->e_shstrndx * header->e_shentsize);
     const char *string_table = (char *) (file + string_section->sh_offset);
 
-    _upf_dwarf dwarf = {0};
+    struct _upf_dwarf dwarf = {0};
     dwarf.file = file;
     dwarf.file_size = size;
 
@@ -204,13 +209,18 @@ static _upf_dwarf _upf_parse_elf() {
     return dwarf;
 }
 
-void uprintf(const char *fmt, ...) {
-    _upf_dwarf dwarf = _upf_parse_elf();
 
-    _upf_parse_info(dwarf.file + dwarf.info->sh_offset, dwarf.info->sh_size, dwarf.file + dwarf.abbrev->sh_offset);
+__attribute__((constructor)) void _upf_init(void) {
+    _upf_dwarf = _upf_parse_elf();
 
-    munmap(dwarf.file, dwarf.file_size);
+    _upf_parse_info(_upf_dwarf.file + _upf_dwarf.info->sh_offset, _upf_dwarf.info->sh_size, _upf_dwarf.file + _upf_dwarf.abbrev->sh_offset);
 }
+
+__attribute__((destructor)) void _upf_fini(void) { munmap(_upf_dwarf.file, _upf_dwarf.file_size); }
+
+void uprintf(const char *fmt, ...) {
+}
+
 
 #undef byte
 
