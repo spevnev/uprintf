@@ -35,7 +35,9 @@
 #ifndef UPRINTF_H
 #define UPRINTF_H
 
-void uprintf(const char *fmt, ...);
+#define uprintf(...) _upf_uprintf(__FILE__, __LINE__, __COUNTER__, __VA_ARGS__)
+
+void _upf_uprintf(const char *file, int line, int id, const char *fmt, ...);
 
 #endif  // UPRINTF_H
 
@@ -56,7 +58,6 @@ void uprintf(const char *fmt, ...);
 #include <unistd.h>
 
 #define byte uint8_t
-
 
 struct _upf_dwarf {
     byte *file;
@@ -125,45 +126,47 @@ static void _upf_parse_cu(const byte *cu, const byte *abbrev) {
     // TODO: parse current DIE given abbreviation table's info
 }
 
-static void _upf_parse_info(const byte *info, size_t length, const byte *abbrev) {
-    size_t offset = 0;
+static void _upf_parse_dwarf(const struct _upf_dwarf *dwarf) {
+    const byte *abbrev = dwarf->file + dwarf->abbrev->sh_offset;
+    const byte *info = dwarf->file + dwarf->info->sh_offset;
+    const byte *info_end = info + dwarf->info->sh_size;
 
-    while (offset < length) {
-        uint64_t length = *((uint32_t *) (info + offset));
-        offset += sizeof(uint32_t);
+    while (info < info_end) {
+        uint64_t length = *((uint32_t *) info);
+        info += sizeof(uint32_t);
 
         char is_64bit = 0;
         if (length == 0xffffffffU) {
-            length = *((uint64_t *) (info + offset));
-            offset += sizeof(uint64_t);
+            length = *((uint64_t *) info);
+            info += sizeof(uint64_t);
             is_64bit = 1;
         }
-        uint64_t next = offset + length;
+        const byte *next = info + length;
 
-        uint16_t version = *((uint16_t *) (info + offset));
-        offset += sizeof(version);
+        uint16_t version = *((uint16_t *) info);
+        info += sizeof(version);
         assert(version == 5);
 
-        uint8_t type = *(info + offset);
-        offset += sizeof(type);
+        uint8_t type = *info;
+        info += sizeof(type);
         assert(type == DW_UT_compile);
 
-        uint8_t address_size = *(info + offset);
-        offset += sizeof(address_size);
+        uint8_t address_size = *info;
+        info += sizeof(address_size);
         assert(address_size == sizeof(void *));
 
         uint64_t abbrev_offset;
         if (is_64bit) {
-            abbrev_offset = *((uint64_t *) (info + offset));
-            offset += sizeof(uint64_t);
+            abbrev_offset = *((uint64_t *) info);
+            info += sizeof(uint64_t);
         } else {
-            abbrev_offset = *((uint32_t *) (info + offset));
-            offset += sizeof(uint32_t);
+            abbrev_offset = *((uint32_t *) info);
+            info += sizeof(uint32_t);
         }
 
-        _upf_parse_cu(info + offset, abbrev + abbrev_offset);
+        _upf_parse_cu(info, abbrev + abbrev_offset);
 
-        offset = next;
+        info = next;
     }
 }
 
@@ -216,9 +219,9 @@ static struct _upf_dwarf _upf_parse_elf(void) {
 
 
 __attribute__((constructor)) void _upf_init(void) {
-    _upf_dwarf = _upf_parse_elf();
 
-    _upf_parse_info(_upf_dwarf.file + _upf_dwarf.info->sh_offset, _upf_dwarf.info->sh_size, _upf_dwarf.file + _upf_dwarf.abbrev->sh_offset);
+    _upf_dwarf = _upf_parse_elf();
+    _upf_parse_dwarf(&_upf_dwarf);
 }
 
 __attribute__((destructor)) void _upf_fini(void) { munmap(_upf_dwarf.file, _upf_dwarf.file_size); }
@@ -253,8 +256,6 @@ void _upf_uprintf(const char *file, int line, int id, const char *fmt, ...) {
 
     va_end(args);
 }
-
-#define uprintf(...) _upf_uprintf(__FILE__, __LINE__, __COUNTER__, __VA_ARGS__)
 
 #undef byte
 

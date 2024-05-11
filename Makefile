@@ -1,7 +1,7 @@
 EXAMPLES := struct
 
 CC      := gcc
-CFLAGS  := -O2 -std=c17 -Wall -Wextra -pedantic -Isrc -g3
+CFLAGS  := -O2 -std=c11 -Wall -Wextra -pedantic -Isrc -g3
 LDFLAGS := 
 
 BUILD_DIR       := build
