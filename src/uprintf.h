@@ -57,15 +57,61 @@ void _upf_uprintf(const char *file, int line, int id, const char *fmt, ...);
 #include <sys/stat.h>
 #include <unistd.h>
 
-#define byte uint8_t
+
+#define ERROR(...)                            \
+    do {                                      \
+        fprintf(stderr, "[ERROR] uprintf: "); \
+        fprintf(stderr, __VA_ARGS__);         \
+        exit(1);                              \
+    } while (0)
+
+#define OUT_OF_MEMORY() ERROR("process ran out of memory.\n");
+
+#define INITIAL_VECTOR_CAPACITY 16
+
+#define VECTOR_TYPEDEF(name, type) \
+    typedef struct {               \
+        size_t capacity;           \
+        size_t length;             \
+        type *data;                \
+    } name
+
+#define VECTOR_PUSH(vec, element)                                                       \
+    do {                                                                                \
+        if ((vec)->capacity == 0) {                                                     \
+            (vec)->capacity = INITIAL_VECTOR_CAPACITY;                                  \
+            (vec)->data = malloc((vec)->capacity * sizeof(*(vec)->data));               \
+            if ((vec)->data == NULL) OUT_OF_MEMORY();                                   \
+        } else if ((vec)->length == (vec)->capacity) {                                  \
+            (vec)->capacity *= 2;                                                       \
+            (vec)->data = realloc((vec)->data, (vec)->capacity * sizeof(*(vec)->data)); \
+            if ((vec)->data == NULL) OUT_OF_MEMORY();                                   \
+        }                                                                               \
+        (vec)->data[(vec)->length++] = (element);                                       \
+    } while (0)
+
+#define VECTOR_RESET(vec) (vec)->length = 0;
+
+#define VECTOR_FREE(vec)     \
+    do {                     \
+        free((vec)->data);   \
+        (vec)->length = 0;   \
+        (vec)->capacity = 0; \
+    } while (0);
+
 
 struct _upf_dwarf {
-    byte *file;
+    uint8_t *file;
     off_t file_size;
 
     const Elf64_Shdr *info;
     const Elf64_Shdr *abbrev;
 };
+
+struct _upf_abbrev {
+};
+
+VECTOR_TYPEDEF(_upf_abbrevs, struct _upf_abbrev);
 
 static struct _upf_dwarf _upf_dwarf = {0};
 
@@ -74,16 +120,16 @@ static struct _upf_dwarf _upf_dwarf = {0};
 // See https://dwarfstd.org/doc/DWARF5.pdf for more details:
 // Section 7.6 contains description
 // Appendix C contains pseudo code of this implementation
-static size_t _upf_uLEB_to_uint64(uint64_t *result, const byte *leb) {
-    static const byte BITS_MASK = 0x7f;      // 01111111
-    static const byte CONTINUE_MASK = 0x80;  // 10000000
+static size_t _upf_uLEB_to_uint64(uint64_t *result, const uint8_t *leb) {
+    static const uint8_t BITS_MASK = 0x7f;      // 01111111
+    static const uint8_t CONTINUE_MASK = 0x80;  // 10000000
 
     size_t i = 0;
     int shift = 0;
 
     *result = 0;
     while (1) {
-        byte b = leb[i++];
+        uint8_t b = leb[i++];
         *result |= (((uint64_t) (b & BITS_MASK)) << shift);
         if ((b & CONTINUE_MASK) == 0) break;
         shift += 7;
@@ -92,44 +138,27 @@ static size_t _upf_uLEB_to_uint64(uint64_t *result, const byte *leb) {
     return i;
 }
 
+static _upf_abbrevs _upf_parse_abbrevs(const uint8_t *abbrev_table) {
+    _upf_abbrevs abbrevs = {0};
 
-// Visualization of Compilation Unit and Abbreviation Table:
-// https://dwarfstd.org/doc/DWARF5.pdf#subsection.D.1.1
-static void _upf_parse_cu(const byte *cu, const byte *abbrev) {
-    uint64_t needed_code;
-    _upf_uLEB_to_uint64(&needed_code, cu);  // TODO: offset both in arg and return value
-
-    uint64_t code, tag;
-    size_t abbrev_offset = 0;
     while (1) {
-        abbrev_offset += _upf_uLEB_to_uint64(&code, abbrev + abbrev_offset);
 
-        if (code == 0) return;
-
-        abbrev_offset += _upf_uLEB_to_uint64(&tag, abbrev + abbrev_offset);
-
-        printf("%d: %X\n", code, tag);
-
-        // byte is_next_child = *(abbrev + abbrev_offset);
-        abbrev_offset += sizeof(byte);
-
-        while (1) {
-            uint64_t attr_name, attr_form;
-            abbrev_offset += _upf_uLEB_to_uint64(&attr_name, abbrev + abbrev_offset);
-            abbrev_offset += _upf_uLEB_to_uint64(&attr_form, abbrev + abbrev_offset);
-            if (attr_name == 0 && attr_form == 0) break;
-        }
-
-        if (code == needed_code) break;
     }
 
-    // TODO: parse current DIE given abbreviation table's info
+    return abbrevs;
+}
+
+static void _upf_parse_cu(const uint8_t *info, const uint8_t *abbrev) {
+    _upf_abbrevs abbrevs = _upf_parse_abbrevs(abbrev);
+
+    }
+
 }
 
 static void _upf_parse_dwarf(const struct _upf_dwarf *dwarf) {
-    const byte *abbrev = dwarf->file + dwarf->abbrev->sh_offset;
-    const byte *info = dwarf->file + dwarf->info->sh_offset;
-    const byte *info_end = info + dwarf->info->sh_size;
+    const uint8_t *abbrev = dwarf->file + dwarf->abbrev->sh_offset;
+    const uint8_t *info = dwarf->file + dwarf->info->sh_offset;
+    const uint8_t *info_end = info + dwarf->info->sh_size;
 
     while (info < info_end) {
         uint64_t length = *((uint32_t *) info);
@@ -141,7 +170,7 @@ static void _upf_parse_dwarf(const struct _upf_dwarf *dwarf) {
             info += sizeof(uint64_t);
             is_64bit = 1;
         }
-        const byte *next = info + length;
+        const uint8_t *next = info + length;
 
         uint16_t version = *((uint16_t *) info);
         info += sizeof(version);
@@ -181,7 +210,7 @@ static struct _upf_dwarf _upf_parse_elf(void) {
     int fd = open(self_file, O_RDONLY);
     assert(fd != -1);
 
-    byte *file = (byte *) mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
+    uint8_t *file = (uint8_t *) mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
     assert(file != MAP_FAILED);
 
     close(fd);
@@ -246,17 +275,22 @@ void _upf_uprintf(const char *file, int line, int id, const char *fmt, ...) {
             // TODO: print struct ^
             ch++;
         } else if (next == '\0' || next == '\n') {
-            fprintf(stderr, "[ERROR] uprintf: unfinished format at the end of line at %s:%d\n", file, line);
-            exit(1);
+            ERROR("unfinished format at the end of line at %s:%d\n", file, line);
         } else {
-            fprintf(stderr, "[ERROR] uprintf: unkown format '%%%c' at %s:%d\n", next, file, line);
-            exit(1);
+            ERROR("unkown format '%%%c' at %s:%d\n", next, file, line);
         }
     }
 
     va_end(args);
 }
 
-#undef byte
+
+#undef VECTOR_FREE
+#undef VECTOR_RESET
+#undef VECTOR_PUSH
+#undef VECTOR_TYPEDEF
+#undef INITIAL_VECTOR_CAPACITY
+#undef OUT_OF_MEMORY
+#undef ERROR
 
 #endif  // UPRINTF_IMPLEMENTATION
