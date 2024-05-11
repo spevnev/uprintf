@@ -21,7 +21,9 @@ In order to use it, you need to pick one file (preferably rarely modified to avo
 
 This will copy library implementation to be built as a part of this file.
 
-`uprintf(fmt, ...)`: fmt is a string to be printed where `%a` will be replaced with a struct. Structures must be provided as pointers.
+**NOTE: regular printf types are not supported**
+
+`uprintf(fmt, ...)`: fmt is a string to be printed where `%S` will be replaced with a struct. Structures must be passed as non-`void*` pointers.
 
 ### Options
 

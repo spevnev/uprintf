@@ -14,7 +14,7 @@ int main(void) {
     int i = 5;
     MyStruct s = {100, 52, "test string", 0.52, &i};
 
-    uprintf("This is my struct: %a\n", &s);
+    uprintf("This is my struct: %S\n", &s);
 
     return 0;
 }

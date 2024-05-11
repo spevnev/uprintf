@@ -219,7 +219,7 @@ __attribute__((constructor)) void _upf_init(void) {
 
 __attribute__((destructor)) void _upf_fini(void) { munmap(_upf_dwarf.file, _upf_dwarf.file_size); }
 
-void uprintf(const char *fmt, ...) {
+void _upf_uprintf(const char *file, int line, const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
 
@@ -234,15 +234,15 @@ void uprintf(const char *fmt, ...) {
         if (next == '%') {
             // TODO: add % to the buffer
             ch++;
-        } else if (next == 'a') {
+        } else if (next == 'S') {
             // void *s = va_arg(args, void *);
             // TODO: print struct ^
             ch++;
-        } else if (next == '\0') {
-            fprintf(stderr, "[ERROR] uprintf: unfinished format specifier at the end of string in '%s'!\n", fmt);
+        } else if (next == '\0' || next == '\n') {
+            fprintf(stderr, "[ERROR] uprintf: unfinished format at the end of line at %s:%d\n", file, line);
             exit(1);
         } else {
-            fprintf(stderr, "[ERROR] uprintf: unkown format type '%%%c' in '%s'!\n", next, fmt);
+            fprintf(stderr, "[ERROR] uprintf: unkown format '%%%c' at %s:%d\n", next, file, line);
             exit(1);
         }
     }
@@ -250,6 +250,7 @@ void uprintf(const char *fmt, ...) {
     va_end(args);
 }
 
+#define uprintf(...) _upf_uprintf(__FILE__, __LINE__, __VA_ARGS__)
 
 #undef byte
 
