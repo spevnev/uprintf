@@ -108,7 +108,18 @@ struct _upf_dwarf {
     const Elf64_Shdr *abbrev;
 };
 
+struct _upf_attr {
+    uint64_t name;
+    uint64_t form;
+};
+
+VECTOR_TYPEDEF(_upf_attrs, struct _upf_attr);
+
 struct _upf_abbrev {
+    uint64_t code;
+    uint64_t tag;
+    uint8_t has_child;
+    _upf_attrs attrs;
 };
 
 VECTOR_TYPEDEF(_upf_abbrevs, struct _upf_abbrev);
@@ -142,7 +153,23 @@ static _upf_abbrevs _upf_parse_abbrevs(const uint8_t *abbrev_table) {
     _upf_abbrevs abbrevs = {0};
 
     while (1) {
+        struct _upf_abbrev abbrev = {0};
+        abbrev_table += _upf_uLEB_to_uint64(&abbrev.code, abbrev_table);
+        if (abbrev.code == 0) break;
+        abbrev_table += _upf_uLEB_to_uint64(&abbrev.tag, abbrev_table);
 
+        abbrev.has_child = *abbrev_table;
+        abbrev_table += sizeof(uint8_t);
+
+        while (1) {
+            struct _upf_attr attr = {0};
+            abbrev_table += _upf_uLEB_to_uint64(&attr.name, abbrev_table);
+            abbrev_table += _upf_uLEB_to_uint64(&attr.form, abbrev_table);
+            if (attr.name == 0 && attr.form == 0) break;
+            VECTOR_PUSH(&abbrev.attrs, attr);
+        }
+
+        VECTOR_PUSH(&abbrevs, abbrev);
     }
 
     return abbrevs;
@@ -151,8 +178,12 @@ static _upf_abbrevs _upf_parse_abbrevs(const uint8_t *abbrev_table) {
 static void _upf_parse_cu(const uint8_t *info, const uint8_t *abbrev) {
     _upf_abbrevs abbrevs = _upf_parse_abbrevs(abbrev);
 
+    for (size_t i = 0; i < abbrevs.length; i++) {
+        printf("%d: %X\n", abbrevs.data[i].code, abbrevs.data[i].tag);
     }
 
+    for (size_t i = 0; i < abbrevs.length; i++) VECTOR_FREE(&abbrevs.data[i].attrs);
+    VECTOR_FREE(&abbrevs);
 }
 
 static void _upf_parse_dwarf(const struct _upf_dwarf *dwarf) {
