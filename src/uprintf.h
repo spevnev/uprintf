@@ -27,6 +27,10 @@
 #error ERROR: uprintf only supports Linux
 #endif
 
+#ifndef __COUNTER__
+#error ERROR: uprintf requires compiler/preprocessor to support "__COUNTER__" predefined macro
+#endif
+
 
 #ifndef UPRINTF_H
 #define UPRINTF_H
@@ -219,7 +223,7 @@ __attribute__((constructor)) void _upf_init(void) {
 
 __attribute__((destructor)) void _upf_fini(void) { munmap(_upf_dwarf.file, _upf_dwarf.file_size); }
 
-void _upf_uprintf(const char *file, int line, const char *fmt, ...) {
+void _upf_uprintf(const char *file, int line, int id, const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
 
@@ -250,7 +254,7 @@ void _upf_uprintf(const char *file, int line, const char *fmt, ...) {
     va_end(args);
 }
 
-#define uprintf(...) _upf_uprintf(__FILE__, __LINE__, __VA_ARGS__)
+#define uprintf(...) _upf_uprintf(__FILE__, __LINE__, __COUNTER__, __VA_ARGS__)
 
 #undef byte
 
