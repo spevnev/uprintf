@@ -111,6 +111,7 @@ struct _upf_dwarf {
 struct _upf_attr {
     uint64_t name;
     uint64_t form;
+    int64_t implicit_const;
 };
 
 VECTOR_TYPEDEF(_upf_attrs, struct _upf_attr);
@@ -127,11 +128,8 @@ VECTOR_TYPEDEF(_upf_abbrevs, struct _upf_abbrev);
 static struct _upf_dwarf _upf_dwarf = {0};
 
 
-// Converts LEB128 to uint64_t and returns number of bytes.
-// See https://dwarfstd.org/doc/DWARF5.pdf for more details:
-// Section 7.6 contains description
-// Appendix C contains pseudo code of this implementation
-static size_t _upf_uLEB_to_uint64(uint64_t *result, const uint8_t *leb) {
+// Converts unsigned LEB128 to uint64_t and returns the size of LEB in bytes
+static size_t _upf_uLEB_to_uint64(const uint8_t *leb, uint64_t *result) {
     static const uint8_t BITS_MASK = 0x7f;      // 01111111
     static const uint8_t CONTINUE_MASK = 0x80;  // 10000000
 
@@ -149,22 +147,45 @@ static size_t _upf_uLEB_to_uint64(uint64_t *result, const uint8_t *leb) {
     return i;
 }
 
+// Converts signed LEB128 to int64_t and returns the size of LEB in bytes
+static size_t _upf_LEB_to_int64(const uint8_t *leb, int64_t *result) {
+    static const uint8_t BITS_MASK = 0x7f;      // 01111111
+    static const uint8_t CONTINUE_MASK = 0x80;  // 10000000
+    static const uint8_t SIGN_MASK = 0x40;      // 01000000
+
+    size_t i = 0;
+    uint8_t b = 0;
+    size_t shift = 0;
+
+    *result = 0;
+    while (1) {
+        b = leb[i++];
+        *result |= (((uint64_t) (b & BITS_MASK)) << shift);
+        shift += 7;
+        if ((b & CONTINUE_MASK) == 0) break;
+    }
+    if ((shift < sizeof(*result) * 8) && (b & SIGN_MASK)) *result |= -(1 << shift);
+
+    return i;
+}
+
 static _upf_abbrevs _upf_parse_abbrevs(const uint8_t *abbrev_table) {
     _upf_abbrevs abbrevs = {0};
 
     while (1) {
         struct _upf_abbrev abbrev = {0};
-        abbrev_table += _upf_uLEB_to_uint64(&abbrev.code, abbrev_table);
+        abbrev_table += _upf_uLEB_to_uint64(abbrev_table, &abbrev.code);
         if (abbrev.code == 0) break;
-        abbrev_table += _upf_uLEB_to_uint64(&abbrev.tag, abbrev_table);
+        abbrev_table += _upf_uLEB_to_uint64(abbrev_table, &abbrev.tag);
 
         abbrev.has_child = *abbrev_table;
         abbrev_table += sizeof(uint8_t);
 
         while (1) {
             struct _upf_attr attr = {0};
-            abbrev_table += _upf_uLEB_to_uint64(&attr.name, abbrev_table);
-            abbrev_table += _upf_uLEB_to_uint64(&attr.form, abbrev_table);
+            abbrev_table += _upf_uLEB_to_uint64(abbrev_table, &attr.name);
+            abbrev_table += _upf_uLEB_to_uint64(abbrev_table, &attr.form);
+            if (attr.form == DW_FORM_implicit_const) abbrev_table += _upf_LEB_to_int64(abbrev_table, &attr.implicit_const);
             if (attr.name == 0 && attr.form == 0) break;
             VECTOR_PUSH(&abbrev.attrs, attr);
         }
@@ -178,9 +199,6 @@ static _upf_abbrevs _upf_parse_abbrevs(const uint8_t *abbrev_table) {
 static void _upf_parse_cu(const uint8_t *info, const uint8_t *abbrev) {
     _upf_abbrevs abbrevs = _upf_parse_abbrevs(abbrev);
 
-    for (size_t i = 0; i < abbrevs.length; i++) {
-        printf("%d: %X\n", abbrevs.data[i].code, abbrevs.data[i].tag);
-    }
 
     for (size_t i = 0; i < abbrevs.length; i++) VECTOR_FREE(&abbrevs.data[i].attrs);
     VECTOR_FREE(&abbrevs);
@@ -231,14 +249,14 @@ static void _upf_parse_dwarf(const struct _upf_dwarf *dwarf) {
 }
 
 static struct _upf_dwarf _upf_parse_elf(void) {
-    static const char *self_file = "/proc/self/exe";
+    static const char *this_file_path = "/proc/self/exe";
 
 
     struct stat file_info;
-    if (stat(self_file, &file_info) == -1) abort();
+    if (stat(this_file_path, &file_info) == -1) abort();
     size_t size = file_info.st_size;
 
-    int fd = open(self_file, O_RDONLY);
+    int fd = open(this_file_path, O_RDONLY);
     assert(fd != -1);
 
     uint8_t *file = (uint8_t *) mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
