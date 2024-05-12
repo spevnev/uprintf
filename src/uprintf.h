@@ -104,6 +104,9 @@ struct _upf_dwarf {
     uint8_t *file;
     off_t file_size;
 
+    uint8_t offset_size;
+    uint8_t address_size;
+
     const Elf64_Shdr *info;
     const Elf64_Shdr *abbrev;
 };
@@ -196,15 +199,106 @@ static _upf_abbrevs _upf_parse_abbrevs(const uint8_t *abbrev_table) {
     return abbrevs;
 }
 
-static void _upf_parse_cu(const uint8_t *info, const uint8_t *abbrev) {
-    _upf_abbrevs abbrevs = _upf_parse_abbrevs(abbrev);
 
+static void _upf_parse_cu(const uint8_t *info, const uint8_t *info_end, const uint8_t *abbrev_table) {
+    _upf_abbrevs abbrevs = _upf_parse_abbrevs(abbrev_table);
+
+    uint64_t code;
+    while (info < info_end) {
+        info += _upf_uLEB_to_uint64(info, &code);
+        if (code == 0) continue;
+        assert(code <= abbrevs.length);
+
+        const struct _upf_abbrev *abbrev = &abbrevs.data[code - 1];
+        for (size_t i = 0; i < abbrev->attrs.length; i++) {
+            uint64_t form = abbrev->attrs.data[i].form;
+        something:
+            switch (form) {
+                case DW_FORM_addr:
+                    info += _upf_dwarf.address_size;
+                    break;
+                case DW_FORM_strx1:
+                case DW_FORM_addrx1:
+                case DW_FORM_flag:
+                case DW_FORM_ref1:
+                case DW_FORM_data1:
+                case DW_FORM_block1:
+                    info += 1;
+                    break;
+                case DW_FORM_strx2:
+                case DW_FORM_addrx2:
+                case DW_FORM_ref2:
+                case DW_FORM_data2:
+                    info += 2;
+                    break;
+                case DW_FORM_strx3:
+                case DW_FORM_addrx3:
+                    info += 3;
+                    break;
+                case DW_FORM_ref_sup4:
+                case DW_FORM_strx4:
+                case DW_FORM_addrx4:
+                case DW_FORM_ref4:
+                case DW_FORM_data4:
+                case DW_FORM_block4:
+                    info += 4;
+                    break;
+                case DW_FORM_ref_sig8:
+                case DW_FORM_ref_sup8:
+                case DW_FORM_ref8:
+                case DW_FORM_data8:
+                    info += 8;
+                    break;
+                case DW_FORM_data16:
+                    info += 16;
+                    break;
+                case DW_FORM_sdata: {
+                    int64_t result;
+                    info += _upf_LEB_to_int64(info, &result);
+                } break;
+                case DW_FORM_loclistx:
+                case DW_FORM_rnglistx:
+                case DW_FORM_addrx:
+                case DW_FORM_strx:
+                case DW_FORM_ref_udata:
+                case DW_FORM_udata: {
+                    uint64_t result;
+                    info += _upf_uLEB_to_uint64(info, &result);
+                } break;
+                case DW_FORM_string:
+                    info += strlen((const char *) info) + 1;
+                    break;
+                case DW_FORM_exprloc:
+                case DW_FORM_block: {
+                    uint64_t length;
+                    info += _upf_uLEB_to_uint64(info, &length);
+                    info += length;
+                } break;
+                case DW_FORM_line_strp:
+                case DW_FORM_strp_sup:
+                case DW_FORM_sec_offset:
+                case DW_FORM_ref_addr:
+                case DW_FORM_strp:
+                    info += _upf_dwarf.offset_size;
+                    break;
+                case DW_FORM_indirect:
+                    info += _upf_uLEB_to_uint64(info, &form);
+                    goto something;
+                    break;
+                case DW_FORM_flag_present:
+                case DW_FORM_implicit_const:
+                    break;
+                default:
+                    assert(0 && "Unreachable");
+            }
+        }
+    }
 
     for (size_t i = 0; i < abbrevs.length; i++) VECTOR_FREE(&abbrevs.data[i].attrs);
     VECTOR_FREE(&abbrevs);
 }
 
-static void _upf_parse_dwarf(const struct _upf_dwarf *dwarf) {
+static void _upf_parse_dwarf(struct _upf_dwarf *dwarf) {
     const uint8_t *abbrev = dwarf->file + dwarf->abbrev->sh_offset;
     const uint8_t *info = dwarf->file + dwarf->info->sh_offset;
     const uint8_t *info_end = info + dwarf->info->sh_size;
@@ -219,6 +313,8 @@ static void _upf_parse_dwarf(const struct _upf_dwarf *dwarf) {
             info += sizeof(uint64_t);
             is_64bit = 1;
         }
+        dwarf->offset_size = is_64bit ? 8 : 4;
+
         const uint8_t *next = info + length;
 
         uint16_t version = *((uint16_t *) info);
@@ -229,9 +325,8 @@ static void _upf_parse_dwarf(const struct _upf_dwarf *dwarf) {
         info += sizeof(type);
         assert(type == DW_UT_compile);
 
-        uint8_t address_size = *info;
-        info += sizeof(address_size);
-        assert(address_size == sizeof(void *));
+        dwarf->address_size = *info;
+        info += sizeof(dwarf->address_size);
 
         uint64_t abbrev_offset;
         if (is_64bit) {
@@ -242,7 +337,7 @@ static void _upf_parse_dwarf(const struct _upf_dwarf *dwarf) {
             info += sizeof(uint32_t);
         }
 
-        _upf_parse_cu(info, abbrev + abbrev_offset);
+        _upf_parse_cu(info, next, abbrev + abbrev_offset);
 
         info = next;
     }
@@ -297,7 +392,6 @@ static struct _upf_dwarf _upf_parse_elf(void) {
 
 
 __attribute__((constructor)) void _upf_init(void) {
-
     _upf_dwarf = _upf_parse_elf();
     _upf_parse_dwarf(&_upf_dwarf);
 }
