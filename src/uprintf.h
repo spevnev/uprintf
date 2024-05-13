@@ -120,6 +120,14 @@ struct _upf_abbrev {
 
 VECTOR_TYPEDEF(_upf_abbrevs, struct _upf_abbrev);
 
+struct _upf_call_site {
+    uint64_t call_origin;
+    const uint8_t *die_ptr;  // points into _upf_dwarf.file
+};
+
+VECTOR_TYPEDEF(_upf_call_sites, struct _upf_call_site);
+
+
 struct _upf_dwarf {
     uint8_t *file;
     off_t file_size;
@@ -130,7 +138,15 @@ struct _upf_dwarf {
 
     const Elf64_Shdr *info;
     const Elf64_Shdr *abbrev;
+    const Elf64_Shdr *str;
 };
+
+struct _upf_state {
+    _upf_call_sites call_sites;
+    uint64_t uprintf_offset;
+};
+
+
 static struct _upf_dwarf _upf_dwarf = {0};
 
 
@@ -276,6 +292,52 @@ static size_t _upf_get_attr_size(const uint8_t *info, uint64_t form) {
     }
 }
 
+static const uint8_t *_upf_parse_subprogram(const uint8_t *info, const struct _upf_abbrev *abbrev, uint8_t *is_uprintf) {
+    static const char *UPRINTF_FUNCTION_NAME = "_upf_uprintf";
+
+
+    for (size_t i = 0; i < abbrev->attrs.length; i++) {
+        struct _upf_attr attr = abbrev->attrs.data[i];
+
+        if (attr.name == DW_AT_name) {
+            assert(attr.form == DW_FORM_strp && "TODO: handle other forms of DW_AT_name in subprogram");  // TODO:
+
+            uint64_t str_table_offset = _upf_dwarf.is_64bit ? (*((uint64_t *) info)) : ((uint64_t) (*((uint32_t *) info)));
+            const char *function_name = _upf_dwarf.file + _upf_dwarf.str->sh_offset + str_table_offset;
+
+            if (strcmp(UPRINTF_FUNCTION_NAME, function_name) == 0) *is_uprintf = 1;
+        }
+
+        info += _upf_get_attr_size(info, attr.form);
+    }
+
+    return info;
+}
+
+static const uint8_t *_upf_parse_call_site(const uint8_t *info, const struct _upf_abbrev *abbrev, _upf_call_sites *call_sites) {
+    for (size_t i = 0; i < abbrev->attrs.length; i++) {
+        struct _upf_attr attr = abbrev->attrs.data[i];
+
+        if (attr.name == DW_AT_call_origin) {
+            assert(attr.form == DW_FORM_ref4 && "TODO: handle other forms of DW_AT_call_origin in call_site");  // TODO:
+
+            struct _upf_call_site call_site = {
+                .call_origin = (uint64_t) (*((uint32_t *) info)),
+                .die_ptr = info,
+            };
+            VECTOR_PUSH(call_sites, call_site);
+        }
+
+        info += _upf_get_attr_size(info, attr.form);
+    }
+
+    return info;
+}
+
+static const uint8_t *_upf_parse_uprintf_calls(const uint8_t *info, const _upf_abbrevs *abbrevs, _upf_call_sites *call_sites) {
+    return NULL;
+}
+
 static const uint8_t *_upf_skip_die(const uint8_t *info, const struct _upf_abbrev *abbrev) {
     for (size_t i = 0; i < abbrev->attrs.length; i++) {
         info += _upf_get_attr_size(info, abbrev->attrs.data[i].form);
@@ -284,18 +346,25 @@ static const uint8_t *_upf_skip_die(const uint8_t *info, const struct _upf_abbre
     return info;
 }
 
-static void _upf_parse_cu(const uint8_t *base, const uint8_t *info, const uint8_t *info_end, const uint8_t *abbrev_table) {
-
-
+static void _upf_parse_cu(struct _upf_state *state, const uint8_t *base, const uint8_t *info, const uint8_t *info_end, const uint8_t *abbrev_table) {
     _upf_abbrevs abbrevs = _upf_parse_abbrevs(abbrev_table);
 
     while (info < info_end) {
+        const uint8_t *die_base = info;
+
         uint64_t code;
         info += _upf_uLEB_to_uint64(info, &code);
         if (code == 0) continue;
         assert(code <= abbrevs.length);
 
         const struct _upf_abbrev *abbrev = &abbrevs.data[code - 1];
+        if (abbrev->tag == DW_TAG_subprogram && state->uprintf_offset == INVALID_OFFSET) {
+            uint8_t is_uprintf = 0;
+            info = _upf_parse_subprogram(info, abbrev, &is_uprintf);
+            if (is_uprintf) state->uprintf_offset = die_base - base;
+        } else if (abbrev->tag == DW_TAG_call_site) {
+            info = _upf_parse_call_site(info, abbrev, &state->call_sites);
+        } else {
             info = _upf_skip_die(info, abbrev);
         }
     }
@@ -309,6 +378,10 @@ static void _upf_parse_dwarf() {
     const uint8_t *info = _upf_dwarf.file + _upf_dwarf.info->sh_offset;
     const uint8_t *info_end = info + _upf_dwarf.info->sh_size;
 
+    struct _upf_state state = {
+        .call_sites = {0},
+        .uprintf_offset = INVALID_OFFSET,
+    };
 
     while (info < info_end) {
         const uint8_t *base = info;
@@ -346,10 +419,16 @@ static void _upf_parse_dwarf() {
             info += sizeof(uint32_t);
         }
 
-        _upf_parse_cu(base, info, next, abbrev + abbrev_offset);
+        _upf_parse_cu(&state, base, info, next, abbrev + abbrev_offset);
 
         info = next;
     }
+    if (state.uprintf_offset == INVALID_OFFSET) ERROR("unable to find the offset of uprintf.\n");
+
+    printf("_upf_uprintf's DIE offset = 0x%X\n", state.uprintf_offset);
+
+
+    VECTOR_FREE(&state.call_sites);
 }
 
 
@@ -390,11 +469,12 @@ static void _upf_parse_elf(void) {
 
         if (strcmp(name, ".debug_info") == 0) _upf_dwarf.info = section;
         else if (strcmp(name, ".debug_abbrev") == 0) _upf_dwarf.abbrev = section;
+        else if (strcmp(name, ".debug_str") == 0) _upf_dwarf.str = section;
 
         section++;
     }
 
-    assert(_upf_dwarf.info != NULL && _upf_dwarf.abbrev != NULL);
+    assert(_upf_dwarf.info != NULL && _upf_dwarf.abbrev != NULL && _upf_dwarf.str != NULL);
 }
 
 
