@@ -58,6 +58,8 @@ void _upf_uprintf(const char *file, int line, int id, const char *fmt, ...);
 #include <unistd.h>
 
 
+#define INVALID_OFFSET (-1ULL)
+
 #define ERROR(...)                            \
     do {                                      \
         fprintf(stderr, "[ERROR] uprintf: "); \
@@ -101,17 +103,6 @@ void _upf_uprintf(const char *file, int line, int id, const char *fmt, ...);
     } while (0);
 
 
-struct _upf_dwarf {
-    uint8_t *file;
-    off_t file_size;
-
-    uint8_t offset_size;
-    uint8_t address_size;
-
-    const Elf64_Shdr *info;
-    const Elf64_Shdr *abbrev;
-};
-
 struct _upf_attr {
     uint64_t name;
     uint64_t form;
@@ -123,12 +114,23 @@ VECTOR_TYPEDEF(_upf_attrs, struct _upf_attr);
 struct _upf_abbrev {
     uint64_t code;
     uint64_t tag;
-    uint8_t has_child;
+    uint8_t has_children;
     _upf_attrs attrs;
 };
 
 VECTOR_TYPEDEF(_upf_abbrevs, struct _upf_abbrev);
 
+struct _upf_dwarf {
+    uint8_t *file;
+    off_t file_size;
+
+    uint8_t is_64bit;
+    uint8_t offset_size;
+    uint8_t address_size;
+
+    const Elf64_Shdr *info;
+    const Elf64_Shdr *abbrev;
+};
 static struct _upf_dwarf _upf_dwarf = {0};
 
 
@@ -183,7 +185,7 @@ static _upf_abbrevs _upf_parse_abbrevs(const uint8_t *abbrev_table) {
         if (abbrev.code == 0) break;
         abbrev_table += _upf_uLEB_to_uint64(abbrev_table, &abbrev.tag);
 
-        abbrev.has_child = *abbrev_table;
+        abbrev.has_children = *abbrev_table;
         abbrev_table += sizeof(uint8_t);
 
         while (1) {
@@ -283,7 +285,6 @@ static const uint8_t *_upf_skip_die(const uint8_t *info, const struct _upf_abbre
 }
 
 static void _upf_parse_cu(const uint8_t *base, const uint8_t *info, const uint8_t *info_end, const uint8_t *abbrev_table) {
-    static const uint64_t INVALID_OFFSET = -1ULL;
 
 
     _upf_abbrevs abbrevs = _upf_parse_abbrevs(abbrev_table);
@@ -303,10 +304,11 @@ static void _upf_parse_cu(const uint8_t *base, const uint8_t *info, const uint8_
     VECTOR_FREE(&abbrevs);
 }
 
-static void _upf_parse_dwarf(struct _upf_dwarf *dwarf) {
-    const uint8_t *abbrev = dwarf->file + dwarf->abbrev->sh_offset;
-    const uint8_t *info = dwarf->file + dwarf->info->sh_offset;
-    const uint8_t *info_end = info + dwarf->info->sh_size;
+static void _upf_parse_dwarf() {
+    const uint8_t *abbrev = _upf_dwarf.file + _upf_dwarf.abbrev->sh_offset;
+    const uint8_t *info = _upf_dwarf.file + _upf_dwarf.info->sh_offset;
+    const uint8_t *info_end = info + _upf_dwarf.info->sh_size;
+
 
     while (info < info_end) {
         const uint8_t *base = info;
@@ -314,13 +316,13 @@ static void _upf_parse_dwarf(struct _upf_dwarf *dwarf) {
         uint64_t length = *((uint32_t *) info);
         info += sizeof(uint32_t);
 
-        char is_64bit = 0;
+        _upf_dwarf.is_64bit = 0;
         if (length == 0xffffffffU) {
             length = *((uint64_t *) info);
             info += sizeof(uint64_t);
-            is_64bit = 1;
+            _upf_dwarf.is_64bit = 1;
         }
-        dwarf->offset_size = is_64bit ? 8 : 4;
+        _upf_dwarf.offset_size = _upf_dwarf.is_64bit ? 8 : 4;
 
         const uint8_t *next = info + length;
 
@@ -332,11 +334,11 @@ static void _upf_parse_dwarf(struct _upf_dwarf *dwarf) {
         info += sizeof(type);
         assert(type == DW_UT_compile);
 
-        dwarf->address_size = *info;
-        info += sizeof(dwarf->address_size);
+        _upf_dwarf.address_size = *info;
+        info += sizeof(_upf_dwarf.address_size);
 
         uint64_t abbrev_offset;
-        if (is_64bit) {
+        if (_upf_dwarf.is_64bit) {
             abbrev_offset = *((uint64_t *) info);
             info += sizeof(uint64_t);
         } else {
@@ -351,19 +353,21 @@ static void _upf_parse_dwarf(struct _upf_dwarf *dwarf) {
 }
 
 
-static struct _upf_dwarf _upf_parse_elf(void) {
-    static const char *this_file_path = "/proc/self/exe";
+static void _upf_parse_elf(void) {
+    static const char *THIS_EXECUTABLE_PATH = "/proc/self/exe";
 
 
     struct stat file_info;
-    if (stat(this_file_path, &file_info) == -1) abort();
+    if (stat(THIS_EXECUTABLE_PATH, &file_info) == -1) abort();
     size_t size = file_info.st_size;
+    _upf_dwarf.file_size = size;
 
-    int fd = open(this_file_path, O_RDONLY);
+    int fd = open(THIS_EXECUTABLE_PATH, O_RDONLY);
     assert(fd != -1);
 
     uint8_t *file = (uint8_t *) mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
     assert(file != MAP_FAILED);
+    _upf_dwarf.file = file;
 
     close(fd);
 
@@ -380,28 +384,23 @@ static struct _upf_dwarf _upf_parse_elf(void) {
     const Elf64_Shdr *string_section = (const Elf64_Shdr *) (file + header->e_shoff + header->e_shstrndx * header->e_shentsize);
     const char *string_table = (char *) (file + string_section->sh_offset);
 
-    struct _upf_dwarf dwarf = {0};
-    dwarf.file = file;
-    dwarf.file_size = size;
-
     const Elf64_Shdr *section = (const Elf64_Shdr *) (file + header->e_shoff);
     for (size_t i = 0; i < header->e_shnum; i++) {
         const char *name = string_table + section->sh_name;
 
-        if (strcmp(name, ".debug_info") == 0) dwarf.info = section;
-        else if (strcmp(name, ".debug_abbrev") == 0) dwarf.abbrev = section;
+        if (strcmp(name, ".debug_info") == 0) _upf_dwarf.info = section;
+        else if (strcmp(name, ".debug_abbrev") == 0) _upf_dwarf.abbrev = section;
 
         section++;
     }
 
-    assert(dwarf.info != NULL && dwarf.abbrev != NULL);
-    return dwarf;
+    assert(_upf_dwarf.info != NULL && _upf_dwarf.abbrev != NULL);
 }
 
 
 __attribute__((constructor)) void _upf_init(void) {
-    _upf_dwarf = _upf_parse_elf();
-    _upf_parse_dwarf(&_upf_dwarf);
+    _upf_parse_elf();
+    _upf_parse_dwarf();
 }
 
 __attribute__((destructor)) void _upf_fini(void) { munmap(_upf_dwarf.file, _upf_dwarf.file_size); }
@@ -443,5 +442,6 @@ void _upf_uprintf(const char *file, int line, int id, const char *fmt, ...) {
 #undef INITIAL_VECTOR_CAPACITY
 #undef OUT_OF_MEMORY
 #undef ERROR
+#undef INVALID_OFFSETS
 
 #endif  // UPRINTF_IMPLEMENTATION
