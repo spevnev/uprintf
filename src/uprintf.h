@@ -143,7 +143,11 @@ struct _upf_dwarf {
 
 struct _upf_state {
     _upf_call_sites call_sites;
-    uint64_t uprintf_offset;
+    // Stores offsets to declaration and definition in an arbitrary order.
+    // It is possible for the second offset to be INVALID if the program only
+    // uses uprintf.h it once (thus there is declaration, but no definition).
+    uint64_t uprintf_offsets[2];
+    int uprintf_index;  // index into uprintf_offsets
 };
 
 
@@ -358,10 +362,10 @@ static void _upf_parse_cu(struct _upf_state *state, const uint8_t *base, const u
         assert(code <= abbrevs.length);
 
         const struct _upf_abbrev *abbrev = &abbrevs.data[code - 1];
-        if (abbrev->tag == DW_TAG_subprogram && state->uprintf_offset == INVALID_OFFSET) {
+        if (abbrev->tag == DW_TAG_subprogram && state->uprintf_index != 2) {
             uint8_t is_uprintf = 0;
             info = _upf_parse_subprogram(info, abbrev, &is_uprintf);
-            if (is_uprintf) state->uprintf_offset = die_base - base;
+            if (is_uprintf) state->uprintf_offsets[state->uprintf_index++] = die_base - base;
         } else if (abbrev->tag == DW_TAG_call_site) {
             info = _upf_parse_call_site(info, abbrev, &state->call_sites);
         } else {
@@ -378,10 +382,7 @@ static void _upf_parse_dwarf() {
     const uint8_t *info = _upf_dwarf.file + _upf_dwarf.info->sh_offset;
     const uint8_t *info_end = info + _upf_dwarf.info->sh_size;
 
-    struct _upf_state state = {
-        .call_sites = {0},
-        .uprintf_offset = INVALID_OFFSET,
-    };
+    struct _upf_state state = {0};
 
     while (info < info_end) {
         const uint8_t *base = info;
@@ -423,10 +424,14 @@ static void _upf_parse_dwarf() {
 
         info = next;
     }
-    if (state.uprintf_offset == INVALID_OFFSET) ERROR("unable to find the offset of uprintf.\n");
+    if (state.uprintf_index == 0) ERROR("unable to find the offset of uprintf.\n");
 
-    printf("_upf_uprintf's DIE offset = 0x%X\n", state.uprintf_offset);
-
+    for (size_t i = 0; i < state.call_sites.length; i++) {
+        struct _upf_call_site call_site = state.call_sites.data[i];
+        if (call_site.call_origin == state.uprintf_offsets[0] || (state.uprintf_index == 2 && call_site.call_origin == state.uprintf_offsets[1])) {
+            printf("DIE of call_site to _upf_uprintf is located at %p\n", state.call_sites.data[i].die_ptr);
+        }
+    }
 
     VECTOR_FREE(&state.call_sites);
 }
