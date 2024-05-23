@@ -127,7 +127,6 @@ struct _upf_call_site {
 
 VECTOR_TYPEDEF(_upf_call_sites, struct _upf_call_site);
 
-
 struct _upf_dwarf {
     uint8_t *file;
     off_t file_size;
@@ -204,7 +203,6 @@ static size_t _upf_LEB_to_int64(const uint8_t *leb, int64_t *result) {
 
     return i;
 }
-
 
 static _upf_abbrevs _upf_parse_abbrevs(const uint8_t *abbrev_table) {
     _upf_abbrevs abbrevs = {0};
@@ -404,7 +402,6 @@ static const uint8_t *_upf_skip_die(const uint8_t *info, const struct _upf_abbre
     return info;
 }
 
-
 static const uint8_t *_upf_parse_subprogram(const uint8_t *info, const struct _upf_abbrev *abbrev, uint8_t *is_uprintf) {
     static const char *UPRINTF_FUNCTION_NAME = "_upf_uprintf";
 
@@ -516,7 +513,8 @@ static struct _upf_variable_entry _upf_parse_variable(const uint8_t *cu_base, co
     return var;
 }
 
-static void _upf_parse_uprintf_call_site(const uint8_t *cu_base, const _upf_abbrevs *abbrevs, const struct _upf_call_site *call_site, const char *file_path) {
+static void _upf_parse_uprintf_call_site(const uint8_t *cu_base, const _upf_abbrevs *abbrevs, const struct _upf_call_site *call_site,
+                                         const char *file_path) {
     uint64_t code;
     struct _upf_param_value param;
 

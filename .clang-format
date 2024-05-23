@@ -4,7 +4,7 @@ AlignTrailingComments: true
 AllowAllParametersOfDeclarationOnNextLine: false
 AlwaysBreakTemplateDeclarations: No
 BreakBeforeBraces: Attach
-ColumnLimit: 160
+ColumnLimit: 140
 ConstructorInitializerAllOnOneLineOrOnePerLine: true
 IncludeBlocks: Merge
 IndentWidth: 4
