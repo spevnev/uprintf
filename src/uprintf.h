@@ -263,116 +263,60 @@ static struct _upf_param_value _upf_eval_dwarf_expr(const uint8_t *info) {
     len--;
 
     if (DW_OP_lit0 <= opcode && opcode <= DW_OP_lit31) {
-        if (len != 0) {
-            printf("[WARN] skipping dwarf expression: stack is not implemented\n");
-            param.is_const = 2;
-            return param;
-        }
+        if (len != 0) goto skip;
         param.is_const = 1;
         param.as.constant = opcode - DW_OP_lit0;
     } else if (opcode == DW_OP_const1u) {
-        if (len != 1) {
-            printf("[WARN] skipping dwarf expression: stack is not implemented\n");
-            param.is_const = 2;
-            return param;
-        }
+        if (len != 1) goto skip;
         param.is_const = 1;
         param.as.constant = *((uint8_t *) info);
     } else if (opcode == DW_OP_const1s) {
-        if (len != 1) {
-            printf("[WARN] skipping dwarf expression: stack is not implemented\n");
-            param.is_const = 2;
-            return param;
-        }
+        if (len != 1) goto skip;
         param.is_const = 1;
         param.as.constant = *((int8_t *) info);
     } else if (opcode == DW_OP_const2u) {
-        if (len != 2) {
-            printf("[WARN] skipping dwarf expression: stack is not implemented\n");
-            param.is_const = 2;
-            return param;
-        }
+        if (len != 2) goto skip;
         param.is_const = 1;
         param.as.constant = *((uint16_t *) info);
     } else if (opcode == DW_OP_const2s) {
-        if (len != 2) {
-            printf("[WARN] skipping dwarf expression: stack is not implemented\n");
-            param.is_const = 2;
-            return param;
-        }
+        if (len != 2) goto skip;
         param.is_const = 1;
         param.as.constant = *((int16_t *) info);
     } else if (opcode == DW_OP_const4u) {
-        if (len != 4) {
-            printf("[WARN] skipping dwarf expression: stack is not implemented\n");
-            param.is_const = 2;
-            return param;
-        }
+        if (len != 4) goto skip;
         param.is_const = 1;
         param.as.constant = *((uint32_t *) info);
     } else if (opcode == DW_OP_const4s) {
-        if (len != 4) {
-            printf("[WARN] skipping dwarf expression: stack is not implemented\n");
-            param.is_const = 2;
-            return param;
-        }
+        if (len != 4) goto skip;
         param.is_const = 1;
         param.as.constant = *((int32_t *) info);
     } else if (opcode == DW_OP_const8u) {
-        if (len != 8) {
-            printf("[WARN] skipping dwarf expression: stack is not implemented\n");
-            param.is_const = 2;
-            return param;
-        }
+        if (len != 8) goto skip;
         param.is_const = 1;
         param.as.constant = *((uint64_t *) info);
     } else if (opcode == DW_OP_const8s) {
-        if (len != 8) {
-            printf("[WARN] skipping dwarf expression: stack is not implemented\n");
-            param.is_const = 2;
-            return param;
-        }
+        if (len != 8) goto skip;
         param.is_const = 1;
         param.as.constant = *((int64_t *) info);
     } else if (opcode == DW_OP_constu) {
         param.is_const = 1;
         size_t leb_size = _upf_uLEB_to_uint64(info, (uint64_t *) &param.as.constant);
-        if (len != leb_size) {
-            printf("[WARN] skipping dwarf expression: stack is not implemented\n");
-            param.is_const = 2;
-            return param;
-        }
+        if (len != leb_size) goto skip;
     } else if (opcode == DW_OP_consts) {
         param.is_const = 1;
         size_t leb_size = _upf_LEB_to_int64(info, &param.as.constant);
-        if (len != leb_size) {
-            printf("[WARN] skipping dwarf expression: stack is not implemented\n");
-            param.is_const = 2;
-            return param;
-        }
+        if (len != leb_size) goto skip;
     } else if (opcode == DW_OP_fbreg) {
         param.as.loc.reg = -1;  // TODO:
         size_t leb_size = _upf_LEB_to_int64(info, &param.as.loc.offset);
-        if (len != leb_size) {
-            printf("[WARN] skipping dwarf expression: stack is not implemented\n");
-            param.is_const = 2;
-            return param;
-        }
+        if (len != leb_size) goto skip;
     } else if (DW_OP_breg0 <= opcode && opcode <= DW_OP_breg31) {
         param.as.loc.reg = opcode - DW_OP_breg0;  // TODO:
         size_t leb_size = _upf_LEB_to_int64(info, &param.as.loc.offset);
-        if (len != leb_size) {
-            printf("[WARN] skipping dwarf expression: stack is not implemented\n");
-            param.is_const = 2;
-            return param;
-        }
+        if (len != leb_size) goto skip;
     } else if (DW_OP_reg0 <= opcode && opcode <= DW_OP_reg31) {
         param.as.loc.reg = opcode - DW_OP_reg0;  // TODO:
-        if (len != 0) {
-            printf("[WARN] skipping dwarf expression: stack is not implemented\n");
-            param.is_const = 2;
-            return param;
-        }
+        if (len != 0) goto skip;
     } else if (opcode == DW_OP_implicit_pointer) {
         printf("[WARN] skipping DW_OP_implicit_pointer\n");
         param.is_const = 2;
@@ -383,11 +327,19 @@ static struct _upf_param_value _upf_eval_dwarf_expr(const uint8_t *info) {
         assert(param.is_const == 0 && "TODO");  // TODO:
         param.as.loc.is_param = 1;
         // TODO: check that this is the last expression
+    } else if (opcode == DW_OP_addr) {
+        param.as.loc.reg = -2;  // TODO:
+        param.as.loc.offset = _upf_get_offset(info);
+        if (len != _upf_dwarf.address_size) goto skip;
     } else {
         printf("0x%x\n", opcode);
         assert(0 && "TODO: handle other dwarf expressions");  // TODO:
     }
 
+    return param;
+skip:
+    printf("[WARN] skipping dwarf expression: stack is not implemented\n");
+    param.is_const = 2;
     return param;
 }
 
@@ -948,8 +900,8 @@ static void _upf_parse_elf(void) {
 
         section++;
     }
-
-    assert(_upf_dwarf.info != NULL && _upf_dwarf.abbrev != NULL && _upf_dwarf.str != NULL);
+    assert(_upf_dwarf.info != NULL && _upf_dwarf.abbrev != NULL && _upf_dwarf.str != NULL && _upf_dwarf.line_str != NULL
+           && _upf_dwarf.loclists != NULL);
 }
 
 
