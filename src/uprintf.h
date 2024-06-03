@@ -690,7 +690,7 @@ static uint32_t _upf_get_type_helper(const uint8_t *cu_base, const uint8_t *info
             struct _upf_attr attr = abbrev->attrs.data[i];
 
             if (attr.name == DW_AT_type) next_info = cu_base + _upf_get_ref(info, attr.form);
-            else if (attr.name == DW_AT_name) type->name = _upf_get_string(info, attr.form);
+            else if (attr.name == DW_AT_name && type->name == NULL) type->name = _upf_get_string(info, attr.form);
 
             info += _upf_get_attr_size(info, attr.form);
         }
@@ -1193,6 +1193,7 @@ void _upf_uprintf(const char *file, int line, int counter, const char *fmt, ...)
     int arg = 0;
     for (const char *ch = fmt; *ch != '\0'; ch++) {
         if (*ch != '%') {
+            printf("%c", *ch);
             // TODO: add to the buffer
             continue;
         }
@@ -1200,6 +1201,7 @@ void _upf_uprintf(const char *file, int line, int counter, const char *fmt, ...)
         char next = *(ch + 1);
 
         if (next == '%') {
+            printf("%%");
             // TODO: add % to the buffer
             ch++;
         } else if (next == 'S') {
