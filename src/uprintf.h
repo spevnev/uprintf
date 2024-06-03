@@ -139,11 +139,12 @@ struct _upf_dwarf {
     uint8_t offset_size;
     uint8_t address_size;
 
-    const Elf64_Shdr *info;
-    const Elf64_Shdr *abbrev;
-    const Elf64_Shdr *str;
-    const Elf64_Shdr *line_str;
-    const Elf64_Shdr *loclists;
+    const uint8_t *info;
+    size_t info_size;
+    const uint8_t *abbrev;
+    const uint8_t *str;
+    const uint8_t *line_str;
+    const uint8_t *loclists;
 };
 
 struct _upf_var_loc {
@@ -393,12 +394,10 @@ skip:
 }
 
 static const char *_upf_get_string(const uint8_t *info, uint64_t form) {
-    uint64_t string_offset = _upf_dwarf.is_64bit ? (*((uint64_t *) info)) : ((uint64_t) (*((uint32_t *) info)));
-    const char *base = (char *) _upf_dwarf.file;
-
     if (form == DW_FORM_strp || form == DW_FORM_line_strp) {
-        uint64_t section_offset = form == DW_FORM_strp ? _upf_dwarf.str->sh_offset : _upf_dwarf.line_str->sh_offset;
-        return base + section_offset + string_offset;
+        const char *section = (char *) (form == DW_FORM_strp ? _upf_dwarf.str : _upf_dwarf.line_str);
+        uint64_t string_offset = _upf_dwarf.is_64bit ? (*((uint64_t *) info)) : ((uint64_t) (*((uint32_t *) info)));
+        return section + string_offset;
     } else if (form == DW_FORM_string) {
         return (const char *) info;
     } else {
@@ -753,7 +752,7 @@ static struct _upf_var_entry _upf_parse_variable(const uint8_t *cu_base, const u
                 assert(param.is_const == 0);
                 VECTOR_PUSH(&var.locs, param.as.loc);
             } else if (attr.form == DW_FORM_sec_offset) {
-                const uint8_t *loclist = _upf_dwarf.file + _upf_dwarf.loclists->sh_offset + _upf_get_offset(info);
+                const uint8_t *loclist = _upf_dwarf.loclists + _upf_get_offset(info);
 
                 uint8_t loclist_type = *loclist++;
                 if (loclist_type == DW_LLE_base_address || loclist_type == DW_LLE_offset_pair) {
@@ -1017,10 +1016,8 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *info, const uin
 }
 
 static void _upf_parse_dwarf() {
-    const uint8_t *abbrev = _upf_dwarf.file + _upf_dwarf.abbrev->sh_offset;
-    const uint8_t *info = _upf_dwarf.file + _upf_dwarf.info->sh_offset;
-    const uint8_t *info_end = info + _upf_dwarf.info->sh_size;
-
+    const uint8_t *info = _upf_dwarf.info;
+    const uint8_t *info_end = info + _upf_dwarf.info_size;
     while (info < info_end) {
         const uint8_t *cu_base = info;
 
@@ -1057,7 +1054,7 @@ static void _upf_parse_dwarf() {
             info += sizeof(uint32_t);
         }
 
-        _upf_parse_cu(cu_base, info, next, abbrev + abbrev_offset);
+        _upf_parse_cu(cu_base, info, next, _upf_dwarf.abbrev + abbrev_offset);
 
         info = next;
     }
@@ -1097,11 +1094,13 @@ static void _upf_parse_elf(void) {
     for (size_t i = 0; i < header->e_shnum; i++) {
         const char *name = string_table + section->sh_name;
 
-        if (strcmp(name, ".debug_info") == 0) _upf_dwarf.info = section;
-        else if (strcmp(name, ".debug_abbrev") == 0) _upf_dwarf.abbrev = section;
-        else if (strcmp(name, ".debug_str") == 0) _upf_dwarf.str = section;
-        else if (strcmp(name, ".debug_line_str") == 0) _upf_dwarf.line_str = section;
-        else if (strcmp(name, ".debug_loclists") == 0) _upf_dwarf.loclists = section;
+        if (strcmp(name, ".debug_info") == 0) {
+            _upf_dwarf.info = file + section->sh_offset;
+            _upf_dwarf.info_size = section->sh_size;
+        } else if (strcmp(name, ".debug_abbrev") == 0) _upf_dwarf.abbrev = file + section->sh_offset;
+        else if (strcmp(name, ".debug_str") == 0) _upf_dwarf.str = file + section->sh_offset;
+        else if (strcmp(name, ".debug_line_str") == 0) _upf_dwarf.line_str = file + section->sh_offset;
+        else if (strcmp(name, ".debug_loclists") == 0) _upf_dwarf.loclists = file + section->sh_offset;
 
         section++;
     }
