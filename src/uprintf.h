@@ -27,6 +27,10 @@
 #error ERROR: uprintf only supports Linux
 #endif
 
+#ifdef __cplusplus
+#error ERROR: uprintf doesn't support C++
+#endif
+
 #ifndef __COUNTER__
 #error ERROR: uprintf requires compiler/preprocessor to support "__COUNTER__" predefined macro
 #endif
