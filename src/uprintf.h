@@ -1,4 +1,4 @@
-// For usage and readme see https://github.com/spevnev/uprintf
+// Usage and other information can be found in README at https://github.com/spevnev/uprintf
 
 // MIT License
 //
