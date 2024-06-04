@@ -28,7 +28,7 @@
 #endif
 
 #ifdef __cplusplus
-#error ERROR: uprintf doesn't support C++
+#error ERROR: uprintf does NOT support C++
 #endif
 
 #ifndef __COUNTER__
@@ -106,30 +106,30 @@ void _upf_uprintf(const char *file, int line, int counter, const char *fmt, ...)
     } while (0);
 
 
-struct _upf_attr {
+typedef struct {
     uint64_t name;
     uint64_t form;
     int64_t implicit_const;
-};
+} _upf_attr;
 
-VECTOR_TYPEDEF(_upf_attrs, struct _upf_attr);
+VECTOR_TYPEDEF(_upf_attrs, _upf_attr);
 
-struct _upf_abbrev {
+typedef struct {
     uint64_t code;
     uint64_t tag;
     uint8_t has_children;
     _upf_attrs attrs;
-};
+} _upf_abbrev;
 
-VECTOR_TYPEDEF(_upf_abbrevs, struct _upf_abbrev);
+VECTOR_TYPEDEF(_upf_abbrevs, _upf_abbrev);
 
-struct _upf_call_site {
+typedef struct {
     const uint8_t *subprogram;  // pointer to DIE of parent subprogram
     const uint8_t *info;
     uint64_t call_origin;
-};
+} _upf_call_site;
 
-VECTOR_TYPEDEF(_upf_call_sites, struct _upf_call_site);
+VECTOR_TYPEDEF(_upf_call_sites, _upf_call_site);
 
 struct _upf_dwarf {
     uint8_t *file;
@@ -147,7 +147,7 @@ struct _upf_dwarf {
     const uint8_t *loclists;
 };
 
-struct _upf_var_loc {
+typedef struct {
     // TODO: how to type reg? enum?
     int reg;
     int64_t offset;
@@ -155,37 +155,37 @@ struct _upf_var_loc {
     uint64_t from;
     uint64_t to;
     uint8_t is_param;
-};
+} _upf_var_loc;
 
 // TODO: rename, union, change types
-struct _upf_param_value {
+typedef struct {
     uint8_t is_const;
     union {
         int64_t constant;
-        struct _upf_var_loc loc;
+        _upf_var_loc loc;
     } as;
-};
+} _upf_param_value;
 
-VECTOR_TYPEDEF(_upf_var_loc_vec, struct _upf_var_loc);
+VECTOR_TYPEDEF(_upf_var_loc_vec, _upf_var_loc);
 
 // TODO: rename, change types
-struct _upf_var_entry {
+typedef struct {
     _upf_var_loc_vec locs;
     const uint8_t *type_die;
-};
+} _upf_var_entry;
 
-VECTOR_TYPEDEF(_upf_var_vec, struct _upf_var_entry);
+VECTOR_TYPEDEF(_upf_var_vec, _upf_var_entry);
 
 VECTOR_TYPEDEF(_upf_uint32_vec, uint32_t);
 
-struct _upf_arg_entry {
+typedef struct {
     const char *file;
     int64_t line;
     int64_t counter;
     _upf_uint32_vec arg_types;
-};
+} _upf_arg_entry;
 
-VECTOR_TYPEDEF(_upf_arg_vec, struct _upf_arg_entry);
+VECTOR_TYPEDEF(_upf_arg_vec, _upf_arg_entry);
 
 struct _upf_field;
 
@@ -206,27 +206,27 @@ enum _upf_type_type {
     _UPF_TT_CH
 };
 
-struct _upf_type {
+typedef struct {
     const char *name;
     enum _upf_type_type type;
     _upf_field_vec fields;
     uint8_t is_pointer;
-};
+} _upf_type;
 
-struct _upf_field {
+typedef struct _upf_field {
     const char *name;
-    struct _upf_type type;
+    _upf_type type;
     int offset;
-};
+} _upf_field;
 
-struct _upf_type_entry {
+typedef struct {
     const uint8_t *type_die;
-    struct _upf_type type;
-};
+    _upf_type type;
+} _upf_type_entry;
 
-VECTOR_TYPEDEF(_upf_types_vec, struct _upf_type_entry);
+VECTOR_TYPEDEF(_upf_types_vec, _upf_type_entry);
 
-static struct _upf_dwarf _upf_dwarf = {0};
+struct _upf_dwarf _upf_dwarf = {0};
 static _upf_arg_vec _upf_args_map = {0};    // TODO: rename
 static _upf_types_vec _upf_type_map = {0};  // TODO: rename
 
@@ -279,7 +279,7 @@ static _upf_abbrevs _upf_parse_abbrevs(const uint8_t *abbrev_table) {
     _upf_abbrevs abbrevs = {0};
 
     while (1) {
-        struct _upf_abbrev abbrev = {0};
+        _upf_abbrev abbrev = {0};
         abbrev_table += _upf_uLEB_to_uint64(abbrev_table, &abbrev.code);
         if (abbrev.code == 0) break;
         abbrev_table += _upf_uLEB_to_uint64(abbrev_table, &abbrev.tag);
@@ -288,7 +288,7 @@ static _upf_abbrevs _upf_parse_abbrevs(const uint8_t *abbrev_table) {
         abbrev_table += sizeof(uint8_t);
 
         while (1) {
-            struct _upf_attr attr = {0};
+            _upf_attr attr = {0};
             abbrev_table += _upf_uLEB_to_uint64(abbrev_table, &attr.name);
             abbrev_table += _upf_uLEB_to_uint64(abbrev_table, &attr.form);
             if (attr.form == DW_FORM_implicit_const) abbrev_table += _upf_LEB_to_int64(abbrev_table, &attr.implicit_const);
@@ -302,9 +302,9 @@ static _upf_abbrevs _upf_parse_abbrevs(const uint8_t *abbrev_table) {
     return abbrevs;
 }
 
-static struct _upf_param_value _upf_eval_dwarf_expr(const uint8_t *info) {
+static _upf_param_value _upf_eval_dwarf_expr(const uint8_t *info) {
     // TODO: rename struct, and variable to result
-    struct _upf_param_value param = {0};
+    _upf_param_value param = {0};
 
     uint64_t len;
     info += _upf_uLEB_to_uint64(info, &len);
@@ -423,7 +423,7 @@ static uint64_t _upf_get_ref(const uint8_t *info, uint64_t form) {
     }
 }
 
-static int64_t _upf_get_data(const uint8_t *info, struct _upf_attr attr) {
+static int64_t _upf_get_data(const uint8_t *info, _upf_attr attr) {
     if (attr.form == DW_FORM_data1) {
         return *info;
     } else if (attr.form == DW_FORM_data2) {
@@ -521,7 +521,7 @@ static size_t _upf_get_attr_size(const uint8_t *info, uint64_t form) {
     }
 }
 
-static const uint8_t *_upf_skip_die(const uint8_t *info, const struct _upf_abbrev *abbrev) {
+static const uint8_t *_upf_skip_die(const uint8_t *info, const _upf_abbrev *abbrev) {
     for (size_t i = 0; i < abbrev->attrs.length; i++) {
         info += _upf_get_attr_size(info, abbrev->attrs.data[i].form);
     }
@@ -529,12 +529,12 @@ static const uint8_t *_upf_skip_die(const uint8_t *info, const struct _upf_abbre
     return info;
 }
 
-static const uint8_t *_upf_parse_subprogram(const uint8_t *info, const struct _upf_abbrev *abbrev, uint8_t *is_uprintf) {
+static const uint8_t *_upf_parse_subprogram(const uint8_t *info, const _upf_abbrev *abbrev, uint8_t *is_uprintf) {
     static const char *UPRINTF_FUNCTION_NAME = "_upf_uprintf";
 
 
     for (size_t i = 0; i < abbrev->attrs.length; i++) {
-        struct _upf_attr attr = abbrev->attrs.data[i];
+        _upf_attr attr = abbrev->attrs.data[i];
 
         if (attr.name == DW_AT_name) {
             const char *function_name = _upf_get_string(info, attr.form);
@@ -547,13 +547,13 @@ static const uint8_t *_upf_parse_subprogram(const uint8_t *info, const struct _u
     return info;
 }
 
-static const uint8_t *_upf_parse_call_site(const uint8_t *info, const struct _upf_abbrev *abbrev, uint64_t *offset) {
+static const uint8_t *_upf_parse_call_site(const uint8_t *info, const _upf_abbrev *abbrev, uint64_t *offset) {
     static const uint64_t INVALID_OFFSET = -1U;
 
 
     *offset = INVALID_OFFSET;
     for (size_t i = 0; i < abbrev->attrs.length; i++) {
-        struct _upf_attr attr = abbrev->attrs.data[i];
+        _upf_attr attr = abbrev->attrs.data[i];
 
         if (attr.name == DW_AT_call_origin) *offset = _upf_get_ref(info, attr.form);
 
@@ -564,10 +564,10 @@ static const uint8_t *_upf_parse_call_site(const uint8_t *info, const struct _up
     return info;
 }
 
-static const uint8_t *_upf_get_param_value(const uint8_t *info, const struct _upf_abbrev *abbrev, struct _upf_param_value *value) {
+static const uint8_t *_upf_get_param_value(const uint8_t *info, const _upf_abbrev *abbrev, _upf_param_value *value) {
     uint8_t found = 0;
     for (size_t i = 0; i < abbrev->attrs.length; i++) {
-        struct _upf_attr attr = abbrev->attrs.data[i];
+        _upf_attr attr = abbrev->attrs.data[i];
 
         if (attr.name == DW_AT_call_value) {
             assert(attr.form == DW_FORM_exprloc);
@@ -583,7 +583,7 @@ static const uint8_t *_upf_get_param_value(const uint8_t *info, const struct _up
 }
 
 // TODO: fully parse type, push it to _upf_type_map and return pointer into the map
-static uint32_t _upf_get_type_helper(const uint8_t *cu_base, const uint8_t *info, const _upf_abbrevs *abbrevs, struct _upf_type *type) {
+static uint32_t _upf_get_type_helper(const uint8_t *cu_base, const uint8_t *info, const _upf_abbrevs *abbrevs, _upf_type *type) {
     for (size_t i = 0; i < _upf_type_map.length; i++) {
         if (_upf_type_map.data[i].type_die == info) {
             *type = _upf_type_map.data[i].type;
@@ -595,11 +595,11 @@ static uint32_t _upf_get_type_helper(const uint8_t *cu_base, const uint8_t *info
 
     uint64_t code;
     info += _upf_uLEB_to_uint64(info, &code);
-    const struct _upf_abbrev *abbrev = &abbrevs->data[code - 1];
+    const _upf_abbrev *abbrev = &abbrevs->data[code - 1];
 
     if (abbrev->tag == DW_TAG_structure_type) {
         for (size_t i = 0; i < abbrev->attrs.length; i++) {
-            struct _upf_attr attr = abbrev->attrs.data[i];
+            _upf_attr attr = abbrev->attrs.data[i];
 
             if (attr.name == DW_AT_name && type->name == NULL) type->name = _upf_get_string(info, attr.form);
 
@@ -615,9 +615,9 @@ static uint32_t _upf_get_type_helper(const uint8_t *cu_base, const uint8_t *info
             abbrev = &abbrevs->data[code - 1];
             assert(abbrev->tag == DW_TAG_member);
 
-            struct _upf_field field = {0};
+            _upf_field field = {0};
             for (size_t i = 0; i < abbrev->attrs.length; i++) {
-                struct _upf_attr attr = abbrev->attrs.data[i];
+                _upf_attr attr = abbrev->attrs.data[i];
 
                 if (attr.name == DW_AT_name) field.name = _upf_get_string(info, attr.form);
                 else if (attr.name == DW_AT_type)
@@ -630,7 +630,7 @@ static uint32_t _upf_get_type_helper(const uint8_t *cu_base, const uint8_t *info
             VECTOR_PUSH(&type->fields, field);
         }
 
-        struct _upf_type_entry entry = {
+        _upf_type_entry entry = {
             .type_die = base,
             .type = *type,
         };
@@ -643,7 +643,7 @@ static uint32_t _upf_get_type_helper(const uint8_t *cu_base, const uint8_t *info
         int size = -1;
         int encoding = -1;
         for (size_t i = 0; i < abbrev->attrs.length; i++) {
-            struct _upf_attr attr = abbrev->attrs.data[i];
+            _upf_attr attr = abbrev->attrs.data[i];
 
             if (attr.name == DW_AT_byte_size) size = _upf_get_data(info, attr);
             else if (attr.name == DW_AT_encoding) encoding = _upf_get_data(info, attr);
@@ -678,7 +678,7 @@ static uint32_t _upf_get_type_helper(const uint8_t *cu_base, const uint8_t *info
         }
 
         // TODO: don't add base types to the map
-        struct _upf_type_entry entry = {
+        _upf_type_entry entry = {
             .type_die = base,
             .type = *type,
         };
@@ -690,7 +690,7 @@ static uint32_t _upf_get_type_helper(const uint8_t *cu_base, const uint8_t *info
     if (abbrev->tag == DW_TAG_typedef) {
         const uint8_t *next_info = NULL;
         for (size_t i = 0; i < abbrev->attrs.length; i++) {
-            struct _upf_attr attr = abbrev->attrs.data[i];
+            _upf_attr attr = abbrev->attrs.data[i];
 
             if (attr.name == DW_AT_type) next_info = cu_base + _upf_get_ref(info, attr.form);
             else if (attr.name == DW_AT_name && type->name == NULL) type->name = _upf_get_string(info, attr.form);
@@ -707,7 +707,7 @@ static uint32_t _upf_get_type_helper(const uint8_t *cu_base, const uint8_t *info
         // TODO: add this info to type?
         if (abbrev->tag == DW_TAG_pointer_type) type->is_pointer = 1;
         for (size_t i = 0; i < abbrev->attrs.length; i++) {
-            struct _upf_attr attr = abbrev->attrs.data[i];
+            _upf_attr attr = abbrev->attrs.data[i];
 
             if (attr.name == DW_AT_type) return _upf_get_type_helper(cu_base, cu_base + _upf_get_ref(info, attr.form), abbrevs, type);
 
@@ -718,7 +718,7 @@ static uint32_t _upf_get_type_helper(const uint8_t *cu_base, const uint8_t *info
     return -1U;
 }
 
-static void _upf_free_type(struct _upf_type type) {
+static void _upf_free_type(_upf_type type) {
     for (size_t i = 0; i < type.fields.length; i++) {
         _upf_free_type(type.fields.data[i].type);
     }
@@ -726,7 +726,7 @@ static void _upf_free_type(struct _upf_type type) {
 }
 
 static uint32_t _upf_get_type(const uint8_t *cu_base, const uint8_t *info, const _upf_abbrevs *abbrevs) {
-    struct _upf_type type = {0};
+    _upf_type type = {0};
 
     uint32_t type_idx = _upf_get_type_helper(cu_base, info, abbrevs, &type);
     if (type_idx == -1U) _upf_free_type(type);
@@ -735,16 +735,15 @@ static uint32_t _upf_get_type(const uint8_t *cu_base, const uint8_t *info, const
 }
 
 // TODO: rename to include parameter?
-static struct _upf_var_entry _upf_parse_variable(const uint8_t *cu_base, const uint8_t *info, const struct _upf_abbrev *abbrev,
-                                                 uint64_t low_pc) {
-    struct _upf_var_entry var = {0};
+static _upf_var_entry _upf_parse_variable(const uint8_t *cu_base, const uint8_t *info, const _upf_abbrev *abbrev, uint64_t low_pc) {
+    _upf_var_entry var = {0};
 
     for (size_t i = 0; i < abbrev->attrs.length; i++) {
-        struct _upf_attr attr = abbrev->attrs.data[i];
+        _upf_attr attr = abbrev->attrs.data[i];
 
         if (attr.name == DW_AT_location) {
             if (attr.form == DW_FORM_exprloc) {
-                struct _upf_param_value param = _upf_eval_dwarf_expr(info);
+                _upf_param_value param = _upf_eval_dwarf_expr(info);
                 if (param.is_const == 2) {
                     VECTOR_FREE(&var.locs);
                     return var;
@@ -773,7 +772,7 @@ static struct _upf_var_entry _upf_parse_variable(const uint8_t *cu_base, const u
                         loclist += _upf_uLEB_to_uint64(loclist, &from);
                         loclist += _upf_uLEB_to_uint64(loclist, &to);
 
-                        struct _upf_param_value param = _upf_eval_dwarf_expr(loclist);
+                        _upf_param_value param = _upf_eval_dwarf_expr(loclist);
                         if (param.is_const != 2) {
                             assert(param.is_const == 0);
 
@@ -797,7 +796,7 @@ static struct _upf_var_entry _upf_parse_variable(const uint8_t *cu_base, const u
                     loclist += _upf_uLEB_to_uint64(loclist, &len);
                     uint64_t to = from + len;
 
-                    struct _upf_param_value param = _upf_eval_dwarf_expr(loclist);
+                    _upf_param_value param = _upf_eval_dwarf_expr(loclist);
                     if (param.is_const == 2) {
                         VECTOR_FREE(&var.locs);
                         return var;
@@ -824,11 +823,11 @@ static struct _upf_var_entry _upf_parse_variable(const uint8_t *cu_base, const u
     return var;
 }
 
-static void _upf_parse_uprintf_call_site(const uint8_t *cu_base, const _upf_abbrevs *abbrevs, const struct _upf_call_site *call_site,
+static void _upf_parse_uprintf_call_site(const uint8_t *cu_base, const _upf_abbrevs *abbrevs, const _upf_call_site *call_site,
                                          const char *file_path) {
     uint64_t code;
-    struct _upf_param_value param;
-    const struct _upf_abbrev *abbrev;
+    _upf_param_value param;
+    const _upf_abbrev *abbrev;
 
     _upf_var_vec loc_to_type_map = {0};  // TODO: rename
     const uint8_t *subprogram = call_site->subprogram;
@@ -844,7 +843,7 @@ static void _upf_parse_uprintf_call_site(const uint8_t *cu_base, const _upf_abbr
         if (abbrev->tag == DW_TAG_subprogram) {
             const uint8_t *_subprogram = subprogram;
             for (size_t i = 0; i < abbrev->attrs.length; i++) {
-                struct _upf_attr attr = abbrev->attrs.data[i];
+                _upf_attr attr = abbrev->attrs.data[i];
 
                 if (attr.name == DW_AT_low_pc) {
                     low_pc = _upf_get_address(_subprogram, attr.form);
@@ -854,7 +853,7 @@ static void _upf_parse_uprintf_call_site(const uint8_t *cu_base, const _upf_abbr
                 _subprogram += _upf_get_attr_size(_subprogram, attr.form);
             }
         } else if (abbrev->tag == DW_TAG_formal_parameter || abbrev->tag == DW_TAG_variable) {
-            struct _upf_var_entry var = _upf_parse_variable(cu_base, subprogram, abbrev, low_pc);
+            _upf_var_entry var = _upf_parse_variable(cu_base, subprogram, abbrev, low_pc);
             if (var.locs.length > 0) VECTOR_PUSH(&loc_to_type_map, var);
         }
 
@@ -869,7 +868,7 @@ static void _upf_parse_uprintf_call_site(const uint8_t *cu_base, const _upf_abbr
     abbrev = &abbrevs->data[code - 1];
     uint64_t return_pc = -1UL;
     for (size_t i = 0; i < abbrev->attrs.length; i++) {
-        struct _upf_attr attr = abbrev->attrs.data[i];
+        _upf_attr attr = abbrev->attrs.data[i];
 
         if (attr.name == DW_AT_call_return_pc) return_pc = _upf_get_address(info, attr.form);
 
@@ -918,9 +917,9 @@ static void _upf_parse_uprintf_call_site(const uint8_t *cu_base, const _upf_abbr
 
         uint8_t found = 0;
         for (size_t i = 0; i < loc_to_type_map.length; i++) {
-            struct _upf_var_entry var = loc_to_type_map.data[i];
+            _upf_var_entry var = loc_to_type_map.data[i];
             for (size_t j = 0; j < var.locs.length; j++) {
-                struct _upf_var_loc loc = var.locs.data[j];
+                _upf_var_loc loc = var.locs.data[j];
                 if (loc.is_param == param.as.loc.is_param && loc.reg == param.as.loc.reg && loc.offset == param.as.loc.offset) {
                     if (loc.is_scoped == 1) {
                         // TODO: return_pc isn't the variable we should be using although is close enough
@@ -945,7 +944,7 @@ static void _upf_parse_uprintf_call_site(const uint8_t *cu_base, const _upf_abbr
         }
     }
 
-    struct _upf_arg_entry entry = {
+    _upf_arg_entry entry = {
         .file = file_path,
         .line = line,
         .counter = counter,
@@ -972,13 +971,13 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *info, const uin
         if (code == 0) continue;
 
         assert(code <= abbrevs.length);
-        const struct _upf_abbrev *abbrev = &abbrevs.data[code - 1];
+        const _upf_abbrev *abbrev = &abbrevs.data[code - 1];
 
         if (abbrev->tag == DW_TAG_subprogram) subprogram = die_base;
 
         if (abbrev->tag == DW_TAG_compile_unit) {
             for (size_t i = 0; i < abbrev->attrs.length; i++) {
-                struct _upf_attr attr = abbrev->attrs.data[i];
+                _upf_attr attr = abbrev->attrs.data[i];
 
                 if (attr.name == DW_AT_name) file_path = _upf_get_string(info, attr.form);
 
@@ -992,7 +991,7 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *info, const uin
             uint64_t offset = 0;
             info = _upf_parse_call_site(info, abbrev, &offset);
 
-            struct _upf_call_site call_site = {
+            _upf_call_site call_site = {
                 .subprogram = subprogram,
                 .info = die_base,
                 .call_origin = offset,
@@ -1006,7 +1005,7 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *info, const uin
     assert(uprintf_offset != INVALID_OFFSET && "unable to find the offset of uprintf.");
 
     for (size_t i = 0; i < call_sites.length; i++) {
-        struct _upf_call_site *call_site = &call_sites.data[i];
+        _upf_call_site *call_site = &call_sites.data[i];
         if (call_site->call_origin == uprintf_offset) _upf_parse_uprintf_call_site(cu_base, &abbrevs, call_site, file_path);
     }
 
@@ -1108,13 +1107,13 @@ static void _upf_parse_elf(void) {
            && _upf_dwarf.loclists != NULL);
 }
 
-static void _upf_print_struct(void *data, const struct _upf_type type) {
+static void _upf_print_struct(void *data, const _upf_type type) {
     // TODO: handle pointers
     switch (type.type) {
         case _UPF_TT_STRUCT:
             printf("%s {\n", type.name);
             for (size_t i = 0; i < type.fields.length; i++) {
-                struct _upf_field *field = &type.fields.data[i];
+                _upf_field *field = &type.fields.data[i];
 
                 printf("    %s %s=", field->type.name, field->name);
                 _upf_print_struct(data + field->offset, field->type);
@@ -1184,7 +1183,7 @@ void _upf_uprintf(const char *file, int line, int counter, const char *fmt, ...)
     uint8_t found = 0;
     _upf_uint32_vec arg_types;
     for (size_t i = 0; i < _upf_args_map.length; i++) {
-        struct _upf_arg_entry entry = _upf_args_map.data[i];
+        _upf_arg_entry entry = _upf_args_map.data[i];
         if (entry.counter == counter && entry.line == line && strcmp(entry.file, file) == 0) {
             arg_types = entry.arg_types;
             found = 1;
