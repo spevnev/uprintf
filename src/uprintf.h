@@ -112,16 +112,16 @@ typedef struct {
     int64_t implicit_const;
 } _upf_attr;
 
-VECTOR_TYPEDEF(_upf_attrs, _upf_attr);
+VECTOR_TYPEDEF(_upf_attr_vec, _upf_attr);
 
 typedef struct {
     uint64_t code;
     uint64_t tag;
     uint8_t has_children;
-    _upf_attrs attrs;
+    _upf_attr_vec attrs;
 } _upf_abbrev;
 
-VECTOR_TYPEDEF(_upf_abbrevs, _upf_abbrev);
+VECTOR_TYPEDEF(_upf_abbrev_vec, _upf_abbrev);
 
 typedef struct {
     const uint8_t *subprogram;  // pointer to DIE of parent subprogram
@@ -129,7 +129,7 @@ typedef struct {
     uint64_t call_origin;
 } _upf_call_site;
 
-VECTOR_TYPEDEF(_upf_call_sites, _upf_call_site);
+VECTOR_TYPEDEF(_upf_call_site_vec, _upf_call_site);
 
 struct _upf_dwarf {
     uint8_t *file;
@@ -224,11 +224,11 @@ typedef struct {
     _upf_type type;
 } _upf_type_entry;
 
-VECTOR_TYPEDEF(_upf_types_vec, _upf_type_entry);
+VECTOR_TYPEDEF(_upf_type_vec, _upf_type_entry);
 
 struct _upf_dwarf _upf_dwarf = {0};
-static _upf_arg_vec _upf_args_map = {0};    // TODO: rename
-static _upf_types_vec _upf_type_map = {0};  // TODO: rename
+static _upf_arg_vec _upf_args_map = {0};   // TODO: rename
+static _upf_type_vec _upf_type_map = {0};  // TODO: rename
 
 
 // Converts unsigned LEB128 to uint64_t and returns the size of LEB in bytes
@@ -275,8 +275,8 @@ static size_t _upf_LEB_to_int64(const uint8_t *leb, int64_t *result) {
 // TODO: rename
 static uint64_t _upf_get_offset(const uint8_t *info) { return _upf_dwarf.is_64bit ? *((uint64_t *) info) : *((uint32_t *) info); }
 
-static _upf_abbrevs _upf_parse_abbrevs(const uint8_t *abbrev_table) {
-    _upf_abbrevs abbrevs = {0};
+static _upf_abbrev_vec _upf_parse_abbrevs(const uint8_t *abbrev_table) {
+    _upf_abbrev_vec abbrevs = {0};
 
     while (1) {
         _upf_abbrev abbrev = {0};
@@ -529,9 +529,8 @@ static const uint8_t *_upf_skip_die(const uint8_t *info, const _upf_abbrev *abbr
     return info;
 }
 
-static const uint8_t *_upf_parse_subprogram(const uint8_t *info, const _upf_abbrev *abbrev, uint8_t *is_uprintf) {
+static const uint8_t *_upf_parse_subprogram(const uint8_t *info, const _upf_abbrev *abbrev, bool *is_uprintf) {
     static const char *UPRINTF_FUNCTION_NAME = "_upf_uprintf";
-
 
     for (size_t i = 0; i < abbrev->attrs.length; i++) {
         _upf_attr attr = abbrev->attrs.data[i];
@@ -583,7 +582,7 @@ static const uint8_t *_upf_get_param_value(const uint8_t *info, const _upf_abbre
 }
 
 // TODO: fully parse type, push it to _upf_type_map and return pointer into the map
-static uint32_t _upf_get_type_helper(const uint8_t *cu_base, const uint8_t *info, const _upf_abbrevs *abbrevs, _upf_type *type) {
+static uint32_t _upf_get_type_helper(const uint8_t *cu_base, const uint8_t *info, const _upf_abbrev_vec *abbrevs, _upf_type *type) {
     for (size_t i = 0; i < _upf_type_map.length; i++) {
         if (_upf_type_map.data[i].type_die == info) {
             *type = _upf_type_map.data[i].type;
@@ -725,7 +724,7 @@ static void _upf_free_type(_upf_type type) {
     VECTOR_FREE(&type.fields);
 }
 
-static uint32_t _upf_get_type(const uint8_t *cu_base, const uint8_t *info, const _upf_abbrevs *abbrevs) {
+static uint32_t _upf_get_type(const uint8_t *cu_base, const uint8_t *info, const _upf_abbrev_vec *abbrevs) {
     _upf_type type = {0};
 
     uint32_t type_idx = _upf_get_type_helper(cu_base, info, abbrevs, &type);
@@ -823,7 +822,7 @@ static _upf_var_entry _upf_parse_variable(const uint8_t *cu_base, const uint8_t 
     return var;
 }
 
-static void _upf_parse_uprintf_call_site(const uint8_t *cu_base, const _upf_abbrevs *abbrevs, const _upf_call_site *call_site,
+static void _upf_parse_uprintf_call_site(const uint8_t *cu_base, const _upf_abbrev_vec *abbrevs, const _upf_call_site *call_site,
                                          const char *file_path) {
     uint64_t code;
     _upf_param_value param;
@@ -958,8 +957,8 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *info, const uin
     static const uint64_t INVALID_OFFSET = -1UL;
 
 
-    _upf_abbrevs abbrevs = _upf_parse_abbrevs(abbrev_table);
-    _upf_call_sites call_sites = {0};
+    _upf_abbrev_vec abbrevs = _upf_parse_abbrevs(abbrev_table);
+    _upf_call_site_vec call_sites = {0};
     uint64_t uprintf_offset = INVALID_OFFSET;
     const uint8_t *subprogram = NULL;
     const char *file_path = NULL;
