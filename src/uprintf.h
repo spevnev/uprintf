@@ -62,6 +62,12 @@ void _upf_uprintf(const char *file, int line, int counter, const char *fmt, ...)
 #include <unistd.h>
 
 
+// number of spaces of indentation per each layer of nesting
+#ifndef UPRINTF_INDENT
+#define UPRINTF_INDENT 4
+#endif
+
+
 #define ERROR(...)                            \
     do {                                      \
         fprintf(stderr, "[ERROR] uprintf: "); \
@@ -1191,6 +1197,8 @@ static char *_upf_print_char(char *p, char ch) {
     return p;
 }
 
+static bool _upf_is_printable(char c) { return ' ' <= c && c <= '~'; }
+
 static char *_upf_print_type(char *p, const uint8_t *data, const _upf_type *type, int depth) {
     // TODO: snprintf
 
@@ -1199,21 +1207,25 @@ static char *_upf_print_type(char *p, const uint8_t *data, const _upf_type *type
             case _UPF_TT_STRUCT:
                 // TODO: check that the pointer is not to already seen struct
                 break;
-            case _UPF_TT_CH:
-                *p++ = '\"';
-                // TODO: don't hardcode uint64 - address may be 32
-                char *str = (char *) (*((uint64_t *) data));
+            case _UPF_TT_CH: {
+                // TODO: what if it is a pointer to a char (or even int8_t) instead of c-style string?
+                char *str = *((char **) data);
+                p += sprintf(p, "%p (\"", str);
                 while (*str != '\0') p = _upf_print_char(p, *str++);
-                *p++ = '\"';
+                p += sprintf(p, "\")");
+            }
+                return p;
+            case _UPF_TT_VOID:
+                p += sprintf(p, "%p", *((void **) data));
                 return p;
             default: {
-                // TODO: print value in parentheses?
+                // TODO: print address and value in parentheses
                 void *ptr = *((void **) data);
                 if (ptr == NULL) {
-                    p += sprintf(p, "(nil)");
+                    p += sprintf(p, "NULL");
                     return p;
                 }
-                p += sprintf(p, "(%p) ", ptr);
+                p += sprintf(p, "%p (", ptr);
                 data = ptr;
             } break;
         }
@@ -1225,17 +1237,22 @@ static char *_upf_print_type(char *p, const uint8_t *data, const _upf_type *type
             for (size_t i = 0; i < type->fields.length; i++) {
                 _upf_field *field = &type->fields.data[i];
 
-                p += sprintf(p, "    %s %s=", field->type.name, field->name);
+                int indent = UPRINTF_INDENT * (depth + 1);
+                memset(p, ' ', indent);
+                p += indent;
+
+                p += sprintf(p, "%s%s %s%s = ", field->type.is_const ? "const " : "", field->type.name, field->type.is_pointer ? "*" : "",
+                             field->name);
                 p = _upf_print_type(p, data + field->offset, &field->type, depth + 1);
                 *p++ = '\n';
             }
             p += sprintf(p, "};");
             break;
         case _UPF_TT_U1:
-            p += sprintf(p, "%u", *((uint8_t *) data));
+            p += sprintf(p, "%hhu", *((uint8_t *) data));
             break;
         case _UPF_TT_U2:
-            p += sprintf(p, "%u", *((uint16_t *) data));
+            p += sprintf(p, "%hu", *((uint16_t *) data));
             break;
         case _UPF_TT_U4:
             p += sprintf(p, "%u", *((uint32_t *) data));
@@ -1244,10 +1261,10 @@ static char *_upf_print_type(char *p, const uint8_t *data, const _upf_type *type
             p += sprintf(p, "%lu", *((uint64_t *) data));
             break;
         case _UPF_TT_S1:
-            p += sprintf(p, "%d", *((int8_t *) data));
+            p += sprintf(p, "%hhd", *((int8_t *) data));
             break;
         case _UPF_TT_S2:
-            p += sprintf(p, "%d", *((int16_t *) data));
+            p += sprintf(p, "%hd", *((int16_t *) data));
             break;
         case _UPF_TT_S4:
             p += sprintf(p, "%d", *((int32_t *) data));
@@ -1261,15 +1278,27 @@ static char *_upf_print_type(char *p, const uint8_t *data, const _upf_type *type
         case _UPF_TT_F8:
             p += sprintf(p, "%lf", *((double *) data));
             break;
-        case _UPF_TT_CH:
-            *p++ = '\'';
-            p = _upf_print_char(p, *((char *) data));
-            *p++ = '\'';
-            break;
+        case _UPF_TT_UCH:
+        case _UPF_TT_CH: {
+            char ch = *((char *) data);
+            if (type->type == _UPF_TT_CH) p += sprintf(p, "%hhd", ch);
+            else p += sprintf(p, "%hhu", ch);
+            if (_upf_is_printable(ch)) {
+                // TODO: sprintf instead
+                *p++ = ' ';
+                *p++ = '(';
+                *p++ = '\'';
+                p = _upf_print_char(p, ch);
+                *p++ = '\'';
+                *p++ = ')';
+            }
+        } break;
         default:
             assert(0 && "UNREACHABLE");
             break;
     }
+
+    if (type->is_pointer) *p++ = ')';
 
     return p;
 }
