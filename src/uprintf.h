@@ -146,7 +146,6 @@ typedef struct {
     bool is_scoped;
     uint64_t from;
     uint64_t to;
-    bool is_param;
 } _upf_var_loc;
 
 VECTOR_TYPEDEF(_upf_var_loc_vec, _upf_var_loc);
@@ -690,11 +689,23 @@ static size_t _upf_get_type_helper(const uint8_t *cu_base, const uint8_t *info, 
 
     if (abbrev->tag == DW_TAG_pointer_type || abbrev->tag == DW_TAG_const_type) {
         // TODO: add this info to type?
-        if (abbrev->tag == DW_TAG_pointer_type) type->is_pointer = true;
         for (size_t i = 0; i < abbrev->attrs.length; i++) {
             _upf_attr attr = abbrev->attrs.data[i];
 
-            if (attr.name == DW_AT_type) return _upf_get_type_helper(cu_base, cu_base + _upf_get_ref(info, attr.form), abbrevs, type);
+            if (attr.name == DW_AT_type) {
+                size_t type_idx = _upf_get_type_helper(cu_base, cu_base + _upf_get_ref(info, attr.form), abbrevs, type);
+                if (abbrev->tag != DW_TAG_pointer_type) return type_idx;
+
+                type->is_pointer = true;  // TODO: better way to add pointer than to duplicate the entire type entry
+
+                _upf_type_entry entry = {
+                    .type_die = base,
+                    .type = *type,
+                };
+                VECTOR_PUSH(&_upf_type_map, entry);
+
+                return _upf_type_map.length - 1;
+            }
 
             info += _upf_get_attr_size(info, attr.form);
         }
@@ -1159,8 +1170,34 @@ static char *_upf_print_char(char *p, char ch) {
     return p;
 }
 
-static char *_upf_print_struct(char *p, uint8_t *data, const _upf_type *type) {
-    // TODO: handle pointers
+static char *_upf_print_type(char *p, const uint8_t *data, const _upf_type *type, int depth) {
+    // TODO: snprintf
+
+    if (type->is_pointer) {
+        switch (type->type) {
+            case _UPF_TT_STRUCT:
+                // TODO: check that the pointer is not to already seen struct
+                break;
+            case _UPF_TT_CH:
+                *p++ = '\"';
+                // TODO: don't hardcode uint64 - address may be 32
+                char *str = (char *) (*((uint64_t *) data));
+                while (*str != '\0') p = _upf_print_char(p, *str++);
+                *p++ = '\"';
+                return p;
+            default: {
+                // TODO: print value in parentheses?
+                void *ptr = *((void **) data);
+                if (ptr == NULL) {
+                    p += sprintf(p, "(nil)");
+                    return p;
+                }
+                p += sprintf(p, "(%p) ", ptr);
+                data = ptr;
+            } break;
+        }
+    }
+
     switch (type->type) {
         case _UPF_TT_STRUCT:
             p += sprintf(p, "%s {\n", type->name);
@@ -1168,7 +1205,7 @@ static char *_upf_print_struct(char *p, uint8_t *data, const _upf_type *type) {
                 _upf_field *field = &type->fields.data[i];
 
                 p += sprintf(p, "    %s %s=", field->type.name, field->name);
-                p = _upf_print_struct(p, data + field->offset, &field->type);
+                p = _upf_print_type(p, data + field->offset, &field->type, depth + 1);
                 *p++ = '\n';
             }
             p += sprintf(p, "};");
@@ -1204,17 +1241,9 @@ static char *_upf_print_struct(char *p, uint8_t *data, const _upf_type *type) {
             p += sprintf(p, "%lf", *((double *) data));
             break;
         case _UPF_TT_CH:
-            if (type->is_pointer) {
-                *p++ = '\"';
-                // TODO: don't hardcode uint64 - address may be 32
-                char *str = (char *) (*((uint64_t *) data));
-                while (*str != '\0') p = _upf_print_char(p, *str++);
-                *p++ = '\"';
-            } else {
-                *p++ = '\'';
-                p = _upf_print_char(p, *((char *) data));
-                *p++ = '\'';
-            }
+            *p++ = '\'';
+            p = _upf_print_char(p, *((char *) data));
+            *p++ = '\'';
             break;
         default:
             assert(0 && "UNREACHABLE");
@@ -1269,12 +1298,10 @@ void _upf_uprintf(const char *file, int line, int counter, const char *fmt, ...)
             *p++ = '%';
             ch++;
         } else if (next == 'S') {
-            if (arg >= arg_types.length) {
-                ERROR("number of specified formats exceeds the number of arguments provided at %s:%d\n", file, line);
-            }
+            if (arg >= arg_types.length) ERROR("there are more conversion specifiers than arguments provided at %s:%d\n", file, line);
 
             // TODO: why pointer?
-            p = _upf_print_struct(p, va_arg(args, void *), &_upf_type_map.data[arg_types.data[arg++]].type);
+            p = _upf_print_type(p, va_arg(args, void *), &_upf_type_map.data[arg_types.data[arg++]].type, 0);
             ch++;
         } else if (next == '\0' || next == '\n') {
             ERROR("unfinished format at the end of line at %s:%d\n", file, line);
@@ -1284,7 +1311,7 @@ void _upf_uprintf(const char *file, int line, int counter, const char *fmt, ...)
     }
     va_end(args);
 
-    assert(arg == arg_types.length);  // TODO: warning/error
+    assert(arg == arg_types.length);  // TODO: warning/error not enough arguments
 
     *p = '\0';
     printf("%s", buffer);
