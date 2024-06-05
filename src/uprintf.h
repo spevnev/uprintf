@@ -573,12 +573,7 @@ static const uint8_t *_upf_get_param_value(const uint8_t *info, const _upf_abbre
 
 // TODO: fully parse type, push it to _upf_type_map and return pointer into the map
 static size_t _upf_get_type_helper(const uint8_t *cu_base, const uint8_t *info, const _upf_abbrev_vec *abbrevs, _upf_type *type) {
-    for (size_t i = 0; i < _upf_type_map.length; i++) {
-        if (_upf_type_map.data[i].type_die == info) {
-            *type = _upf_type_map.data[i].type;
-            return i;
-        }
-    }
+    // TODO: FULLY rework caching
 
     const uint8_t *base = info;
 
@@ -695,8 +690,15 @@ static size_t _upf_get_type_helper(const uint8_t *cu_base, const uint8_t *info, 
         }
         assert(next_info != NULL);  // TODO:
 
-        // TODO: only save struct & union types to map
-        return _upf_get_type_helper(cu_base, next_info, abbrevs, type);
+        _upf_get_type_helper(cu_base, next_info, abbrevs, type);
+
+        _upf_type_entry entry = {
+            .type_die = base,
+            .type = *type,
+        };
+        VECTOR_PUSH(&_upf_type_map, entry);
+
+        return _upf_type_map.length - 1;
     }
 
     if (abbrev->tag == DW_TAG_pointer_type || abbrev->tag == DW_TAG_const_type) {
