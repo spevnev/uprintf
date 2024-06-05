@@ -183,7 +183,9 @@ enum _upf_type_type {
     _UPF_TT_S8,
     _UPF_TT_F4,
     _UPF_TT_F8,
-    _UPF_TT_CH
+    _UPF_TT_CH,
+    _UPF_TT_UCH,
+    _UPF_TT_VOID
 };
 
 typedef struct {
@@ -191,6 +193,7 @@ typedef struct {
     enum _upf_type_type type;
     _upf_field_vec fields;
     bool is_pointer;
+    bool is_const;
 } _upf_type;
 
 typedef struct _upf_field {
@@ -656,6 +659,9 @@ static size_t _upf_get_type_helper(const uint8_t *cu_base, const uint8_t *info, 
         } else if (encoding == DW_ATE_signed_char) {
             assert(size == 1);
             type->type = _UPF_TT_CH;
+        } else if (encoding == DW_ATE_unsigned_char) {
+            assert(size == 1);
+            type->type = _UPF_TT_UCH;
         } else {
             printf("0x%02x\n", encoding);
             assert(0 && "TODO: handle other base types");  // TODO:
@@ -688,27 +694,42 @@ static size_t _upf_get_type_helper(const uint8_t *cu_base, const uint8_t *info, 
     }
 
     if (abbrev->tag == DW_TAG_pointer_type || abbrev->tag == DW_TAG_const_type) {
-        // TODO: add this info to type?
         for (size_t i = 0; i < abbrev->attrs.length; i++) {
             _upf_attr attr = abbrev->attrs.data[i];
 
-            if (attr.name == DW_AT_type) {
-                size_t type_idx = _upf_get_type_helper(cu_base, cu_base + _upf_get_ref(info, attr.form), abbrevs, type);
-                if (abbrev->tag != DW_TAG_pointer_type) return type_idx;
+            if (attr.name == DW_AT_type) offset = _upf_get_ref(info, attr.form);
 
-                type->is_pointer = true;  // TODO: better way to add pointer than to duplicate the entire type entry
+            info += _upf_get_attr_size(info, attr.form);
+        }
 
+        if (offset == -1UL) {
+            assert(abbrev->tag == DW_TAG_pointer_type);
+            type->type = _UPF_TT_VOID;
+            type->name = "void";
+        } else {
+            _upf_get_type_helper(cu_base, cu_base + offset, abbrevs, type);
+            if (abbrev->tag != DW_TAG_pointer_type) {
+                assert(abbrev->tag == DW_TAG_const_type);
+
+                type->is_const = true;
                 _upf_type_entry entry = {
                     .type_die = base,
                     .type = *type,
                 };
                 VECTOR_PUSH(&_upf_type_map, entry);
-
                 return _upf_type_map.length - 1;
             }
-
-            info += _upf_get_attr_size(info, attr.form);
         }
+
+        type->is_pointer = true;  // TODO: better way to add pointer than current(duplicating the entire type entry)
+
+        _upf_type_entry entry = {
+            .type_die = base,
+            .type = *type,
+        };
+        VECTOR_PUSH(&_upf_type_map, entry);
+
+        return _upf_type_map.length - 1;
     }
 
     return -1U;
