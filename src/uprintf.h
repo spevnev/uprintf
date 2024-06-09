@@ -39,7 +39,7 @@
 #ifndef UPRINTF_H
 #define UPRINTF_H
 
-#define uprintf(...) _upf_uprintf(__FILE__, __LINE__, __COUNTER__, __VA_ARGS__)
+#define uprintf(fmt, ...) _upf_uprintf(__FILE__, __LINE__, __COUNTER__, fmt, __VA_ARGS__)
 
 void _upf_uprintf(const char *file, int line, int counter, const char *fmt, ...);
 
@@ -702,6 +702,7 @@ static size_t _upf_get_type_helper(const uint8_t *cu_base, const uint8_t *info, 
     }
 
     if (abbrev->tag == DW_TAG_pointer_type || abbrev->tag == DW_TAG_const_type) {
+        uint64_t offset = -1UL;
         for (size_t i = 0; i < abbrev->attrs.length; i++) {
             _upf_attr attr = abbrev->attrs.data[i];
 
@@ -1351,6 +1352,7 @@ void _upf_uprintf(const char *file, int line, int counter, const char *fmt, ...)
             ch++;
         } else if (next == 'S') {
             if (arg >= arg_types.length) ERROR("there are more conversion specifiers than arguments provided at %s:%d\n", file, line);
+            assert(arg < 2 && "TODO: for some reason DWARF includes only first 6 call_site_parameters in the function call......");
 
             // TODO: why pointer?
             p = _upf_print_type(p, va_arg(args, void *), &_upf_type_map.data[arg_types.data[arg++]].type, 0);
