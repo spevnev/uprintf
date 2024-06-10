@@ -17,8 +17,14 @@ all: examples
 clean:
 	rm -rf $(BUILD_DIR)
 
+.PHONY: run
+run: $(patsubst %, run/%, $(EXAMPLES))
+
 .PHONY: examples
 examples: $(patsubst %, $(EXAMPLE_BIN_DIR)/%, $(EXAMPLES))
+
+run/%: $(EXAMPLE_BIN_DIR)/%
+	./$<
 
 $(EXAMPLE_BIN_DIR)/%: $(EXAMPLE_OBJ_DIR)/%.o
 	@mkdir -p $(@D)
