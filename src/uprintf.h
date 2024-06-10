@@ -853,16 +853,14 @@ static _upf_var_entry _upf_parse_variable(const uint8_t *cu_base, const uint8_t 
 }
 
 static void _upf_parse_uprintf_call_site(const uint8_t *cu_base, const _upf_abbrev_vec *abbrevs, const _upf_call_site *call_site,
-                                         const char *file_path) {
+                                         const char *file_path, _upf_var_vec *vars) {
     static const uint64_t INVALID_OFFSET = -1UL;
 
     uint64_t code;
     _upf_param_value param;
     const _upf_abbrev *abbrev;
 
-    _upf_var_vec loc_to_type_map = {0};  // TODO: rename
     const uint8_t *subprogram = call_site->subprogram;
-    // TODO: parse global variables
     uint64_t low_pc = INVALID_OFFSET;
     while (1) {
         subprogram += _upf_uLEB_to_uint64(subprogram, &code);
@@ -886,7 +884,7 @@ static void _upf_parse_uprintf_call_site(const uint8_t *cu_base, const _upf_abbr
             assert(low_pc != INVALID_OFFSET);
         } else if (abbrev->tag == DW_TAG_formal_parameter || abbrev->tag == DW_TAG_variable) {
             _upf_var_entry var = _upf_parse_variable(cu_base, subprogram, abbrev, low_pc);
-            if (var.locs.length > 0) VECTOR_PUSH(&loc_to_type_map, var);
+            if (var.locs.length > 0) VECTOR_PUSH(vars, var);
         }
 
         subprogram = _upf_skip_die(subprogram, abbrev);
@@ -949,8 +947,8 @@ static void _upf_parse_uprintf_call_site(const uint8_t *cu_base, const _upf_abbr
         assert(!param.is_const);
 
         bool found = false;
-        for (size_t i = 0; i < loc_to_type_map.length; i++) {
-            _upf_var_entry var = loc_to_type_map.data[i];
+        for (size_t i = 0; i < vars->length; i++) {
+            _upf_var_entry var = vars->data[i];
             for (size_t j = 0; j < var.locs.length; j++) {
                 _upf_var_loc loc = var.locs.data[j];
                 if (loc.is_param == param.as.loc.is_param && loc.reg == param.as.loc.reg && loc.offset == param.as.loc.offset) {
@@ -993,20 +991,31 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *info, const uin
 
     _upf_abbrev_vec abbrevs = _upf_parse_abbrevs(abbrev_table);
     _upf_call_site_vec call_sites = {0};
+    _upf_var_vec vars = {0};
     uint64_t uprintf_offset = INVALID_OFFSET;
     const uint8_t *subprogram = NULL;
     const char *file_path = NULL;
+    int depth = 0;
     while (info < info_end) {
         const uint8_t *die_base = info;
 
         uint64_t code;
         info += _upf_uLEB_to_uint64(info, &code);
-        if (code == 0) continue;
+        if (code == 0) {
+            depth--;
+            continue;
+        }
 
         assert(code <= abbrevs.length);
         const _upf_abbrev *abbrev = &abbrevs.data[code - 1];
+        if (abbrev->has_children) depth++;
 
         if (abbrev->tag == DW_TAG_subprogram) subprogram = die_base;
+
+        if (abbrev->tag == DW_TAG_variable && depth == 1) {
+            _upf_var_entry var = _upf_parse_variable(cu_base, info, abbrev, -1UL);
+            if (var.locs.length > 0) VECTOR_PUSH(&vars, var);
+        }
 
         if (abbrev->tag == DW_TAG_compile_unit) {
             for (size_t i = 0; i < abbrev->attrs.length; i++) {
@@ -1053,12 +1062,17 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *info, const uin
 
     for (size_t i = 0; i < call_sites.length; i++) {
         _upf_call_site *call_site = &call_sites.data[i];
-        if (call_site->call_origin == uprintf_offset) _upf_parse_uprintf_call_site(cu_base, &abbrevs, call_site, file_path);
+        if (call_site->call_origin == uprintf_offset) {
+            size_t vars_length = vars.length;
+            _upf_parse_uprintf_call_site(cu_base, &abbrevs, call_site, file_path, &vars);
+            vars.length = vars_length;  // clear variables local to parsed subprogram
+        }
     }
 
     VECTOR_FREE(&call_sites);
     for (size_t i = 0; i < abbrevs.length; i++) VECTOR_FREE(&abbrevs.data[i].attrs);
     VECTOR_FREE(&abbrevs);
+    VECTOR_FREE(&vars);
 }
 
 static void _upf_parse_dwarf() {
@@ -1351,8 +1365,8 @@ void _upf_uprintf(const char *file, int line, int counter, const char *fmt, ...)
             *p++ = '%';
             ch++;
         } else if (next == 'S') {
+            assert(arg < 2 && "For some reason DWARF includes only first 6 call_site_parameters in the function call, so it only accepts 2 structs at a time");
             if (arg >= arg_types.length) ERROR("there are more conversion specifiers than arguments provided at %s:%d\n", file, line);
-            assert(arg < 2 && "TODO: for some reason DWARF includes only first 6 call_site_parameters in the function call......");
 
             // TODO: why pointer?
             p = _upf_print_type(p, va_arg(args, void *), &_upf_type_map.data[arg_types.data[arg++]].type, 0);
