@@ -1,7 +1,8 @@
 EXAMPLES := struct
+#union primitive
 
 CC      := gcc
-CFLAGS  := -O2 -std=c11 -Wall -Wextra -pedantic -Isrc -g3
+CFLAGS  := -O2 -std=c11 -Wall -Wextra -pedantic -Isrc -g3 -fsanitize=leak,undefined
 LDFLAGS := 
 
 BUILD_DIR       := build

@@ -78,37 +78,115 @@ void _upf_uprintf(const char *file, int line, int counter, const char *fmt, ...)
 #define OUT_OF_MEMORY() ERROR("process ran out of memory.\n");
 
 
+#define INITIAL_ARENA_SIZE 4096
+
+typedef struct _upf_arena_region {
+    char *data;
+    size_t capacity;
+    size_t length;
+    struct _upf_arena_region *next;
+} _upf_arena_region;
+
+typedef struct {
+    _upf_arena_region *tail;
+    _upf_arena_region *head;
+} _upf_arena;
+
+static void _upf_arena_init(_upf_arena *arena) {
+    _upf_arena_region *region = (_upf_arena_region *) malloc(sizeof(*region));
+    if (region == NULL) OUT_OF_MEMORY();
+    region->capacity = INITIAL_ARENA_SIZE;
+    region->data = (char *) malloc(region->capacity);
+    if (region->data == NULL) OUT_OF_MEMORY();
+    region->length = 0;
+    region->next = NULL;
+
+    arena->head = region;
+    arena->tail = region;
+}
+
+static char *_upf_arena_alloc(_upf_arena *arena, size_t size) {
+    assert(arena->head != NULL && arena->tail != NULL);
+
+    if (size > arena->head->capacity - arena->head->length) {
+        _upf_arena_region *region = (_upf_arena_region *) malloc(sizeof(*region));
+        if (region == NULL) OUT_OF_MEMORY();
+        region->capacity = arena->head->capacity * 2;
+        region->data = (char *) malloc(region->capacity);
+        if (region->data == NULL) OUT_OF_MEMORY();
+        region->length = 0;
+        region->next = NULL;
+
+        arena->head->next = region;
+        arena->head = region;
+    }
+
+    char *memory = arena->head->data + arena->head->length;
+    arena->head->length += size;
+    return memory;
+}
+
+static void _upf_arena_free(_upf_arena *arena) {
+    assert(arena->head != NULL && arena->tail != NULL);
+
+    _upf_arena_region *region = arena->tail;
+    while (region != NULL) {
+        _upf_arena_region *next = region->next;
+
+        free(region->data);
+        free(region);
+
+        region = next;
+    }
+
+    arena->head = NULL;
+    arena->tail = NULL;
+}
+
+
 #define INITIAL_VECTOR_CAPACITY 16
+
+#define VECTOR_CSTR_ARENA(a) \
+    {                        \
+        .arena = (a),        \
+    }
 
 #define VECTOR_TYPEDEF(name, type) \
     typedef struct {               \
+        _upf_arena *arena;         \
         size_t capacity;           \
         size_t length;             \
         type *data;                \
     } name
 
-#define VECTOR_PUSH(vec, element)                                                       \
-    do {                                                                                \
-        if ((vec)->capacity == 0) {                                                     \
-            (vec)->capacity = INITIAL_VECTOR_CAPACITY;                                  \
-            (vec)->data = malloc((vec)->capacity * sizeof(*(vec)->data));               \
-            if ((vec)->data == NULL) OUT_OF_MEMORY();                                   \
-        } else if ((vec)->length == (vec)->capacity) {                                  \
-            (vec)->capacity *= 2;                                                       \
-            (vec)->data = realloc((vec)->data, (vec)->capacity * sizeof(*(vec)->data)); \
-            if ((vec)->data == NULL) OUT_OF_MEMORY();                                   \
-        }                                                                               \
-        (vec)->data[(vec)->length++] = (element);                                       \
+#define VECTOR_PUSH(vec, element)                                                             \
+    do {                                                                                      \
+        if ((vec)->capacity == 0) {                                                           \
+            (vec)->capacity = INITIAL_VECTOR_CAPACITY;                                        \
+            size_t size = (vec)->capacity * sizeof(*(vec)->data);                             \
+            (vec)->data = (vec)->arena ? _upf_arena_alloc((vec)->arena, size) : malloc(size); \
+            if ((vec)->data == NULL) OUT_OF_MEMORY();                                         \
+        } else if ((vec)->length == (vec)->capacity) {                                        \
+            (vec)->capacity *= 2;                                                             \
+            size_t size = (vec)->capacity * sizeof(*(vec)->data);                             \
+            if ((vec)->arena == NULL) (vec)->data = realloc((vec)->data, size);               \
+            else {                                                                            \
+                void *new_data = _upf_arena_alloc((vec)->arena, size);                        \
+                assert(size % 2 == 0);                                                        \
+                memcpy(new_data, (vec)->data, size / 2);                                      \
+                (vec)->data = new_data;                                                       \
+            }                                                                                 \
+            if ((vec)->data == NULL) OUT_OF_MEMORY();                                         \
+        }                                                                                     \
+        (vec)->data[(vec)->length++] = (element);                                             \
     } while (0)
 
-#define VECTOR_RESET(vec) (vec)->length = 0;
-
-#define VECTOR_FREE(vec)     \
-    do {                     \
-        free((vec)->data);   \
-        (vec)->length = 0;   \
-        (vec)->capacity = 0; \
-        (vec)->data = NULL;  \
+#define VECTOR_FREE(vec)                             \
+    do {                                             \
+        if ((vec)->arena == NULL) free((vec)->data); \
+        (vec)->length = 0;                           \
+        (vec)->capacity = 0;                         \
+        (vec)->data = NULL;                          \
     } while (0);
 
 
@@ -243,9 +321,10 @@ struct _upf_dwarf {
 };
 
 
-struct _upf_dwarf _upf_dwarf = {0};
-static _upf_arg_vec _upf_args_map = {0};   // TODO: rename
-static _upf_type_vec _upf_type_map = {0};  // TODO: rename
+static _upf_arena _upf_vec_arena = {0};
+static struct _upf_dwarf _upf_dwarf = {0};
+static _upf_arg_vec _upf_args_map = VECTOR_CSTR_ARENA(&_upf_vec_arena);   // TODO: rename
+static _upf_type_vec _upf_type_map = VECTOR_CSTR_ARENA(&_upf_vec_arena);  // TODO: rename
 
 
 // Converts unsigned LEB128 to uint64_t and returns the size of LEB in bytes
@@ -293,10 +372,12 @@ static size_t _upf_LEB_to_int64(const uint8_t *leb, int64_t *result) {
 static uint64_t _upf_get_offset(const uint8_t *info) { return _upf_dwarf.is_64bit ? *((uint64_t *) info) : *((uint32_t *) info); }
 
 static _upf_abbrev_vec _upf_parse_abbrevs(const uint8_t *abbrev_table) {
-    _upf_abbrev_vec abbrevs = {0};
+    _upf_abbrev_vec abbrevs = VECTOR_CSTR_ARENA(&_upf_vec_arena);
 
     while (1) {
-        _upf_abbrev abbrev = {0};
+        _upf_abbrev abbrev = {
+            .attrs = VECTOR_CSTR_ARENA(&_upf_vec_arena),
+        };
         abbrev_table += _upf_uLEB_to_uint64(abbrev_table, &abbrev.code);
         if (abbrev.code == 0) break;
         abbrev_table += _upf_uLEB_to_uint64(abbrev_table, &abbrev.tag);
@@ -746,26 +827,22 @@ static size_t _upf_get_type_helper(const uint8_t *cu_base, const uint8_t *info, 
     return -1U;
 }
 
-static void _upf_free_type(_upf_type type) {
-    for (size_t i = 0; i < type.fields.length; i++) {
-        _upf_free_type(type.fields.data[i].type);
-    }
-    VECTOR_FREE(&type.fields);
-}
 
 static size_t _upf_get_type(const uint8_t *cu_base, const uint8_t *info, const _upf_abbrev_vec *abbrevs) {
-    _upf_type type = {0};
-    size_t type_idx = _upf_get_type_helper(cu_base, info, abbrevs, &type);
-    if (type_idx == -1U) _upf_free_type(type);
+    _upf_type type = {
+        .fields = VECTOR_CSTR_ARENA(&_upf_vec_arena),
+    };
 
-    return type_idx;
+    return _upf_get_type_helper(cu_base, info, abbrevs, &type);
 }
 
 // TODO: rename to include parameter?
 static _upf_var_entry _upf_parse_variable(const uint8_t *cu_base, const uint8_t *info, const _upf_abbrev *abbrev, uint64_t low_pc) {
     static const uint64_t INVALID_OFFSET = -1UL;
 
-    _upf_var_entry var = {0};
+    _upf_var_entry var = {
+        .locs = VECTOR_CSTR_ARENA(&_upf_vec_arena),
+    };
 
     for (size_t i = 0; i < abbrev->attrs.length; i++) {
         _upf_attr attr = abbrev->attrs.data[i];
@@ -773,10 +850,7 @@ static _upf_var_entry _upf_parse_variable(const uint8_t *cu_base, const uint8_t 
         if (attr.name == DW_AT_location) {
             if (attr.form == DW_FORM_exprloc) {
                 _upf_param_value param = _upf_eval_dwarf_expr(info);
-                if (param.is_const == 2) {
-                    VECTOR_FREE(&var.locs);
-                    return var;
-                }
+                if (param.is_const == 2) return var;
                 assert(!param.is_const);
                 VECTOR_PUSH(&var.locs, param.as.loc);
             } else if (attr.form == DW_FORM_sec_offset) {
@@ -828,10 +902,7 @@ static _upf_var_entry _upf_parse_variable(const uint8_t *cu_base, const uint8_t 
                     uint64_t to = from + len;
 
                     _upf_param_value param = _upf_eval_dwarf_expr(loclist);
-                    if (param.is_const == 2) {
-                        VECTOR_FREE(&var.locs);
-                        return var;
-                    }
+                    if (param.is_const == 2) return var;
                     assert(!param.is_const);
 
                     param.as.loc.is_scoped = true;
@@ -939,7 +1010,7 @@ static void _upf_parse_uprintf_call_site(const uint8_t *cu_base, const _upf_abbr
     info = _upf_skip_die(info, &abbrevs->data[code - 1]);
 
     // variadic arguments
-    _upf_size_vec arg_types = {0};
+    _upf_size_vec arg_types = VECTOR_CSTR_ARENA(&_upf_vec_arena);
     while (1) {
         info += _upf_uLEB_to_uint64(info, &code);
         if (code == 0) break;
@@ -951,7 +1022,6 @@ static void _upf_parse_uprintf_call_site(const uint8_t *cu_base, const _upf_abbr
         info = _upf_get_param_value(info, abbrev, &param);
         if (param.is_const == 2) {
             fprintf(stderr, "[ERROR] Can't determine argument types for uprintf call at %s:%ld\n", file_path, line);
-            VECTOR_FREE(&arg_types);
             return;
         }
         assert(!param.is_const);
@@ -980,7 +1050,6 @@ static void _upf_parse_uprintf_call_site(const uint8_t *cu_base, const _upf_abbr
         }
         if (!found) {
             fprintf(stderr, "[ERROR] Can't determine argument types for uprintf call at %s:%ld\n", file_path, line);
-            VECTOR_FREE(&arg_types);
             return;
         }
     }
@@ -1000,8 +1069,8 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *info, const uin
     static const char *UPRINTF_FUNCTION_NAME = "_upf_uprintf";
 
     _upf_abbrev_vec abbrevs = _upf_parse_abbrevs(abbrev_table);
-    _upf_call_site_vec call_sites = {0};
-    _upf_var_vec vars = {0};
+    _upf_call_site_vec call_sites = VECTOR_CSTR_ARENA(&_upf_vec_arena);
+    _upf_var_vec vars = VECTOR_CSTR_ARENA(&_upf_vec_arena);
     uint64_t uprintf_offset = INVALID_OFFSET;
     const uint8_t *subprogram = NULL;
     const char *file_path = NULL;
@@ -1068,7 +1137,7 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *info, const uin
         }
     }
     assert(file_path != NULL && "compilation unit must have a path.");
-    if (uprintf_offset == INVALID_OFFSET) goto exit;
+    if (uprintf_offset == INVALID_OFFSET) return;
 
     for (size_t i = 0; i < call_sites.length; i++) {
         _upf_call_site *call_site = &call_sites.data[i];
@@ -1078,12 +1147,6 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *info, const uin
             vars.length = vars_length;  // clear variables local to parsed subprogram
         }
     }
-
-exit:
-    VECTOR_FREE(&call_sites);
-    for (size_t i = 0; i < abbrevs.length; i++) VECTOR_FREE(&abbrevs.data[i].attrs);
-    VECTOR_FREE(&abbrevs);
-    VECTOR_FREE(&vars);
 }
 
 static void _upf_parse_dwarf() {
@@ -1332,6 +1395,8 @@ static char *_upf_print_type(char *p, const uint8_t *data, const _upf_type *type
 
 
 __attribute__((constructor)) void _upf_init(void) {
+    _upf_arena_init(&_upf_vec_arena);
+
     _upf_parse_elf();
     _upf_parse_dwarf();
 }
@@ -1340,8 +1405,7 @@ __attribute__((destructor)) void _upf_fini(void) {
     // Must be unloaded at the end of the program because many variables point
     // into the _upf_dwarf.file to avoid unnecessarily copying date.
     munmap(_upf_dwarf.file, _upf_dwarf.file_size);
-    VECTOR_FREE(&_upf_args_map);
-    VECTOR_FREE(&_upf_type_map);
+    _upf_arena_free(&_upf_vec_arena);
 }
 
 void _upf_uprintf(const char *file, int line, int counter, const char *fmt, ...) {
@@ -1402,9 +1466,9 @@ void _upf_uprintf(const char *file, int line, int counter, const char *fmt, ...)
 #undef true
 #undef bool
 #undef VECTOR_FREE
-#undef VECTOR_RESET
 #undef VECTOR_PUSH
 #undef VECTOR_TYPEDEF
+#undef VECTOR_CSTR_ARENA
 #undef INITIAL_VECTOR_CAPACITY
 #undef OUT_OF_MEMORY
 #undef ERROR
