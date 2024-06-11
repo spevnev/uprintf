@@ -420,6 +420,7 @@ skip:
 static const char *_upf_get_string(const uint8_t *info, uint64_t form) {
     if (form == DW_FORM_strp || form == DW_FORM_line_strp) {
         const char *section = (char *) (form == DW_FORM_strp ? _upf_dwarf.str : _upf_dwarf.line_str);
+        assert(section != NULL);
         uint64_t string_offset = _upf_dwarf.is_64bit ? (*((uint64_t *) info)) : ((uint64_t) (*((uint32_t *) info)));
         return section + string_offset;
     } else if (form == DW_FORM_string) {
@@ -579,6 +580,7 @@ static size_t _upf_get_type_helper(const uint8_t *cu_base, const uint8_t *info, 
 
     uint64_t code;
     info += _upf_uLEB_to_uint64(info, &code);
+    assert(code > 0 && code <= abbrevs->length);
     const _upf_abbrev *abbrev = &abbrevs->data[code - 1];
 
     if (abbrev->tag == DW_TAG_structure_type) {
@@ -778,6 +780,7 @@ static _upf_var_entry _upf_parse_variable(const uint8_t *cu_base, const uint8_t 
                 assert(!param.is_const);
                 VECTOR_PUSH(&var.locs, param.as.loc);
             } else if (attr.form == DW_FORM_sec_offset) {
+                assert(_upf_dwarf.loclists != NULL);
                 const uint8_t *loclist = _upf_dwarf.loclists + _upf_get_offset(info);
 
                 uint8_t loclist_type = *loclist++;
@@ -787,6 +790,7 @@ static _upf_var_entry _upf_parse_variable(const uint8_t *cu_base, const uint8_t 
                         base = _upf_get_offset(loclist);
                         loclist += _upf_dwarf.address_size;
                     } else {
+                        loclist--;
                         assert(low_pc != INVALID_OFFSET);
                         base = low_pc;
                     }
@@ -865,6 +869,7 @@ static void _upf_parse_uprintf_call_site(const uint8_t *cu_base, const _upf_abbr
     while (1) {
         subprogram += _upf_uLEB_to_uint64(subprogram, &code);
         if (subprogram >= call_site->info) break;
+        if (code == 0) continue;
 
         assert(code <= abbrevs->length);
         abbrev = &abbrevs->data[code - 1];
@@ -895,6 +900,7 @@ static void _upf_parse_uprintf_call_site(const uint8_t *cu_base, const _upf_abbr
 
     // call site
     info += _upf_uLEB_to_uint64(info, &code);
+    assert(code > 0 && code <= abbrevs->length);
     abbrev = &abbrevs->data[code - 1];
     uint64_t return_pc = -1UL;
     for (size_t i = 0; i < abbrev->attrs.length; i++) {
@@ -908,10 +914,12 @@ static void _upf_parse_uprintf_call_site(const uint8_t *cu_base, const _upf_abbr
 
     // file
     info += _upf_uLEB_to_uint64(info, &code);
+    assert(code > 0 && code <= abbrevs->length);
     info = _upf_skip_die(info, &abbrevs->data[code - 1]);
 
     // line
     info += _upf_uLEB_to_uint64(info, &code);
+    assert(code > 0 && code <= abbrevs->length);
     info = _upf_get_param_value(info, &abbrevs->data[code - 1], &param);
     assert(param.is_const);
     int64_t line = param.as.constant;
@@ -919,6 +927,7 @@ static void _upf_parse_uprintf_call_site(const uint8_t *cu_base, const _upf_abbr
 
     // counter
     info += _upf_uLEB_to_uint64(info, &code);
+    assert(code > 0 && code <= abbrevs->length);
     info = _upf_get_param_value(info, &abbrevs->data[code - 1], &param);
     assert(param.is_const);
     int64_t counter = param.as.constant;
@@ -926,6 +935,7 @@ static void _upf_parse_uprintf_call_site(const uint8_t *cu_base, const _upf_abbr
 
     // fmt
     info += _upf_uLEB_to_uint64(info, &code);
+    assert(code > 0 && code <= abbrevs->length);
     info = _upf_skip_die(info, &abbrevs->data[code - 1]);
 
     // variadic arguments
@@ -1058,7 +1068,7 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *info, const uin
         }
     }
     assert(file_path != NULL && "compilation unit must have a path.");
-    assert(uprintf_offset != INVALID_OFFSET && "unable to find the offset of uprintf.");
+    if (uprintf_offset == INVALID_OFFSET) goto exit;
 
     for (size_t i = 0; i < call_sites.length; i++) {
         _upf_call_site *call_site = &call_sites.data[i];
@@ -1069,6 +1079,7 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *info, const uin
         }
     }
 
+exit:
     VECTOR_FREE(&call_sites);
     for (size_t i = 0; i < abbrevs.length; i++) VECTOR_FREE(&abbrevs.data[i].attrs);
     VECTOR_FREE(&abbrevs);
@@ -1169,8 +1180,7 @@ static void _upf_parse_elf(void) {
 
         section++;
     }
-    assert(_upf_dwarf.info != NULL && _upf_dwarf.abbrev != NULL && _upf_dwarf.str != NULL && _upf_dwarf.line_str != NULL
-           && _upf_dwarf.loclists != NULL);
+    assert(_upf_dwarf.info != NULL && _upf_dwarf.abbrev != NULL);
 }
 
 static char *_upf_print_char(char *p, char ch) {
