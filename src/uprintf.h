@@ -382,6 +382,10 @@ static size_t _upf_LEB_to_int64(const uint8_t *leb, int64_t *result) {
 // TODO: rename
 static uint64_t _upf_get_offset(const uint8_t *info) { return _upf_dwarf.offset_size == 8 ? *((uint64_t *) info) : *((uint32_t *) info); }
 
+static uint64_t _upf_get_address2(const uint8_t *info) {
+    return _upf_dwarf.address_size == 8 ? *((uint64_t *) info) : *((uint32_t *) info);
+}
+
 static _upf_abbrev_vec _upf_parse_abbrevs(const uint8_t *abbrev_table) {
     _upf_abbrev_vec abbrevs = VECTOR_CSTR_ARENA(&_upf_vec_arena);
 
@@ -497,6 +501,16 @@ static _upf_param_value _upf_eval_dwarf_expr(const _upf_cu_info *cu, const uint8
         param.as.loc.reg = LOC_ADDR;
         param.as.loc.offset = _upf_get_offset(info);
         if (len != _upf_dwarf.address_size) goto skip;
+    } else if (opcode == DW_OP_addrx) {
+        assert(_upf_dwarf.addr != NULL);
+
+        uint64_t addr_offset;
+        size_t leb_len = _upf_uLEB_to_uint64(info, &addr_offset);
+
+        param.as.loc.reg = LOC_ADDR;
+        param.as.loc.offset = _upf_get_address2(_upf_dwarf.addr + cu->addr_base + addr_offset * _upf_dwarf.address_size);
+
+        if (len != leb_len) goto skip;
     } else {
         printf("0x%x\n", opcode);
         assert(0 && "TODO: handle other dwarf expressions");  // TODO:
@@ -1319,6 +1333,27 @@ static void _upf_parse_elf(void) {
             temp += sizeof(uint16_t);
 
             _upf_dwarf.str_offsets = temp;
+        } else if (strcmp(name, ".debug_addr") == 0) {
+            const uint8_t *temp = file + section->sh_offset;
+
+            // skipping length
+            if (*((uint32_t *) temp) == 0xffffffffU) temp += sizeof(uint64_t);
+            temp += sizeof(uint32_t);
+
+            uint16_t version = *((uint16_t *) temp);
+            assert(version == 5);
+            temp += sizeof(uint16_t);
+
+            uint8_t address_size = *((uint8_t *) temp);
+            _upf_dwarf.address_size = address_size;
+            temp += sizeof(uint8_t);
+
+            uint8_t segment_selector_size = *((uint8_t *) temp);
+            assert(segment_selector_size == 0
+                   && "Segmented addresses aren't supported since x86_64/amd64 (the only supported architecture) doesn't have them");
+            temp += sizeof(uint8_t);
+
+            _upf_dwarf.addr = temp;
         }
 
         section++;
