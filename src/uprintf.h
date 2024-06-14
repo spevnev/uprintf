@@ -480,10 +480,6 @@ static _upf_param_value _upf_eval_dwarf_expr(const _upf_cu_info *cu, const uint8
     } else if (DW_OP_reg0 <= opcode && opcode <= DW_OP_reg31) {
         param.as.loc.reg = opcode - DW_OP_reg0;
         if (len != 0) goto skip;
-    } else if (opcode == DW_OP_implicit_pointer) {
-        printf("[WARN] skipping DW_OP_implicit_pointer\n");
-        param.is_const = 2;
-        return param;
     } else if (opcode == DW_OP_entry_value) {
         uint64_t subexpr_len;
         size_t leb_len = _upf_uLEB_to_uint64(info, &subexpr_len);
@@ -511,6 +507,14 @@ static _upf_param_value _upf_eval_dwarf_expr(const _upf_cu_info *cu, const uint8
         param.as.loc.offset = _upf_get_address2(_upf_dwarf.addr + cu->addr_base + addr_offset * _upf_dwarf.address_size);
 
         if (len != leb_len) goto skip;
+    } else if (opcode == DW_OP_implicit_pointer) {
+        printf("[WARN] skipping DW_OP_implicit_pointer\n");
+        param.is_const = 2;
+        return param;
+    } else if (opcode == DW_OP_piece) {
+        printf("[WARN] skipping DW_OP_piece\n");
+        param.is_const = 2;
+        return param;
     } else {
         printf("0x%x\n", opcode);
         assert(0 && "TODO: handle other dwarf expressions");  // TODO:
@@ -544,7 +548,8 @@ static uint64_t _upf_get_x_offset(const uint8_t *info, uint64_t form) {
             return offset;
         case DW_FORM_addrx:
         case DW_FORM_strx:
-            return _upf_uLEB_to_uint64(info, &offset);
+            _upf_uLEB_to_uint64(info, &offset);
+            return offset;
         default:
             assert(0 && "UNREACHABLE");
     }
@@ -565,7 +570,7 @@ static const char *_upf_get_string(const _upf_cu_info *cu, const uint8_t *info, 
         case DW_FORM_strx3:
         case DW_FORM_strx4: {
             assert(_upf_dwarf.str_offsets != NULL && cu->str_offsets_base != INVALID_OFFSET);
-            uint64_t offset = (cu->str_offsets_base + _upf_get_x_offset(info, form)) * _upf_dwarf.offset_size;
+            uint64_t offset = cu->str_offsets_base + _upf_get_x_offset(info, form) * _upf_dwarf.offset_size;
             return _upf_dwarf.str + _upf_get_offset(_upf_dwarf.str_offsets + offset);
         }
         default:
@@ -608,9 +613,13 @@ static int64_t _upf_get_data(const uint8_t *info, _upf_attr attr) {
     }
 }
 
-static uint64_t _upf_get_address(const uint8_t *info, uint64_t form) {
+static uint64_t _upf_get_address(const _upf_cu_info *cu, const uint8_t *info, uint64_t form) {
     if (form == DW_FORM_addr) {
         return _upf_get_offset(info);
+    } else if (form == DW_FORM_addrx) {
+        assert(_upf_dwarf.addr != NULL);
+        uint64_t offset = cu->addr_base + _upf_get_x_offset(info, form) * _upf_dwarf.address_size;
+        return _upf_get_address2(_upf_dwarf.addr + offset);
     } else {
         assert(0 && "TODO: handle other address types");  // TODO:
     }
@@ -1325,6 +1334,7 @@ static void _upf_parse_elf(void) {
             _upf_dwarf.loclists = file + section->sh_offset;
         } else if (strcmp(name, ".debug_str_offsets") == 0) {
             const uint8_t *temp = file + section->sh_offset;
+            _upf_dwarf.str_offsets = temp;
 
             // skipping length
             if (*((uint32_t *) temp) == 0xffffffffU) temp += sizeof(uint64_t);
@@ -1337,10 +1347,9 @@ static void _upf_parse_elf(void) {
             uint16_t reserved = *((uint16_t *) temp);
             assert(reserved == 0);
             temp += sizeof(uint16_t);
-
-            _upf_dwarf.str_offsets = temp;
         } else if (strcmp(name, ".debug_addr") == 0) {
             const uint8_t *temp = file + section->sh_offset;
+            _upf_dwarf.addr = temp;
 
             // skipping length
             if (*((uint32_t *) temp) == 0xffffffffU) temp += sizeof(uint64_t);
@@ -1358,8 +1367,6 @@ static void _upf_parse_elf(void) {
             assert(segment_selector_size == 0
                    && "Segmented addresses aren't supported since x86_64/amd64 (the only supported architecture) doesn't have them");
             temp += sizeof(uint8_t);
-
-            _upf_dwarf.addr = temp;
         }
 
         section++;
