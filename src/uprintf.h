@@ -902,7 +902,9 @@ static size_t _upf_get_type(const _upf_cu_info *cu, const uint8_t *info) {
     return _upf_get_type_helper(cu, info, &type);
 }
 
-static bool _upf_get_locations(const _upf_cu_info *cu, const uint8_t *info, uint64_t form, uint64_t low_pc, _upf_loc_vec *locs) {
+// TODO: is there any point in returning bool, or partial result + handle them
+static bool _upf_get_locations(const _upf_cu_info *cu, const uint8_t *info, uint64_t form, _upf_loc_vec *locs) {
+    assert(locs->length == 0);
     if (form == DW_FORM_exprloc) {
         _upf_param_value param = _upf_eval_dwarf_expr(cu, info);
         if (param.is_const == 2) return false;
@@ -910,65 +912,70 @@ static bool _upf_get_locations(const _upf_cu_info *cu, const uint8_t *info, uint
         VECTOR_PUSH(locs, param.as.loc);
     } else if (form == DW_FORM_sec_offset) {
         assert(_upf_dwarf.loclists != NULL);
-        const uint8_t *loclist = _upf_dwarf.loclists + _upf_get_offset(info);
+        uint64_t base = INVALID_OFFSET;
+        bool result = true;
+        uint64_t o = _upf_get_offset(info);
+        const uint8_t *loclist = _upf_dwarf.loclists + o;
+        while (*loclist != DW_LLE_end_of_list) {
+            switch (*loclist++) {
+                case DW_LLE_base_address:
+                    base = _upf_get_address2(loclist);
+                    loclist += _upf_dwarf.address_size;
+                    break;
+                case DW_LLE_offset_pair: {
+                    uint64_t from, to;
+                    loclist += _upf_uLEB_to_uint64(loclist, &from);
+                    loclist += _upf_uLEB_to_uint64(loclist, &to);
 
-        uint8_t loclist_type = *loclist++;
-        if (loclist_type == DW_LLE_base_address || loclist_type == DW_LLE_offset_pair) {
-            uint64_t base;
-            if (loclist_type == DW_LLE_base_address) {
-                base = _upf_get_offset(loclist);
-                loclist += _upf_dwarf.address_size;
-            } else {
-                loclist--;
-                assert(low_pc != INVALID_OFFSET);
-                base = low_pc;
+                    _upf_param_value param = _upf_eval_dwarf_expr(cu, loclist);
+                    if (param.is_const != 2) {
+                        assert(!param.is_const);
+
+                        param.as.loc.is_scoped = true;
+                        param.as.loc.from = base + from;
+                        param.as.loc.to = base + to;
+
+                        VECTOR_PUSH(locs, param.as.loc);
+                    } else {
+                        result = false;
+                    }
+
+                    // TODO: move this inside _upf_eval_dwarf_expr?
+                    uint64_t expr_len;
+                    loclist += _upf_uLEB_to_uint64(loclist, &expr_len);
+                    loclist += expr_len;
+                } break;
+                case DW_LLE_start_length: {
+                    uint64_t from = _upf_get_address2(loclist);
+                    loclist += _upf_dwarf.address_size;
+
+                    uint64_t len;
+                    loclist += _upf_uLEB_to_uint64(loclist, &len);
+                    uint64_t to = from + len;
+
+                    _upf_param_value param = _upf_eval_dwarf_expr(cu, loclist);
+                    if (param.is_const != 2) {
+                        assert(!param.is_const);
+
+                        param.as.loc.is_scoped = true;
+                        param.as.loc.from = from;
+                        param.as.loc.to = to;
+
+                        VECTOR_PUSH(locs, param.as.loc);
+                    } else {
+                        result = false;
+                    }
+
+                    // TODO: move this inside _upf_eval_dwarf_expr?
+                    uint64_t expr_len;
+                    loclist += _upf_uLEB_to_uint64(loclist, &expr_len);
+                    loclist += expr_len;
+                } break;
+                default:
+                    assert(0 && "TODO: handle other loclist types");  // TODO:
             }
-
-            uint64_t from, to;
-            while (*loclist != DW_LLE_end_of_list) {
-                assert(*loclist == DW_LLE_offset_pair);
-
-                loclist++;
-                loclist += _upf_uLEB_to_uint64(loclist, &from);
-                loclist += _upf_uLEB_to_uint64(loclist, &to);
-
-                _upf_param_value param = _upf_eval_dwarf_expr(cu, loclist);
-                if (param.is_const != 2) {
-                    assert(!param.is_const);
-
-                    param.as.loc.is_scoped = true;
-                    param.as.loc.from = base + from;
-                    param.as.loc.to = base + to;
-
-                    VECTOR_PUSH(locs, param.as.loc);
-                }
-
-                // TODO: move this inside _upf_eval_dwarf_expr?
-                uint64_t expr_len;
-                loclist += _upf_uLEB_to_uint64(loclist, &expr_len);
-                loclist += expr_len;
-            }
-        } else if (loclist_type == DW_LLE_start_length) {
-            uint64_t from = _upf_get_offset(loclist);
-            loclist += _upf_dwarf.address_size;
-
-            uint64_t len;
-            loclist += _upf_uLEB_to_uint64(loclist, &len);
-            uint64_t to = from + len;
-
-            _upf_param_value param = _upf_eval_dwarf_expr(cu, loclist);
-            if (param.is_const == 2) return false;
-            assert(!param.is_const);
-
-            param.as.loc.is_scoped = true;
-            param.as.loc.from = from;
-            param.as.loc.to = to;
-
-            VECTOR_PUSH(locs, param.as.loc);
-        } else {
-            printf("0x%x\n", loclist_type);
-            assert(0 && "TODO: handle other loclist types");  // TODO:
         }
+        return result;
     } else {
         assert(0 && "TODO: handle other forms of DW_AT_location in variable/parameter");  // TODO:
     }
@@ -977,7 +984,7 @@ static bool _upf_get_locations(const _upf_cu_info *cu, const uint8_t *info, uint
 }
 
 // TODO: rename to include parameter?
-static _upf_var_entry _upf_parse_variable(const _upf_cu_info *cu, const uint8_t *info, const _upf_abbrev *abbrev, uint64_t low_pc) {
+static _upf_var_entry _upf_parse_variable(const _upf_cu_info *cu, const uint8_t *info, const _upf_abbrev *abbrev) {
     _upf_var_entry var = {
         .locs = VECTOR_CSTR_ARENA(&_upf_vec_arena),
     };
@@ -986,7 +993,7 @@ static _upf_var_entry _upf_parse_variable(const _upf_cu_info *cu, const uint8_t 
         _upf_attr attr = abbrev->attrs.data[i];
 
         if (attr.name == DW_AT_location) {
-            if (!_upf_get_locations(cu, info, attr.form, low_pc, &var.locs)) return var;
+            if (!_upf_get_locations(cu, info, attr.form, &var.locs)) return var;
         } else if (attr.name == DW_AT_type) {
             var.type_die = cu->base + _upf_get_ref(info, attr.form);
         }
@@ -1026,7 +1033,7 @@ static void _upf_parse_uprintf_call_site(const _upf_cu_info *cu, const _upf_para
             }
             assert(low_pc != INVALID_OFFSET);
         } else if (abbrev->tag == DW_TAG_formal_parameter || abbrev->tag == DW_TAG_variable) {
-            _upf_var_entry var = _upf_parse_variable(cu, subprogram, abbrev, low_pc);
+            _upf_var_entry var = _upf_parse_variable(cu, subprogram, abbrev);
             if (var.locs.length > 0) VECTOR_PUSH(vars, var);
         }
 
@@ -1070,7 +1077,7 @@ static void _upf_parse_uprintf_call_site(const _upf_cu_info *cu, const _upf_para
 
             if (attr.name == DW_AT_location) {
                 locs.length = 0;
-                bool result = _upf_get_locations(cu, info, attr.form, low_pc, &locs);
+                bool result = _upf_get_locations(cu, info, attr.form, &locs);
                 assert(result);
                 assert(locs.length == 1);
             } else if (attr.name == DW_AT_call_value) {
@@ -1159,7 +1166,6 @@ static const uint8_t *_upf_parse_uprintf_subprogram(const _upf_cu_info *cu, cons
                                                     const uint8_t *die_base, _upf_uprintf_info *uprintf) {
     static const char *UPRINTF_FUNCTION_NAME = "_upf_uprintf";
 
-    uint64_t low_pc = INVALID_OFFSET;
     bool found = false;
     for (size_t i = 0; i < abbrev->attrs.length; i++) {
         _upf_attr attr = abbrev->attrs.data[i];
@@ -1170,8 +1176,6 @@ static const uint8_t *_upf_parse_uprintf_subprogram(const _upf_cu_info *cu, cons
                 found = true;
                 uprintf->offset = die_base - cu->base;
             }
-        } else if (attr.name == DW_AT_low_pc) {
-            low_pc = _upf_get_address(cu, info, attr.form);
         }
 
         info += _upf_get_attr_size(info, attr.form);
@@ -1202,8 +1206,8 @@ static const uint8_t *_upf_parse_uprintf_subprogram(const _upf_cu_info *cu, cons
                 else assert(0 && "UNREACHABLE");
             } else if (attr.name == DW_AT_location) {
                 locs.length = 0;
-                _upf_get_locations(cu, info, attr.form, low_pc, &locs);
-                assert(!locs.data[0].is_scoped || locs.data[0].from == low_pc);
+                _upf_get_locations(cu, info, attr.form, &locs);
+                assert(locs.length > 0);
                 param.loc = locs.data[0];
             }
 
@@ -1288,7 +1292,7 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *info, const uin
             };
             VECTOR_PUSH(&call_sites, call_site);
         } else if (abbrev->tag == DW_TAG_variable && depth == 1) {
-            _upf_var_entry var = _upf_parse_variable(&cu, info, abbrev, INVALID_OFFSET);
+            _upf_var_entry var = _upf_parse_variable(&cu, info, abbrev);
             if (var.locs.length > 0) VECTOR_PUSH(&vars, var);
             info = _upf_skip_die(info, abbrev);
         } else {
