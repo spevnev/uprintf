@@ -522,11 +522,11 @@ static _upf_param_value _upf_eval_dwarf_expr(const _upf_cu_info *cu, const uint8
 
         if (len != leb_len) goto skip;
     } else if (opcode == DW_OP_implicit_pointer) {
-        printf("[WARN] skipping DW_OP_implicit_pointer\n");
+        fprintf(stderr, "[WARN] skipping DW_OP_implicit_pointer\n");
         param.is_const = 2;
         return param;
     } else if (opcode == DW_OP_piece) {
-        printf("[WARN] skipping DW_OP_piece\n");
+        fprintf(stderr, "[WARN] skipping DW_OP_piece\n");
         param.is_const = 2;
         return param;
     } else {
@@ -536,7 +536,7 @@ static _upf_param_value _upf_eval_dwarf_expr(const _upf_cu_info *cu, const uint8
 
     return param;
 skip:
-    printf("[WARN] skipping dwarf expression: stack is not implemented\n");
+    fprintf(stderr, "[WARN] skipping dwarf expression: stack is not implemented\n");
     param.is_const = 2;
     return param;
 }
