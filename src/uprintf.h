@@ -331,7 +331,7 @@ struct _upf_dwarf {
     uint8_t *file;
     off_t file_size;
 
-    bool is_64bit;
+    bool is64bit;
     uint8_t offset_size;
     uint8_t address_size;
 
@@ -393,11 +393,16 @@ static size_t _upf_LEB_to_int64(const uint8_t *leb, int64_t *result) {
     return i;
 }
 
-// TODO: rename
-static uint64_t _upf_get_offset(const uint8_t *info) { return _upf_dwarf.offset_size == 8 ? *((uint64_t *) info) : *((uint32_t *) info); }
+static uint64_t _upf_get_offset(const uint8_t *info) {
+    uint64_t offset = 0;
+    memcpy(&offset, info, _upf_dwarf.offset_size);
+    return offset;
+}
 
-static uint64_t _upf_get_address2(const uint8_t *info) {
-    return _upf_dwarf.address_size == 8 ? *((uint64_t *) info) : *((uint32_t *) info);
+static uint64_t _upf_get_address(const uint8_t *info) {
+    uint64_t address = 0;
+    memcpy(&address, info, _upf_dwarf.address_size);
+    return address;
 }
 
 static _upf_abbrev_vec _upf_parse_abbrevs(const uint8_t *abbrev_table) {
@@ -430,8 +435,6 @@ static _upf_abbrev_vec _upf_parse_abbrevs(const uint8_t *abbrev_table) {
 }
 
 static _upf_param_value _upf_eval_dwarf_expr(const _upf_cu_info *cu, const uint8_t *info) {
-    // TODO: rename struct, and variable to result
-    _upf_param_value param = {0};
 
     uint64_t len;
     info += _upf_uLEB_to_uint64(info, &len);
@@ -439,6 +442,7 @@ static _upf_param_value _upf_eval_dwarf_expr(const _upf_cu_info *cu, const uint8
     uint8_t opcode = *info++;
     len--;
 
+    _upf_param_value param = {0};
     if (DW_OP_lit0 <= opcode && opcode <= DW_OP_lit31) {
         if (len != 0) goto skip;
         param.is_const = true;
@@ -446,38 +450,54 @@ static _upf_param_value _upf_eval_dwarf_expr(const _upf_cu_info *cu, const uint8
     } else if (opcode == DW_OP_const1u) {
         if (len != 1) goto skip;
         param.is_const = true;
-        param.as.constant = *((uint8_t *) info);
+        param.as.constant = *info;
     } else if (opcode == DW_OP_const1s) {
         if (len != 1) goto skip;
         param.is_const = true;
-        param.as.constant = *((int8_t *) info);
+        int8_t temp = 0;
+        memcpy(&temp, info, sizeof(temp));
+        memcpy(&param.as.constant, &temp, sizeof(temp));
     } else if (opcode == DW_OP_const2u) {
         if (len != 2) goto skip;
         param.is_const = true;
-        param.as.constant = *((uint16_t *) info);
+        uint16_t temp = 0;
+        memcpy(&temp, info, sizeof(temp));
+        memcpy(&param.as.constant, &temp, sizeof(temp));
     } else if (opcode == DW_OP_const2s) {
         if (len != 2) goto skip;
         param.is_const = true;
-        param.as.constant = *((int16_t *) info);
+        int16_t temp = 0;
+        memcpy(&temp, info, sizeof(temp));
+        memcpy(&param.as.constant, &temp, sizeof(temp));
     } else if (opcode == DW_OP_const4u) {
         if (len != 4) goto skip;
         param.is_const = true;
-        param.as.constant = *((uint32_t *) info);
+        uint32_t temp = 0;
+        memcpy(&temp, info, sizeof(temp));
+        memcpy(&param.as.constant, &temp, sizeof(temp));
     } else if (opcode == DW_OP_const4s) {
         if (len != 4) goto skip;
         param.is_const = true;
-        param.as.constant = *((int32_t *) info);
+        int32_t temp = 0;
+        memcpy(&temp, info, sizeof(temp));
+        memcpy(&param.as.constant, &temp, sizeof(temp));
     } else if (opcode == DW_OP_const8u) {
         if (len != 8) goto skip;
         param.is_const = true;
-        param.as.constant = *((uint64_t *) info);
+        uint64_t temp = 0;
+        memcpy(&temp, info, sizeof(temp));
+        memcpy(&param.as.constant, &temp, sizeof(temp));
     } else if (opcode == DW_OP_const8s) {
         if (len != 8) goto skip;
         param.is_const = true;
-        param.as.constant = *((int64_t *) info);
+        int64_t temp = 0;
+        memcpy(&temp, info, sizeof(temp));
+        memcpy(&param.as.constant, &temp, sizeof(temp));
     } else if (opcode == DW_OP_constu) {
         param.is_const = true;
-        size_t leb_size = _upf_uLEB_to_uint64(info, (uint64_t *) &param.as.constant);
+        uint64_t temp;
+        size_t leb_size = _upf_uLEB_to_uint64(info, &temp);
+        param.as.constant = temp;
         if (len != leb_size) goto skip;
     } else if (opcode == DW_OP_consts) {
         param.is_const = true;
@@ -509,7 +529,7 @@ static _upf_param_value _upf_eval_dwarf_expr(const _upf_cu_info *cu, const uint8
         }
     } else if (opcode == DW_OP_addr) {
         param.as.loc.reg = LOC_ADDR;
-        param.as.loc.offset = _upf_get_offset(info);
+        param.as.loc.offset = _upf_get_address(info);
         if (len != _upf_dwarf.address_size) goto skip;
     } else if (opcode == DW_OP_addrx) {
         assert(_upf_dwarf.addr != NULL);
@@ -518,7 +538,7 @@ static _upf_param_value _upf_eval_dwarf_expr(const _upf_cu_info *cu, const uint8
         size_t leb_len = _upf_uLEB_to_uint64(info, &addr_offset);
 
         param.as.loc.reg = LOC_ADDR;
-        param.as.loc.offset = _upf_get_address2(_upf_dwarf.addr + cu->addr_base + addr_offset * _upf_dwarf.address_size);
+        param.as.loc.offset = _upf_get_address(_upf_dwarf.addr + cu->addr_base + addr_offset * _upf_dwarf.address_size);
 
         if (len != leb_len) goto skip;
     } else if (opcode == DW_OP_implicit_pointer) {
@@ -539,104 +559,6 @@ skip:
     fprintf(stderr, "[WARN] skipping dwarf expression: stack is not implemented\n");
     param.is_const = 2;
     return param;
-}
-
-static uint64_t _upf_get_x_offset(const uint8_t *info, uint64_t form) {
-    uint64_t offset;
-    switch (form) {
-        case DW_FORM_strx1:
-        case DW_FORM_addrx1:
-            memcpy(&offset, info, 1);
-            return offset;
-        case DW_FORM_strx2:
-        case DW_FORM_addrx2:
-            memcpy(&offset, info, 2);
-            return offset;
-        case DW_FORM_strx3:
-        case DW_FORM_addrx3:
-            memcpy(&offset, info, 3);
-            return offset;
-        case DW_FORM_strx4:
-        case DW_FORM_addrx4:
-            memcpy(&offset, info, 4);
-            return offset;
-        case DW_FORM_addrx:
-        case DW_FORM_strx:
-            _upf_uLEB_to_uint64(info, &offset);
-            return offset;
-        default:
-            assert(0 && "UNREACHABLE");
-    }
-}
-
-static const char *_upf_get_string(const _upf_cu_info *cu, const uint8_t *info, uint64_t form) {
-    switch (form) {
-        case DW_FORM_strp:
-            return _upf_dwarf.str + _upf_get_offset(info);
-        case DW_FORM_line_strp:
-            assert(_upf_dwarf.line_str != NULL);
-            return _upf_dwarf.line_str + _upf_get_offset(info);
-        case DW_FORM_string:
-            return (const char *) info;
-        case DW_FORM_strx:
-        case DW_FORM_strx1:
-        case DW_FORM_strx2:
-        case DW_FORM_strx3:
-        case DW_FORM_strx4: {
-            assert(_upf_dwarf.str_offsets != NULL && cu->str_offsets_base != INVALID_OFFSET);
-            uint64_t offset = cu->str_offsets_base + _upf_get_x_offset(info, form) * _upf_dwarf.offset_size;
-            return _upf_dwarf.str + _upf_get_offset(_upf_dwarf.str_offsets + offset);
-        }
-        default:
-            assert(0 && "TODO: handle other string types");  // TODO:
-    }
-}
-
-static uint64_t _upf_get_ref(const uint8_t *info, uint64_t form) {
-    if (form == DW_FORM_ref1) {
-        return *info;
-    } else if (form == DW_FORM_ref2) {
-        return *((uint16_t *) info);
-    } else if (form == DW_FORM_ref4) {
-        return *((uint32_t *) info);
-    } else if (form == DW_FORM_ref8) {
-        return *((uint64_t *) info);
-    } else if (form == DW_FORM_ref_udata) {
-        uint64_t result;
-        _upf_uLEB_to_uint64(info, &result);
-        return result;
-    } else {
-        assert(0 && "TODO: handle other ref types");  // TODO:
-    }
-}
-
-static int64_t _upf_get_data(const uint8_t *info, _upf_attr attr) {
-    if (attr.form == DW_FORM_data1) {
-        return *info;
-    } else if (attr.form == DW_FORM_data2) {
-        return *((int16_t *) info);
-    } else if (attr.form == DW_FORM_data4) {
-        return *((int32_t *) info);
-    } else if (attr.form == DW_FORM_data8) {
-        return *((int64_t *) info);
-    } else if (attr.form == DW_FORM_implicit_const) {
-        return attr.implicit_const;
-    } else {
-        printf("0x%02lx\n", attr.form);
-        assert(0 && "TODO: handle other data types");  // TODO:
-    }
-}
-
-static uint64_t _upf_get_address(const _upf_cu_info *cu, const uint8_t *info, uint64_t form) {
-    if (form == DW_FORM_addr) {
-        return _upf_get_offset(info);
-    } else if (form == DW_FORM_addrx) {
-        assert(_upf_dwarf.addr != NULL);
-        uint64_t offset = cu->addr_base + _upf_get_x_offset(info, form) * _upf_dwarf.address_size;
-        return _upf_get_address2(_upf_dwarf.addr + offset);
-    } else {
-        assert(0 && "TODO: handle other address types");  // TODO:
-    }
 }
 
 static size_t _upf_get_attr_size(const uint8_t *info, uint64_t form) {
@@ -709,6 +631,104 @@ static size_t _upf_get_attr_size(const uint8_t *info, uint64_t form) {
             return 0;
         default:
             assert(0 && "UNREACHABLE");
+    }
+}
+
+static uint64_t _upf_get_x_offset(const uint8_t *info, uint64_t form) {
+    uint64_t offset = 0;
+    switch (form) {
+        case DW_FORM_strx1:
+        case DW_FORM_addrx1:
+            memcpy(&offset, info, 1);
+            return offset;
+        case DW_FORM_strx2:
+        case DW_FORM_addrx2:
+            memcpy(&offset, info, 2);
+            return offset;
+        case DW_FORM_strx3:
+        case DW_FORM_addrx3:
+            memcpy(&offset, info, 3);
+            return offset;
+        case DW_FORM_strx4:
+        case DW_FORM_addrx4:
+            memcpy(&offset, info, 4);
+            return offset;
+        case DW_FORM_addrx:
+        case DW_FORM_strx:
+            _upf_uLEB_to_uint64(info, &offset);
+            return offset;
+        default:
+            assert(0 && "UNREACHABLE");
+    }
+}
+
+static const char *_upf_get_string(const _upf_cu_info *cu, const uint8_t *info, uint64_t form) {
+    switch (form) {
+        case DW_FORM_strp:
+            return _upf_dwarf.str + _upf_get_offset(info);
+        case DW_FORM_line_strp:
+            assert(_upf_dwarf.line_str != NULL);
+            return _upf_dwarf.line_str + _upf_get_offset(info);
+        case DW_FORM_string:
+            return (const char *) info;
+        case DW_FORM_strx:
+        case DW_FORM_strx1:
+        case DW_FORM_strx2:
+        case DW_FORM_strx3:
+        case DW_FORM_strx4: {
+            assert(_upf_dwarf.str_offsets != NULL && cu->str_offsets_base != INVALID_OFFSET);
+            uint64_t offset = cu->str_offsets_base + _upf_get_x_offset(info, form) * _upf_dwarf.offset_size;
+            return _upf_dwarf.str + _upf_get_offset(_upf_dwarf.str_offsets + offset);
+        }
+        default:
+            assert(0 && "TODO: handle other string types");  // TODO:
+    }
+}
+
+static uint64_t _upf_get_ref(const uint8_t *info, uint64_t form) {
+    uint64_t ref = 0;
+    switch (form) {
+        case DW_FORM_ref1:
+        case DW_FORM_ref2:
+        case DW_FORM_ref4:
+        case DW_FORM_ref8:
+            memcpy(&ref, info, _upf_get_attr_size(info, form));
+            break;
+        case DW_FORM_ref_udata:
+            _upf_uLEB_to_uint64(info, &ref);
+            break;
+        default:
+            assert(0 && "TODO: handle other ref types");  // TODO:
+    }
+    return ref;
+}
+
+static int64_t _upf_get_data(const uint8_t *info, _upf_attr attr) {
+    switch (attr.form) {
+        case DW_FORM_data1:
+        case DW_FORM_data2:
+        case DW_FORM_data4:
+        case DW_FORM_data8: {
+            int64_t data = 0;
+            memcpy(&data, info, _upf_get_attr_size(info, attr.form));
+            return data;
+        } break;
+        case DW_FORM_implicit_const:
+            return attr.implicit_const;
+        default:
+            assert(0 && "TODO: handle other data types");  // TODO:
+    }
+}
+
+static uint64_t _upf_get_addr(const _upf_cu_info *cu, const uint8_t *info, uint64_t form) {
+    if (form == DW_FORM_addr) {
+        return _upf_get_address(info);
+    } else if (form == DW_FORM_addrx) {
+        assert(_upf_dwarf.addr != NULL);
+        uint64_t offset = cu->addr_base + _upf_get_x_offset(info, form) * _upf_dwarf.address_size;
+        return _upf_get_address(_upf_dwarf.addr + offset);
+    } else {
+        assert(0 && "TODO: handle other address types");  // TODO:
     }
 }
 
@@ -914,12 +934,11 @@ static bool _upf_get_locations(const _upf_cu_info *cu, const uint8_t *info, uint
         assert(_upf_dwarf.loclists != NULL);
         uint64_t base = INVALID_OFFSET;
         bool result = true;
-        uint64_t o = _upf_get_offset(info);
-        const uint8_t *loclist = _upf_dwarf.loclists + o;
+        const uint8_t *loclist = _upf_dwarf.loclists + _upf_get_offset(info);
         while (*loclist != DW_LLE_end_of_list) {
             switch (*loclist++) {
                 case DW_LLE_base_address:
-                    base = _upf_get_address2(loclist);
+                    base = _upf_get_address(loclist);
                     loclist += _upf_dwarf.address_size;
                     break;
                 case DW_LLE_offset_pair: {
@@ -946,7 +965,7 @@ static bool _upf_get_locations(const _upf_cu_info *cu, const uint8_t *info, uint
                     loclist += expr_len;
                 } break;
                 case DW_LLE_start_length: {
-                    uint64_t from = _upf_get_address2(loclist);
+                    uint64_t from = _upf_get_address(loclist);
                     loclist += _upf_dwarf.address_size;
 
                     uint64_t len;
@@ -1025,7 +1044,7 @@ static void _upf_parse_uprintf_call_site(const _upf_cu_info *cu, const _upf_para
                 _upf_attr attr = abbrev->attrs.data[i];
 
                 if (attr.name == DW_AT_low_pc) {
-                    low_pc = _upf_get_address(cu, info, attr.form);
+                    low_pc = _upf_get_addr(cu, info, attr.form);
                     break;
                 }
 
@@ -1050,7 +1069,7 @@ static void _upf_parse_uprintf_call_site(const _upf_cu_info *cu, const _upf_para
     for (size_t i = 0; i < abbrev->attrs.length; i++) {
         _upf_attr attr = abbrev->attrs.data[i];
 
-        if (attr.name == DW_AT_call_return_pc) return_pc = _upf_get_address(cu, info, attr.form);
+        if (attr.name == DW_AT_call_return_pc) return_pc = _upf_get_addr(cu, info, attr.form);
 
         info += _upf_get_attr_size(info, attr.form);
     }
@@ -1137,6 +1156,7 @@ static void _upf_parse_uprintf_call_site(const _upf_cu_info *cu, const _upf_para
                                 if (!(loc.from < return_pc && return_pc <= loc.to)) continue;
                             }
 
+                            assert(var.type_die != NULL);
                             size_t type_idx = _upf_get_type(cu, var.type_die);
                             if (type_idx != -1U) {
                                 VECTOR_PUSH(&entry.arg_types, type_idx);
@@ -1318,22 +1338,25 @@ static void _upf_parse_dwarf() {
     while (info < info_end) {
         const uint8_t *cu_base = info;
 
-        uint64_t length = *((uint32_t *) info);
+        uint64_t length = 0;
+        memcpy(&length, info, sizeof(uint32_t));
         info += sizeof(uint32_t);
 
-        _upf_dwarf.is_64bit = false;
+        _upf_dwarf.is64bit = false;
         if (length == 0xffffffffU) {
-            length = *((uint64_t *) info);
+            memcpy(&length, info, sizeof(uint64_t));
             info += sizeof(uint64_t);
-            _upf_dwarf.is_64bit = true;
+            _upf_dwarf.is64bit = true;
         }
-        _upf_dwarf.offset_size = _upf_dwarf.is_64bit ? 8 : 4;
+
+        _upf_dwarf.offset_size = _upf_dwarf.is64bit ? 8 : 4;
 
         const uint8_t *next = info + length;
 
-        uint16_t version = *((uint16_t *) info);
+        uint16_t version = 0;
+        memcpy(&version, info, sizeof(version));
         info += sizeof(version);
-        assert(version == 5);
+        if (version != 5) ERROR("uprintf only supports DWARF version 5.\n");
 
         uint8_t type = *info;
         info += sizeof(type);
@@ -1344,14 +1367,8 @@ static void _upf_parse_dwarf() {
         _upf_dwarf.address_size = address_size;
         info += sizeof(address_size);
 
-        uint64_t abbrev_offset;
-        if (_upf_dwarf.is_64bit) {
-            abbrev_offset = *((uint64_t *) info);
-            info += sizeof(uint64_t);
-        } else {
-            abbrev_offset = *((uint32_t *) info);
-            info += sizeof(uint32_t);
-        }
+        uint64_t abbrev_offset = _upf_get_offset(info);
+        info += _upf_dwarf.offset_size;
 
         _upf_parse_cu(cu_base, info, next, _upf_dwarf.abbrev + abbrev_offset);
 
@@ -1407,34 +1424,37 @@ static void _upf_parse_elf(void) {
             const uint8_t *temp = file + section->sh_offset;
             _upf_dwarf.str_offsets = temp;
 
-            // skipping length
-            if (*((uint32_t *) temp) == 0xffffffffU) temp += sizeof(uint64_t);
+            uint32_t dwarf64_length = 0xffffffffU;
+            if (memcmp(temp, &dwarf64_length, sizeof(dwarf64_length)) == 0) temp += sizeof(uint64_t);
             temp += sizeof(uint32_t);
 
-            uint16_t version = *((uint16_t *) temp);
+            uint16_t version = 0;
+            memcpy(&version, temp, sizeof(version));
             assert(version == 5);
             temp += sizeof(uint16_t);
 
-            uint16_t reserved = *((uint16_t *) temp);
+            uint16_t reserved = 0;
+            memcpy(&reserved, temp, sizeof(reserved));
             assert(reserved == 0);
             temp += sizeof(uint16_t);
         } else if (strcmp(name, ".debug_addr") == 0) {
             const uint8_t *temp = file + section->sh_offset;
             _upf_dwarf.addr = temp;
 
-            // skipping length
-            if (*((uint32_t *) temp) == 0xffffffffU) temp += sizeof(uint64_t);
+            uint32_t dwarf64_length = 0xffffffffU;
+            if (memcmp(temp, &dwarf64_length, sizeof(dwarf64_length)) == 0) temp += sizeof(uint64_t);
             temp += sizeof(uint32_t);
 
-            uint16_t version = *((uint16_t *) temp);
+            uint16_t version = 0;
+            memcpy(&version, temp, sizeof(version));
             assert(version == 5);
             temp += sizeof(uint16_t);
 
-            uint8_t address_size = *((uint8_t *) temp);
+            uint8_t address_size = *temp;
             _upf_dwarf.address_size = address_size;
             temp += sizeof(uint8_t);
 
-            uint8_t segment_selector_size = *((uint8_t *) temp);
+            uint8_t segment_selector_size = *temp;
             assert(segment_selector_size == 0
                    && "Segmented addresses aren't supported since x86_64/amd64 (the only supported architecture) doesn't have them");
             temp += sizeof(uint8_t);
@@ -1538,7 +1558,7 @@ static char *_upf_print_type(char *p, const uint8_t *data, const _upf_type *type
             p += sprintf(p, "};");
             break;
         case _UPF_TT_U1:
-            p += sprintf(p, "%hhu", *((uint8_t *) data));
+            p += sprintf(p, "%hhu", *data);
             break;
         case _UPF_TT_U2:
             p += sprintf(p, "%hu", *((uint16_t *) data));
