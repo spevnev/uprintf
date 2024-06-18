@@ -1012,9 +1012,17 @@ static _upf_var_entry _upf_parse_variable(const _upf_cu_info *cu, const uint8_t 
         _upf_attr attr = abbrev->attrs.data[i];
 
         if (attr.name == DW_AT_location) {
-            if (!_upf_get_locations(cu, info, attr.form, &var.locs)) return var;
+            if (!_upf_get_locations(cu, info, attr.form, &var.locs)) return var;  // failure
         } else if (attr.name == DW_AT_type) {
             var.type_die = cu->base + _upf_get_ref(info, attr.form);
+        } else if (attr.name == DW_AT_abstract_origin) {
+            const uint8_t *new_info = cu->base + _upf_get_ref(info, attr.form);
+
+            uint64_t code;
+            new_info += _upf_uLEB_to_uint64(new_info, &code);
+            assert(code > 0 && code <= cu->abbrevs->length);
+            _upf_var_entry new_var = _upf_parse_variable(cu, new_info, &cu->abbrevs->data[code - 1]);
+            var.type_die = new_var.type_die;
         }
 
         info += _upf_get_attr_size(info, attr.form);
