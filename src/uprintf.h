@@ -343,6 +343,7 @@ struct _upf_dwarf {
     const char *str;
     const char *line_str;
     const uint8_t *loclists;
+    const uint8_t *loclist_offsets;
     const uint8_t *str_offsets;
     const uint8_t *addr;
 };
@@ -916,6 +917,71 @@ static size_t _upf_get_type(const _upf_cu_info *cu, const uint8_t *info, _upf_ty
     return -1U;
 }
 
+static bool _upf_parse_loclist(const _upf_cu_info *cu, const uint8_t *loclist, _upf_loc_vec *locs) {
+    uint64_t base = INVALID_OFFSET;
+    bool result = true;
+    while (*loclist != DW_LLE_end_of_list) {
+        switch (*loclist++) {
+            case DW_LLE_base_address:
+                base = _upf_get_address(loclist);
+                loclist += _upf_dwarf.address_size;
+                break;
+            case DW_LLE_offset_pair: {
+                uint64_t from, to;
+                loclist += _upf_uLEB_to_uint64(loclist, &from);
+                loclist += _upf_uLEB_to_uint64(loclist, &to);
+
+                _upf_param_value param = _upf_eval_dwarf_expr(cu, loclist);
+                if (param.is_const != 2) {
+                    assert(!param.is_const);
+
+                    param.as.loc.is_scoped = true;
+                    param.as.loc.from = base + from;
+                    param.as.loc.to = base + to;
+
+                    VECTOR_PUSH(locs, param.as.loc);
+                } else {
+                    result = false;
+                }
+
+                // TODO: move this inside _upf_eval_dwarf_expr?
+                uint64_t expr_len;
+                loclist += _upf_uLEB_to_uint64(loclist, &expr_len);
+                loclist += expr_len;
+            } break;
+            case DW_LLE_start_length: {
+                uint64_t from = _upf_get_address(loclist);
+                loclist += _upf_dwarf.address_size;
+
+                uint64_t len;
+                loclist += _upf_uLEB_to_uint64(loclist, &len);
+                uint64_t to = from + len;
+
+                _upf_param_value param = _upf_eval_dwarf_expr(cu, loclist);
+                if (param.is_const != 2) {
+                    assert(!param.is_const);
+
+                    param.as.loc.is_scoped = true;
+                    param.as.loc.from = from;
+                    param.as.loc.to = to;
+
+                    VECTOR_PUSH(locs, param.as.loc);
+                } else {
+                    result = false;
+                }
+
+                // TODO: move this inside _upf_eval_dwarf_expr?
+                uint64_t expr_len;
+                loclist += _upf_uLEB_to_uint64(loclist, &expr_len);
+                loclist += expr_len;
+            } break;
+            default:
+                assert(0 && "TODO: handle other loclist types");  // TODO:
+        }
+    }
+    return result;
+}
+
 // TODO: is there any point in returning bool, or partial result + handle them
 static bool _upf_get_locations(const _upf_cu_info *cu, const uint8_t *info, uint64_t form, _upf_loc_vec *locs) {
     assert(locs->length == 0);
@@ -926,71 +992,18 @@ static bool _upf_get_locations(const _upf_cu_info *cu, const uint8_t *info, uint
         VECTOR_PUSH(locs, param.as.loc);
     } else if (form == DW_FORM_sec_offset) {
         assert(_upf_dwarf.loclists != NULL);
-        uint64_t base = INVALID_OFFSET;
-        bool result = true;
         const uint8_t *loclist = _upf_dwarf.loclists + _upf_get_offset(info);
-        while (*loclist != DW_LLE_end_of_list) {
-            switch (*loclist++) {
-                case DW_LLE_base_address:
-                    base = _upf_get_address(loclist);
-                    loclist += _upf_dwarf.address_size;
-                    break;
-                case DW_LLE_offset_pair: {
-                    uint64_t from, to;
-                    loclist += _upf_uLEB_to_uint64(loclist, &from);
-                    loclist += _upf_uLEB_to_uint64(loclist, &to);
-
-                    _upf_param_value param = _upf_eval_dwarf_expr(cu, loclist);
-                    if (param.is_const != 2) {
-                        assert(!param.is_const);
-
-                        param.as.loc.is_scoped = true;
-                        param.as.loc.from = base + from;
-                        param.as.loc.to = base + to;
-
-                        VECTOR_PUSH(locs, param.as.loc);
-                    } else {
-                        result = false;
-                    }
-
-                    // TODO: move this inside _upf_eval_dwarf_expr?
-                    uint64_t expr_len;
-                    loclist += _upf_uLEB_to_uint64(loclist, &expr_len);
-                    loclist += expr_len;
-                } break;
-                case DW_LLE_start_length: {
-                    uint64_t from = _upf_get_address(loclist);
-                    loclist += _upf_dwarf.address_size;
-
-                    uint64_t len;
-                    loclist += _upf_uLEB_to_uint64(loclist, &len);
-                    uint64_t to = from + len;
-
-                    _upf_param_value param = _upf_eval_dwarf_expr(cu, loclist);
-                    if (param.is_const != 2) {
-                        assert(!param.is_const);
-
-                        param.as.loc.is_scoped = true;
-                        param.as.loc.from = from;
-                        param.as.loc.to = to;
-
-                        VECTOR_PUSH(locs, param.as.loc);
-                    } else {
-                        result = false;
-                    }
-
-                    // TODO: move this inside _upf_eval_dwarf_expr?
-                    uint64_t expr_len;
-                    loclist += _upf_uLEB_to_uint64(loclist, &expr_len);
-                    loclist += expr_len;
-                } break;
-                default:
-                    assert(0 && "TODO: handle other loclist types");  // TODO:
-            }
-        }
-        return result;
+        return _upf_parse_loclist(cu, loclist, locs);
     } else if (form == DW_FORM_loclistx) {
-        assert(0 && "TODO");  // TODO:
+        assert(_upf_dwarf.loclist_offsets != NULL);
+
+        uint64_t index;
+        _upf_uLEB_to_uint64(info, &index);
+
+        uint64_t loclist_offset = _upf_get_offset(_upf_dwarf.loclist_offsets + index * _upf_dwarf.offset_size);
+        const uint8_t *loclist = _upf_dwarf.loclist_offsets + loclist_offset;
+
+        return _upf_parse_loclist(cu, loclist, locs);
     } else UNREACHABLE();
 
     return true;
@@ -1431,7 +1444,33 @@ static void _upf_parse_elf(void) {
         } else if (strcmp(name, ".debug_line_str") == 0) {
             _upf_dwarf.line_str = (const char *) (file + section->sh_offset);
         } else if (strcmp(name, ".debug_loclists") == 0) {
-            _upf_dwarf.loclists = file + section->sh_offset;
+            const uint8_t *temp = file + section->sh_offset;
+            _upf_dwarf.loclists = temp;
+
+            uint32_t dwarf64_length = 0xffffffffU;
+            if (memcmp(temp, &dwarf64_length, sizeof(dwarf64_length)) == 0) temp += sizeof(uint64_t);
+            temp += sizeof(uint32_t);
+
+            uint16_t version = 0;
+            memcpy(&version, temp, sizeof(version));
+            assert(version == 5);
+            temp += sizeof(uint16_t);
+
+            uint8_t address_size = *temp;
+            assert(_upf_dwarf.address_size == 0 || _upf_dwarf.address_size == address_size);
+            _upf_dwarf.address_size = address_size;
+            temp += sizeof(uint8_t);
+
+            uint8_t segment_selector_size = *temp;
+            assert(segment_selector_size == 0
+                   && "Segmented addresses aren't supported since x86_64/amd64 (the only supported architecture) doesn't have them");
+            temp += sizeof(uint8_t);
+
+            uint32_t offset_count = 0;
+            memcpy(&offset_count, temp, sizeof(offset_count));
+            temp += sizeof(uint32_t);
+
+            if (offset_count > 0) _upf_dwarf.loclist_offsets = temp;
         } else if (strcmp(name, ".debug_str_offsets") == 0) {
             const uint8_t *temp = file + section->sh_offset;
             _upf_dwarf.str_offsets = temp;
@@ -1463,6 +1502,7 @@ static void _upf_parse_elf(void) {
             temp += sizeof(uint16_t);
 
             uint8_t address_size = *temp;
+            assert(_upf_dwarf.address_size == 0 || _upf_dwarf.address_size == address_size);
             _upf_dwarf.address_size = address_size;
             temp += sizeof(uint8_t);
 
