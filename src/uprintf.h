@@ -1160,7 +1160,7 @@ static void _upf_parse_uprintf_call_site(const _upf_cu_info *cu, const _upf_para
                 }
                 assert(!param.is_const);
 
-                bool found = false;
+                size_t type_idx = INVALID_OFFSET;
                 for (size_t i = 0; i < vars->length; i++) {
                     _upf_var_entry var = vars->data[i];
                     for (size_t j = 0; j < var.locs.length; j++) {
@@ -1177,21 +1177,14 @@ static void _upf_parse_uprintf_call_site(const _upf_cu_info *cu, const _upf_para
                             };
 
                             assert(var.type_die != NULL);
-                            size_t type_idx = _upf_get_type(cu, var.type_die, &type);
-                            if (type_idx != -1U) {
-                                VECTOR_PUSH(&entry.arg_types, type_idx);
-                                found = true;
-                            }
-                            break;
+                            type_idx = _upf_get_type(cu, var.type_die, &type);
+                            goto found;
                         }
                     }
-                    if (found) break;
                 }
-                if (!found) {
-                    // TODO: what if line number is -1/wrong?
-                    fprintf(stderr, "[ERROR] Can't determine argument types for uprintf call at %s:%ld\n", file_path, entry.line);
-                    return;
-                }
+            found:
+                if (type_idx != INVALID_OFFSET) VECTOR_PUSH(&entry.arg_types, type_idx);
+                // TODO: rework in order to allow placeholder + encourage lazy type parsing
             } break;
             default:
                 UNREACHABLE();
@@ -1224,7 +1217,6 @@ static void _upf_parse_uprintf_subprogram(const _upf_cu_info *cu, const uint8_t 
 
     // TODO: check param parsing: print + compare to dwarfdump
     uint64_t code;
-    const uint8_t *prev_info = info;
     _upf_loc_vec locs = VECTOR_CSTR_ARENA(&_upf_vec_arena);
     while (1) {
         info += _upf_uLEB_to_uint64(info, &code);
@@ -1357,7 +1349,7 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *info, const uin
     }
 }
 
-static void _upf_parse_dwarf() {
+static void _upf_parse_dwarf(void) {
     const uint8_t *info = _upf_dwarf.info;
     const uint8_t *info_end = info + _upf_dwarf.info_size;
     while (info < info_end) {
@@ -1570,7 +1562,7 @@ static char *_upf_print_type(char *p, const uint8_t *data, const _upf_type *type
                 // TODO: it might not have a \0
                 char *str = *((char **) data);
                 p += sprintf(p, "%p (\"", (void *) str);
-                while (*str != '\0') p += sprintf(p, _upf_escape_char(*str++));
+                while (*str != '\0') p += sprintf(p, "%s", _upf_escape_char(*str++));
                 p += sprintf(p, "\")");
             }
                 return p;
