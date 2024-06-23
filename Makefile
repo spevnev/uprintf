@@ -2,7 +2,7 @@ EXAMPLES := struct
 #union primitive
 
 CC      := gcc
-FLAGS  := -g3 -O2 -std=c11
+FLAGS  := -g3 -O2 -std=c17
 CFLAGS := -Wall -Wextra -pedantic -Isrc -fsanitize=undefined
 
 BUILD_DIR := build
