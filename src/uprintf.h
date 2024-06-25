@@ -327,7 +327,7 @@ typedef struct {
             const _upf_cu_info *cu;
             const uint8_t *type_die;
         } lazy;
-        _upf_loc loc;
+        const _upf_cu_info *cu;
     } as;
 } _upf_uprintf_arg;
 
@@ -338,6 +338,7 @@ typedef struct {
     uint64_t line;
     uint64_t counter;
     _upf_uprintf_arg_vec arg_types;
+    _upf_var_vec vars;
 } _upf_arg_entry;
 
 VECTOR_TYPEDEF(_upf_arg_vec, _upf_arg_entry);
@@ -357,6 +358,7 @@ typedef struct {
 } _upf_uprintf_info;
 
 struct _upf_dwarf {
+    int64_t base_address;
     uint8_t *file;
     off_t file_size;
 
@@ -1247,12 +1249,14 @@ static void _upf_parse_uprintf_call_site(const _upf_cu_info *cu, const _upf_para
         info += _upf_get_attr_size(info, attr.form);
     }
 
+    bool has_runtime = false;
     _upf_loc_vec locs = VECTOR_CSTR_ARENA(&_upf_vec_arena);
     _upf_arg_entry entry = {
         .file = cu->file_path,
         .line = INVALID,
         .counter = INVALID,
         .arg_types = VECTOR_CSTR_ARENA(&_upf_vec_arena),
+        .vars = VECTOR_CSTR_ARENA(&_upf_vec_arena),
     };
     while (1) {
         info += _upf_uLEB_to_uint64(info, &code);
@@ -1352,10 +1356,11 @@ static void _upf_parse_uprintf_call_site(const _upf_cu_info *cu, const _upf_para
                     }
                 }
                 if (!found) {
+                    has_runtime = true;
                     _upf_uprintf_arg arg = {
                         .kind = _UPF_AK_RUNTIME,
                         .as = {
-                            .loc = param.as.loc,
+                            .cu = cu,
                         },
                     };
                     VECTOR_PUSH(&entry.arg_types, arg);
@@ -1363,6 +1368,19 @@ static void _upf_parse_uprintf_call_site(const _upf_cu_info *cu, const _upf_para
             } break;
             default:
                 UNREACHABLE();
+        }
+    }
+
+    if (has_runtime) {
+        // save variables which can be useful at runtime
+        for (size_t i = 0; i < vars->length; i++) {
+            _upf_var_entry var = vars->data[i];
+            for (size_t j = 0; j < var.locs.length; j++) {
+                _upf_loc loc = var.locs.data[j];
+                if (loc.reg != LOC_FBREG && loc.reg != LOC_ADDR) continue;
+
+                VECTOR_PUSH(&entry.vars, var);
+            }
         }
     }
 
@@ -1834,12 +1852,38 @@ static char *_upf_print_type(char *p, const uint8_t *data, const _upf_type *type
     return p;
 }
 
+// TODO: assert everywhere where address_size is set?
+// Addresses of static variables are stored in bss segment, and static const
+// variables are stored in data segment. DWARF's `DW_OP_addr`es pointing to
+// them are all relative to the beginning of the process's address space,
+// which we get from `/proc/self/maps`. It is the one with the executable
+// name to its right, but since it usually comes first we can just read first
+// address.
+static int64_t _upf_get_address_space_base(void) {
+    char buffer[18];  // per 2 for at most 8 bytes, 1 for -, 1 for \0
+
+    int fd = open("/proc/self/maps", O_RDONLY);
+    if (read(fd, buffer, 17) == -1) goto error;
+    close(fd);
+
+    char *ch = buffer;
+    while (*ch != '\0' && *ch != '-') ch++;
+    if (*ch == '\0') goto error;
+    *ch = '\0';
+
+    return strtol(buffer, NULL, 16);
+error:
+    fprintf(stderr, "[WARN] uprintf: Unable to get base of address space. Runtime type deduction isn't possible.");
+    return 0;
+}
+
 
 __attribute__((constructor)) void _upf_init(void) {
     _upf_arena_init(&_upf_vec_arena);
 
     _upf_parse_elf();
     _upf_parse_dwarf();
+    _upf_dwarf.base_address = _upf_get_address_space_base();
 }
 
 __attribute__((destructor)) void _upf_fini(void) {
@@ -1855,11 +1899,13 @@ void _upf_uprintf(const char *file, uint64_t line, uint64_t counter, const char 
 
     bool found = false;
     _upf_uprintf_arg_vec arg_types;
+    _upf_var_vec vars;
     for (size_t i = 0; i < _upf_args_map.length; i++) {
         // TODO: handle invalid counter
         _upf_arg_entry entry = _upf_args_map.data[i];
         if (entry.counter == counter && entry.line == line && strcmp(entry.file, file) == 0) {
             arg_types = entry.arg_types;
+            vars = entry.vars;
             found = true;
             break;
         }
@@ -1899,9 +1945,45 @@ void _upf_uprintf(const char *file, uint64_t line, uint64_t counter, const char 
                     arg->kind = _UPF_AK_TYPE;
                     arg->as.type_idx = type_idx;
                     break;
-                case _UPF_AK_RUNTIME:
-                    assert(0);  // TODO: find dynamically and parse and set to type_idx
-                    break;
+                case _UPF_AK_RUNTIME: {
+                    int64_t fbreg_offset = ((int64_t) ptr) - _upf_prev_rsp;
+                    int64_t relative_address = _upf_dwarf.base_address - ((int64_t) ptr);
+
+                    printf("line=0x%x arg=%p prsp=%x ret=%p\n", line, ptr, _upf_prev_rsp,
+                           __builtin_extract_return_addr(__builtin_return_address(0)));
+
+                    const uint8_t *type_die = NULL;
+                    for (size_t i = 0; i < vars.length && type_die == NULL; i++) {
+                        _upf_var_entry var = vars.data[i];
+                        for (size_t j = 0; j < var.locs.length; j++) {
+                            _upf_loc loc = var.locs.data[j];
+                            if (loc.reg == LOC_FBREG) {
+                                if (loc.offset == fbreg_offset) {
+                                    printf("[INFO] runtime match! fbreg_offset=%d\n", loc.offset);
+                                    type_die = var.type_die;
+                                    break;
+                                }
+                            } else if (loc.reg == LOC_ADDR) {
+                                if (loc.offset == relative_address) {
+                                    printf("[INFO] runtime match! relative_address=%x\n", loc.offset);
+                                    type_die = var.type_die;
+                                    break;
+                                }
+                            } else {
+                                UNREACHABLE();
+                            }
+                        }
+                    }
+
+                    if (!type_die) {
+                        // TODO: skip? error?
+                        assert(0);
+                    }
+
+                    type_idx = _upf_get_type(arg->as.cu, type_die);
+                    arg->kind = _UPF_AK_TYPE;
+                    arg->as.type_idx = type_idx;
+                } break;
                 default:
                     UNREACHABLE();
             }
