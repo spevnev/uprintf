@@ -2083,6 +2083,58 @@ static _upf_token _upf_consume_any2(_upf_tokenizer *t, ...) {
 }
 
 #define _upf_consume_any(t, ...) _upf_consume_any2(t, __VA_ARGS__, _UPF_TOK_NONE)
+
+VECTOR_TYPEDEF(_upf_idx_vec, size_t);
+VECTOR_TYPEDEF(_upf_cstr_vec, const char *);
+
+static _upf_idx_vec _upf_parse_args(const char *args) {
+    _upf_idx_vec types = VECTOR_CSTR_ARENA(&_upf_vec_arena);
+    _upf_tokenizer t = _upf_tokenize(args);
+
+    _upf_cstr_vec vars = VECTOR_CSTR_ARENA(&_upf_vec_arena);
+    while (_upf_can_consume(&t)) {
+        vars.length = 0;
+        bool is_casted = false;
+        const char *typename = NULL;
+        const char *var = NULL;
+        int deref = 0;
+
+        if (_upf_try_consume(&t, _UPF_TOK_OPEN_PAREN)) {
+            _upf_try_consume(&t, _UPF_TOK_KEYWORD);
+
+            typename = _upf_consume(&t, _UPF_TOK_ID).as.string;
+            is_casted = true;
+
+            _upf_consume(&t, _UPF_TOK_STAR);
+            _upf_consume(&t, _UPF_TOK_CLOSE_PAREN);
+
+            while (_upf_can_consume(&t) && !_upf_try_consume(&t, _UPF_TOK_COMMA)) _upf_skip(&t);
+        } else {
+            if (_upf_try_consume(&t, _UPF_TOK_AMPERSAND)) deref--;
+            while (_upf_can_consume(&t) && _upf_try_consume(&t, _UPF_TOK_STAR)) deref++;
+
+            VECTOR_PUSH(&vars, _upf_consume(&t, _UPF_TOK_ID).as.string);
+            while (_upf_can_consume(&t) && !_upf_try_consume(&t, _UPF_TOK_COMMA)) {
+                if (_upf_try_consume(&t, _UPF_TOK_OPEN_BRACKET)) {
+                    _upf_consume(&t, _UPF_TOK_NUMBER);
+                    _upf_consume(&t, _UPF_TOK_CLOSE_BRACKET);
+                    if (!_upf_can_consume(&t) || _upf_try_consume(&t, _UPF_TOK_COMMA)) break;
+                }
+
+                _upf_consume_any(&t, _UPF_TOK_DOT, _UPF_TOK_PTR_MEMBER);
+                VECTOR_PUSH(&vars, _upf_consume(&t, _UPF_TOK_ID).as.string);
+            }
+        }
+
+        if (is_casted) {
+            // TODO: find type with that name
+        } else {
+            // TODO: find variables and then each next one must be its member -> get types recursively
+        }
+    }
+
+    return types;
+}
     static char buffer[16384];  // TODO: dynamically resize and/or check size
     char *p = buffer;
 
