@@ -1404,65 +1404,10 @@ static void _upf_parse_uprintf_call_site(const _upf_cu_info *cu, const _upf_para
     VECTOR_PUSH(&_upf_args_map, entry);
 }
 
-static void _upf_parse_uprintf_subprogram(const _upf_cu_info *cu, const uint8_t *info, const _upf_abbrev *abbrev, const uint8_t *die_base,
-                                          _upf_uprintf_info *uprintf) {
+static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *info, const uint8_t *info_end, const uint8_t *abbrev_table) {
     static const char *UPRINTF_FUNCTION_NAME = "_upf_uprintf";
 
-    bool found = false;
-    for (size_t i = 0; i < abbrev->attrs.length; i++) {
-        _upf_attr attr = abbrev->attrs.data[i];
-
-        if (attr.name == DW_AT_name) {
-            const char *function_name = _upf_get_string(cu, info, attr.form);
-            if (strcmp(function_name, UPRINTF_FUNCTION_NAME) == 0) {
-                found = true;
-                uprintf->offset = die_base - cu->base;
-            }
-        }
-
-        info += _upf_get_attr_size(info, attr.form);
-    }
-    if (!found) return;
-
-    // TODO: check param parsing: print + compare to dwarfdump
-    uint64_t code;
-    _upf_loc_vec locs = VECTOR_CSTR_ARENA(&_upf_vec_arena);
-    while (1) {
-        info += _upf_uLEB_to_uint64(info, &code);
-        if (code == 0) return;
-        assert(code <= cu->abbrevs.length);
-
-        abbrev = &cu->abbrevs.data[code - 1];
-        if (abbrev->tag != DW_TAG_formal_parameter) {
-            info = _upf_skip_die(info, abbrev);
-            continue;
-        }
-
-        _upf_param param = {0};
-        for (size_t i = 0; i < abbrev->attrs.length; i++) {
-            _upf_attr attr = abbrev->attrs.data[i];
-
-            if (attr.name == DW_AT_name) {
-                const char *name = _upf_get_string(cu, info, attr.form);
-                if (strcmp(name, "file") == 0) param.kind = _UPF_PK_FILE;
-                else if (strcmp(name, "line") == 0) param.kind = _UPF_PK_LINE;
-                else if (strcmp(name, "counter") == 0) param.kind = _UPF_PK_COUNTER;
-                else if (strcmp(name, "fmt") == 0) param.kind = _UPF_PK_FMT;
-                else UNREACHABLE();
-            } else if (attr.name == DW_AT_location) {
-                locs.length = 0;
-                _upf_get_locations(cu, info, attr.form, &locs);
-                assert(locs.length > 0);
-                param.loc = locs.data[0];
-            }
-
-            info += _upf_get_attr_size(info, attr.form);
-        }
-        VECTOR_PUSH(&uprintf->params, param);
-    }
-}
-
-static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *info, const uint8_t *info_end, const uint8_t *abbrev_table) {
+    // TODO: non-vec arena
     _upf_cu_info *cu = (_upf_cu_info *) _upf_arena_alloc(&_upf_vec_arena, sizeof(*cu));
     cu->base = cu_base;
     cu->abbrevs = _upf_parse_abbrevs(abbrev_table);
@@ -1471,10 +1416,7 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *info, const uin
     cu->addr_base = 0;
     cu->low_pc = INVALID;
 
-    _upf_uprintf_info uprintf = {
-        .offset = INVALID,
-        .params = VECTOR_CSTR_ARENA(&_upf_vec_arena),
-    };
+    uint64_t uprintf_offset = INVALID;
     _upf_call_site_vec call_sites = VECTOR_CSTR_ARENA(&_upf_vec_arena);
     _upf_var_vec vars = VECTOR_CSTR_ARENA(&_upf_vec_arena);
     const uint8_t *subprogram = NULL;
@@ -1527,9 +1469,17 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *info, const uin
             cu->file_path = _upf_get_string(cu, name_info, name_form);
 
             if (low_pc_info != NULL && low_pc_form != INVALID) cu->low_pc = _upf_get_addr(cu, low_pc_info, low_pc_form);
-        } else if (abbrev->tag == DW_TAG_subprogram && uprintf.offset == INVALID) {
-            _upf_parse_uprintf_subprogram(cu, info, abbrev, die_base, &uprintf);
-            info = _upf_skip_die(info, abbrev);
+        } else if (abbrev->tag == DW_TAG_subprogram && uprintf_offset == INVALID) {
+            for (size_t i = 0; i < abbrev->attrs.length; i++) {
+                _upf_attr attr = abbrev->attrs.data[i];
+
+                if (attr.name == DW_AT_name) {
+                    const char *function_name = _upf_get_string(cu, info, attr.form);
+                    if (strcmp(function_name, UPRINTF_FUNCTION_NAME) == 0) uprintf_offset = die_base - cu->base;
+                }
+
+                info += _upf_get_attr_size(info, attr.form);
+            }
         } else if (abbrev->tag == DW_TAG_call_site) {
             uint64_t call_origin = INVALID;
             for (size_t i = 0; i < abbrev->attrs.length; i++) {
@@ -1556,13 +1506,13 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *info, const uin
         }
     }
     assert(cu->file_path != NULL && "compilation unit must have a path.");
-    if (uprintf.offset == INVALID) return;
+    if (uprintf_offset == INVALID) return;
 
     for (size_t i = 0; i < call_sites.length; i++) {
         _upf_call_site *call_site = &call_sites.data[i];
-        if (call_site->call_origin == uprintf.offset) {
+        if (call_site->call_origin == uprintf_offset) {
             size_t vars_length = vars.length;
-            _upf_parse_uprintf_call_site(cu, &uprintf.params, call_site, &vars);
+            // _upf_parse_uprintf_call_site(cu, &uprintf.params, call_site, &vars);
             vars.length = vars_length;  // clear variables local to parsed subprogram
         }
     }
