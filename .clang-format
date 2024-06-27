@@ -14,3 +14,4 @@ SpaceAfterCStyleCast: true
 SpaceBeforeRangeBasedForLoopColon: true
 AllowShortIfStatementsOnASingleLine: AllIfsAndElse
 MaxEmptyLinesToKeep: 2
+InsertNewlineAtEOF: true
