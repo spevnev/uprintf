@@ -1911,6 +1911,7 @@ __attribute__((destructor)) void _upf_fini(void) {
 
 void _upf_uprintf(const char *file, uint64_t line, uint64_t counter, const char *fmt, ...) {
 enum _upf_token_kind {
+    _UPF_TOK_NONE,
     _UPF_TOK_OPEN_PAREN,
     _UPF_TOK_CLOSE_PAREN,
     _UPF_TOK_OPEN_BRACKET,
@@ -1936,7 +1937,12 @@ typedef struct {
 
 VECTOR_TYPEDEF(_upf_token_vec, _upf_token);
 
-static _upf_token_vec _upf_parse_args(const char *args) {
+typedef struct {
+    _upf_token_vec tokens;
+    size_t idx;
+} _upf_tokenizer;
+
+static _upf_tokenizer _upf_tokenize(const char *string) {
     static const _upf_token signs[] = {{_UPF_TOK_OPEN_PAREN, {"("}},    {_UPF_TOK_CLOSE_PAREN, {")"}}, {_UPF_TOK_OPEN_BRACKET, {"["}},
                                        {_UPF_TOK_CLOSE_BRACKET, {"]"}}, {_UPF_TOK_STAR, {"*"}},        {_UPF_TOK_AMPERSAND, {"&"}},
                                        {_UPF_TOK_COMMA, {","}},         {_UPF_TOK_DOT, {"."}},         {_UPF_TOK_PTR_MEMBER, {"->"}}};
@@ -1944,7 +1950,7 @@ static _upf_token_vec _upf_parse_args(const char *args) {
 
     _upf_token_vec tokens = VECTOR_CSTR_ARENA(&_upf_vec_arena);
 
-    const char *ch = args;
+    const char *ch = string;
     while (*ch != '\0') {
         if (*ch == ' ') {
             ch++;
@@ -2022,9 +2028,61 @@ static _upf_token_vec _upf_parse_args(const char *args) {
         ERROR("Unkown character when parsing arguments '%c'.\n", *ch);  // TODO: don't crash?
     }
 
-    return tokens;
+    _upf_tokenizer tokenizer = {
+        .tokens = tokens,
+        .idx = 0,
+    };
+    return tokenizer;
 }
 
+static bool _upf_can_consume(const _upf_tokenizer *t) { return t->idx < t->tokens.length; }
+
+static void _upf_skip(_upf_tokenizer *t) {
+    if (!_upf_can_consume(t)) ERROR("todo1");
+
+    t->idx++;
+}
+
+static _upf_token _upf_consume(_upf_tokenizer *t, enum _upf_token_kind kind) {
+    if (!_upf_can_consume(t)) ERROR("todo2");
+
+    _upf_token token = t->tokens.data[t->idx++];
+    if (token.kind != kind) ERROR("expected %d\n", kind);
+
+    return token;
+}
+
+static bool _upf_try_consume(_upf_tokenizer *t, enum _upf_token_kind kind) {
+    if (!_upf_can_consume(t)) return false;
+
+    _upf_token token = t->tokens.data[t->idx];
+    if (token.kind != kind) return false;
+
+    t->idx++;
+    return true;
+}
+
+static _upf_token _upf_consume_any2(_upf_tokenizer *t, ...) {
+    va_list va_args;
+    va_start(va_args, t);
+
+    if (!_upf_can_consume(t)) ERROR("TODO");
+    _upf_token token = t->tokens.data[t->idx++];
+
+    while (1) {
+        enum _upf_token_kind kind = va_arg(va_args, enum _upf_token_kind);
+        if (kind == _UPF_TOK_NONE) break;
+
+        if (token.kind == kind) {
+            va_end(va_args);
+            return token;
+        }
+    }
+
+    ERROR("TODO");
+}
+
+#define _upf_consume_any(t, ...) _upf_consume_any2(t, __VA_ARGS__, _UPF_TOK_NONE)
     static char buffer[16384];  // TODO: dynamically resize and/or check size
     char *p = buffer;
 
