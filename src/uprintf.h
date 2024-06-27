@@ -57,6 +57,7 @@ void _upf_uprintf(const char *file, uint64_t line, uint64_t counter, const char 
 #include <assert.h>
 #include <dwarf.h>
 #include <elf.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <stdarg.h>
 #include <stdint.h>
@@ -150,6 +151,17 @@ static void _upf_arena_free(_upf_arena *arena) {
 
     arena->head = NULL;
     arena->tail = NULL;
+}
+
+// Copies [begin, end) to arena-allocated string
+static char *_upf_arena_string(_upf_arena *arena, const char *begin, const char *end) {
+    size_t len = end - begin;
+
+    char *string = (char *) _upf_arena_alloc(arena, len + 2);
+    memcpy(string, begin, len);
+    string[len] = '\0';
+
+    return string;
 }
 
 
@@ -1894,6 +1906,115 @@ __attribute__((destructor)) void _upf_fini(void) {
 }
 
 void _upf_uprintf(const char *file, uint64_t line, uint64_t counter, const char *fmt, ...) {
+enum _upf_token_kind {
+    _UPF_TOK_OPEN_PAREN,
+    _UPF_TOK_CLOSE_PAREN,
+    _UPF_TOK_OPEN_BRACKET,
+    _UPF_TOK_CLOSE_BRACKET,
+    _UPF_TOK_STAR,
+    _UPF_TOK_AMPERSAND,
+    _UPF_TOK_COMMA,
+    _UPF_TOK_DOT,
+    _UPF_TOK_PTR_MEMBER,
+    _UPF_TOK_NUMBER,
+    _UPF_TOK_ID,
+    _UPF_TOK_STRING
+};
+
+typedef struct {
+    enum _upf_token_kind kind;
+    union {
+        const char *string;
+        long num;
+    } as;
+} _upf_token;
+
+VECTOR_TYPEDEF(_upf_token_vec, _upf_token);
+
+static _upf_token_vec _upf_parse_args(const char *args) {
+    static const _upf_token signs[] = {{_UPF_TOK_OPEN_PAREN, {"("}},    {_UPF_TOK_CLOSE_PAREN, {")"}}, {_UPF_TOK_OPEN_BRACKET, {"["}},
+                                       {_UPF_TOK_CLOSE_BRACKET, {"]"}}, {_UPF_TOK_STAR, {"*"}},        {_UPF_TOK_AMPERSAND, {"&"}},
+                                       {_UPF_TOK_COMMA, {","}},         {_UPF_TOK_DOT, {"."}},         {_UPF_TOK_PTR_MEMBER, {"->"}}};
+
+    _upf_token_vec tokens = {0};
+
+    const char *ch = args;
+    while (*ch != '\0') {
+        if (*ch == ' ') {
+            ch++;
+            continue;
+        }
+
+        bool found = false;
+        for (size_t i = 0; i < sizeof(signs) / sizeof(*signs) && !found; i++) {
+            size_t len = strlen(signs[i].as.string);
+            if (strncmp(ch, signs[i].as.string, len) == 0) {
+                VECTOR_PUSH(&tokens, signs[i]);
+                ch += len;
+                found = true;
+            }
+        }
+        if (found) continue;
+
+        if ('0' <= *ch && *ch <= '9') {
+            errno = 0;
+            char *end = NULL;
+            long num = strtol(ch, &end, 0);
+            assert(errno == 0 && end != NULL);
+
+            _upf_token token = {
+                .kind = _UPF_TOK_NUMBER,
+                .as = {
+                    .num = num, 
+                },
+            };
+            VECTOR_PUSH(&tokens, token);
+
+            ch = end;
+            continue;
+        }
+
+        if (('a' <= *ch && *ch <= 'z') || ('A' <= *ch && *ch <= 'Z') || *ch == '_') {
+            const char *end = ch;
+            while (('a' <= *end && *end <= 'z') || ('A' <= *end && *end <= 'Z') || ('0' <= *end && *end <= '9') || *end == '_') end++;
+
+            _upf_token token = {
+                .kind = _UPF_TOK_ID,
+                .as = {
+                    .string = _upf_arena_string(&_upf_vec_arena, ch, end),
+                },
+            };
+            VECTOR_PUSH(&tokens, token);
+
+            ch = end;
+            continue;
+        }
+
+        if (*ch == '"') {
+            ch++;
+
+            const char *end = ch;
+            while (*end != '"' && *end != '\0') end++;
+            assert(*end != '\0');  // C compiler won't allow this, so it must be a bug within the code
+
+            _upf_token token = {
+                .kind = _UPF_TOK_STRING,
+                .as = {
+                    .string = _upf_arena_string(&_upf_vec_arena, ch, end),
+                },
+            };
+            VECTOR_PUSH(&tokens, token);
+
+            ch = end + 1;
+            continue;
+        }
+
+        ERROR("Unkown character when parsing arguments '%c'.\n", *ch);  // TODO: don't crash?
+    }
+
+    return tokens;
+}
+
     static char buffer[16384];  // TODO: dynamically resize and/or check size
     char *p = buffer;
 
