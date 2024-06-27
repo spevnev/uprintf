@@ -1922,7 +1922,8 @@ enum _upf_token_kind {
     _UPF_TOK_PTR_MEMBER,
     _UPF_TOK_NUMBER,
     _UPF_TOK_ID,
-    _UPF_TOK_STRING
+    _UPF_TOK_STRING,
+    _UPF_TOK_KEYWORD
 };
 
 typedef struct {
@@ -1939,8 +1940,9 @@ static _upf_token_vec _upf_parse_args(const char *args) {
     static const _upf_token signs[] = {{_UPF_TOK_OPEN_PAREN, {"("}},    {_UPF_TOK_CLOSE_PAREN, {")"}}, {_UPF_TOK_OPEN_BRACKET, {"["}},
                                        {_UPF_TOK_CLOSE_BRACKET, {"]"}}, {_UPF_TOK_STAR, {"*"}},        {_UPF_TOK_AMPERSAND, {"&"}},
                                        {_UPF_TOK_COMMA, {","}},         {_UPF_TOK_DOT, {"."}},         {_UPF_TOK_PTR_MEMBER, {"->"}}};
+    static const char *keywords[] = {"struct", "union", "enum"};
 
-    _upf_token_vec tokens = {0};
+    _upf_token_vec tokens = VECTOR_CSTR_ARENA(&_upf_vec_arena);
 
     const char *ch = args;
     while (*ch != '\0') {
@@ -1968,9 +1970,7 @@ static _upf_token_vec _upf_parse_args(const char *args) {
 
             _upf_token token = {
                 .kind = _UPF_TOK_NUMBER,
-                .as = {
-                    .num = num, 
-                },
+                .as = { .num = num, },
             };
             VECTOR_PUSH(&tokens, token);
 
@@ -1982,11 +1982,19 @@ static _upf_token_vec _upf_parse_args(const char *args) {
             const char *end = ch;
             while (('a' <= *end && *end <= 'z') || ('A' <= *end && *end <= 'Z') || ('0' <= *end && *end <= '9') || *end == '_') end++;
 
+            const char *string = _upf_arena_string(&_upf_vec_arena, ch, end);
+
+            enum _upf_token_kind kind = _UPF_TOK_ID;
+            for (size_t i = 0; i < sizeof(keywords) / sizeof(*keywords); i++) {
+                if (strcmp(string, keywords[i]) == 0) {
+                    kind = _UPF_TOK_KEYWORD;
+                    break;
+                }
+            }
+
             _upf_token token = {
-                .kind = _UPF_TOK_ID,
-                .as = {
-                    .string = _upf_arena_string(&_upf_vec_arena, ch, end),
-                },
+                .kind = kind,
+                .as = { .string = string, },
             };
             VECTOR_PUSH(&tokens, token);
 
@@ -2003,9 +2011,7 @@ static _upf_token_vec _upf_parse_args(const char *args) {
 
             _upf_token token = {
                 .kind = _UPF_TOK_STRING,
-                .as = {
-                    .string = _upf_arena_string(&_upf_vec_arena, ch, end),
-                },
+                .as = { .string = _upf_arena_string(&_upf_vec_arena, ch, end), },
             };
             VECTOR_PUSH(&tokens, token);
 
