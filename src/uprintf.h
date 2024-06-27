@@ -41,13 +41,16 @@
 
 #include <stdint.h>
 
-void _upf_uprintf(const char *file, uint64_t line, uint64_t counter, const char *fmt, ...);
+void _upf_uprintf(const char *file, uint64_t line, uint64_t counter, const char *fmt, const char *args, ...);
 
-#define uprintf(fmt, ...)                                                \
-    do {                                                                 \
-        __asm__("mov %%rsp, %[rsp]\n\t" : [rsp] "=m"(_upf_prev_rsp));    \
-        _upf_uprintf(__FILE__, __LINE__, __COUNTER__, fmt, __VA_ARGS__); \
-    } while (0)
+
+// If variadic arguments were to be stringified directly, the arguments which
+// use macros would stringify to the macro name instead of being expanded, but
+// by calling another macro the argument-macros will be expanded and stringified
+// to their real values.
+#define _upf_stringify_va_args(...) #__VA_ARGS__
+
+#define uprintf(fmt, ...) _upf_uprintf(__FILE__, __LINE__, __COUNTER__, fmt, _upf_stringify_va_args(__VA_ARGS__), __VA_ARGS__);
 
 #endif  // UPRINTF_H
 
@@ -1859,7 +1862,6 @@ __attribute__((destructor)) void _upf_fini(void) {
     _upf_arena_free(&_upf_vec_arena);
 }
 
-void _upf_uprintf(const char *file, uint64_t line, uint64_t counter, const char *fmt, ...) {
 enum _upf_token_kind {
     _UPF_TOK_NONE,
     _UPF_TOK_OPEN_PAREN,
@@ -2085,6 +2087,18 @@ static _upf_idx_vec _upf_parse_args(const char *args) {
 
     return types;
 }
+__attribute__((noinline)) void _upf_uprintf(const char *file, uint64_t line, uint64_t counter, const char *fmt, const char *args, ...) {
+    void *return_pc = __builtin_extract_return_addr(__builtin_return_address(0));
+
+    (void) file;
+    (void) line;
+    (void) counter;
+    (void) fmt;
+
+    _upf_idx_vec types = _upf_parse_args(args);
+}
+
+void _upf_uprintf2(const char *file, uint64_t line, uint64_t counter, const char *fmt, const char *args, ...) {
     static char buffer[16384];  // TODO: dynamically resize and/or check size
     char *p = buffer;
 
@@ -2107,8 +2121,8 @@ static _upf_idx_vec _upf_parse_args(const char *args) {
         return;
     }
 
-    va_list args;
-    va_start(args, fmt);
+    va_list va_args;
+    va_start(va_args, args);
     size_t arg_idx = 0;
     for (const char *ch = fmt; *ch != '\0'; ch++) {
         if (*ch != '%') {
@@ -2124,7 +2138,7 @@ static _upf_idx_vec _upf_parse_args(const char *args) {
             assert(arg_idx < 2 && "For some reason DWARF includes only first 6 call_site_parameters in the function call, so it only accepts 2 structs at a time");
             if (arg_idx >= arg_types.length) ERROR("there are more conversion specifiers than arguments provided at %s:%lu\n", file, line);
 
-            void *ptr = va_arg(args, void *);
+            void *ptr = va_arg(va_args, void *);
             size_t type_idx = INVALID;
             _upf_uprintf_arg *arg = &arg_types.data[arg_idx++];
             switch (arg->kind) {
@@ -2136,45 +2150,6 @@ static _upf_idx_vec _upf_parse_args(const char *args) {
                     arg->kind = _UPF_AK_TYPE;
                     arg->as.type_idx = type_idx;
                     break;
-                case _UPF_AK_RUNTIME: {
-                    int64_t fbreg_offset = ((int64_t) ptr) - _upf_prev_rsp;
-                    int64_t relative_address = _upf_dwarf.base_address - ((int64_t) ptr);
-
-                    printf("line=0x%x arg=%p prsp=%x ret=%p\n", line, ptr, _upf_prev_rsp,
-                           __builtin_extract_return_addr(__builtin_return_address(0)));
-
-                    const uint8_t *type_die = NULL;
-                    for (size_t i = 0; i < vars.length && type_die == NULL; i++) {
-                        _upf_var_entry var = vars.data[i];
-                        for (size_t j = 0; j < var.locs.length; j++) {
-                            _upf_loc loc = var.locs.data[j];
-                            if (loc.reg == LOC_FBREG) {
-                                if (loc.offset == fbreg_offset) {
-                                    printf("[INFO] runtime match! fbreg_offset=%d\n", loc.offset);
-                                    type_die = var.type_die;
-                                    break;
-                                }
-                            } else if (loc.reg == LOC_ADDR) {
-                                if (loc.offset == relative_address) {
-                                    printf("[INFO] runtime match! relative_address=%x\n", loc.offset);
-                                    type_die = var.type_die;
-                                    break;
-                                }
-                            } else {
-                                UNREACHABLE();
-                            }
-                        }
-                    }
-
-                    if (!type_die) {
-                        // TODO: skip? error?
-                        assert(0);
-                    }
-
-                    type_idx = _upf_get_type(arg->as.cu, type_die);
-                    arg->kind = _UPF_AK_TYPE;
-                    arg->as.type_idx = type_idx;
-                } break;
                 default:
                     UNREACHABLE();
             }
@@ -2194,7 +2169,7 @@ static _upf_idx_vec _upf_parse_args(const char *args) {
             ERROR("unkown format '%%%c' at %s:%lu\n", next, file, line);
         }
     }
-    va_end(args);
+    va_end(va_args);
 
     assert(arg_idx == arg_types.length);  // TODO: warning/error not enough arguments
 
