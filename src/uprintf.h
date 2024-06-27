@@ -118,7 +118,10 @@ static void _upf_arena_init(_upf_arena *arena) {
 static uint8_t *_upf_arena_alloc(_upf_arena *arena, size_t size) {
     assert(arena->head != NULL && arena->tail != NULL);
 
-    if (size > arena->head->capacity - arena->head->length) {
+    size_t alignment = (arena->head->length % sizeof(void *));
+    if (alignment > 0) alignment = sizeof(void *) - alignment;
+
+    if (alignment + size > arena->head->capacity - arena->head->length) {
         _upf_arena_region *region = (_upf_arena_region *) malloc(sizeof(*region));
         if (region == NULL) OUT_OF_MEMORY();
         region->capacity = arena->head->capacity * 2;
@@ -129,10 +132,11 @@ static uint8_t *_upf_arena_alloc(_upf_arena *arena, size_t size) {
 
         arena->head->next = region;
         arena->head = region;
+        alignment = 0;
     }
 
-    uint8_t *memory = arena->head->data + arena->head->length;
-    arena->head->length += size;
+    uint8_t *memory = arena->head->data + arena->head->length + alignment;
+    arena->head->length += alignment + size;
     return memory;
 }
 
@@ -188,13 +192,13 @@ static char *_upf_arena_string(_upf_arena *arena, const char *begin, const char 
             (vec)->data = (vec)->arena ? _upf_arena_alloc((vec)->arena, size) : malloc(size); \
             if ((vec)->data == NULL) OUT_OF_MEMORY();                                         \
         } else if ((vec)->length == (vec)->capacity) {                                        \
+            size_t old_size = (vec)->capacity * sizeof(*(vec)->data);                         \
             (vec)->capacity *= 2;                                                             \
-            size_t size = (vec)->capacity * sizeof(*(vec)->data);                             \
-            if ((vec)->arena == NULL) (vec)->data = realloc((vec)->data, size);               \
+            size_t new_size = (vec)->capacity * sizeof(*(vec)->data);                         \
+            if ((vec)->arena == NULL) (vec)->data = realloc((vec)->data, new_size);           \
             else {                                                                            \
-                void *new_data = _upf_arena_alloc((vec)->arena, size);                        \
-                assert(size % 2 == 0);                                                        \
-                memcpy(new_data, (vec)->data, size / 2);                                      \
+                void *new_data = _upf_arena_alloc((vec)->arena, new_size);                    \
+                memcpy(new_data, (vec)->data, old_size);                                      \
                 (vec)->data = new_data;                                                       \
             }                                                                                 \
             if ((vec)->data == NULL) OUT_OF_MEMORY();                                         \
