@@ -104,12 +104,12 @@ typedef struct _upf_arena_region {
     struct _upf_arena_region *next;
 } _upf_arena_region;
 
-typedef struct {
+struct _upf_arena {
     _upf_arena_region *tail;
     _upf_arena_region *head;
-} _upf_arena;
+};
 
-static void _upf_arena_init(_upf_arena *arena) {
+static void _upf_arena_init(struct _upf_arena *arena) {
     _upf_arena_region *region = (_upf_arena_region *) malloc(sizeof(*region));
     if (region == NULL) OUT_OF_MEMORY();
     region->capacity = INITIAL_ARENA_SIZE;
@@ -122,7 +122,7 @@ static void _upf_arena_init(_upf_arena *arena) {
     arena->tail = region;
 }
 
-static uint8_t *_upf_arena_alloc(_upf_arena *arena, size_t size) {
+static uint8_t *_upf_arena_alloc(struct _upf_arena *arena, size_t size) {
     assert(arena->head != NULL && arena->tail != NULL);
 
     size_t alignment = (arena->head->length % sizeof(void *));
@@ -147,7 +147,7 @@ static uint8_t *_upf_arena_alloc(_upf_arena *arena, size_t size) {
     return memory;
 }
 
-static void _upf_arena_free(_upf_arena *arena) {
+static void _upf_arena_free(struct _upf_arena *arena) {
     assert(arena->head != NULL && arena->tail != NULL);
 
     _upf_arena_region *region = arena->tail;
@@ -165,7 +165,7 @@ static void _upf_arena_free(_upf_arena *arena) {
 }
 
 // Copies [begin, end) to arena-allocated string
-static char *_upf_arena_string(_upf_arena *arena, const char *begin, const char *end) {
+static char *_upf_arena_string(struct _upf_arena *arena, const char *begin, const char *end) {
     size_t len = end - begin;
 
     char *string = (char *) _upf_arena_alloc(arena, len + 2);
@@ -185,7 +185,7 @@ static char *_upf_arena_string(_upf_arena *arena, const char *begin, const char 
 
 #define VECTOR_TYPEDEF(name, type) \
     typedef struct {               \
-        _upf_arena *arena;         \
+        struct _upf_arena *arena;  \
         size_t capacity;           \
         size_t length;             \
         type *data;                \
@@ -369,10 +369,10 @@ struct _upf_dwarf {
 };
 
 
-static _upf_arena _upf_vec_arena = {0};
+static struct _upf_arena _upf_arena = {0};
 static struct _upf_dwarf _upf_dwarf = {0};
-static _upf_type_vec _upf_type_map = VECTOR_CSTR_ARENA(&_upf_vec_arena);  // TODO: rename
-static _upf_cu_vec _upf_cus = VECTOR_CSTR_ARENA(&_upf_vec_arena);         // TODO: rename
+static _upf_type_vec _upf_type_map = VECTOR_CSTR_ARENA(&_upf_arena);  // TODO: rename
+static _upf_cu_vec _upf_cus = VECTOR_CSTR_ARENA(&_upf_arena);         // TODO: rename
 
 
 // Converts unsigned LEB128 to uint64_t and returns the size of LEB in bytes
@@ -429,11 +429,11 @@ static uint64_t _upf_get_address(const uint8_t *info) {
 }
 
 static _upf_abbrev_vec _upf_parse_abbrevs(const uint8_t *abbrev_table) {
-    _upf_abbrev_vec abbrevs = VECTOR_CSTR_ARENA(&_upf_vec_arena);
+    _upf_abbrev_vec abbrevs = VECTOR_CSTR_ARENA(&_upf_arena);
 
     while (1) {
         _upf_abbrev abbrev = {
-            .attrs = VECTOR_CSTR_ARENA(&_upf_vec_arena),
+            .attrs = VECTOR_CSTR_ARENA(&_upf_arena),
         };
         abbrev_table += _upf_uLEB_to_uint64(abbrev_table, &abbrev.code);
         if (abbrev.code == 0) break;
@@ -900,7 +900,7 @@ static size_t _upf_get_type(const _upf_cu *cu, const uint8_t *info) {
             _upf_type type = {
                 .name = NULL,
                 .kind = _UPF_TK_STRUCT,
-                .fields = VECTOR_CSTR_ARENA(&_upf_vec_arena),
+                .fields = VECTOR_CSTR_ARENA(&_upf_arena),
                 .is_pointer = false,
                 .is_const = false,
             };
@@ -1147,7 +1147,7 @@ static bool _upf_get_locations(const _upf_cu *cu, const uint8_t *info, uint64_t 
 // TODO: rename to include parameter?
 static _upf_var_entry _upf_parse_variable(const _upf_cu *cu, const uint8_t *info, const _upf_abbrev *abbrev) {
     _upf_var_entry var = {
-        .locs = VECTOR_CSTR_ARENA(&_upf_vec_arena),
+        .locs = VECTOR_CSTR_ARENA(&_upf_arena),
     };
 
     for (size_t i = 0; i < abbrev->attrs.length; i++) {
@@ -1245,7 +1245,7 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *info, const uin
         .file_path = NULL,
         .base = cu_base,
         .abbrevs = _upf_parse_abbrevs(abbrev_table),
-        .types = VECTOR_CSTR_ARENA(&_upf_vec_arena),
+        .types = VECTOR_CSTR_ARENA(&_upf_arena),
         .str_offsets_base = INVALID,
         .addr_base = 0,
         .low_pc = INVALID,
@@ -1253,8 +1253,8 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *info, const uin
     };
 
     uint64_t uprintf_offset = INVALID;
-    _upf_call_site_vec call_sites = VECTOR_CSTR_ARENA(&_upf_vec_arena);
-    _upf_var_vec vars = VECTOR_CSTR_ARENA(&_upf_vec_arena);
+    _upf_call_site_vec call_sites = VECTOR_CSTR_ARENA(&_upf_arena);
+    _upf_var_vec vars = VECTOR_CSTR_ARENA(&_upf_arena);
     const uint8_t *subprogram = NULL;
     int depth = 0;
     while (info < info_end) {
@@ -1734,7 +1734,7 @@ __attribute__((constructor)) void _upf_init(void) {
     if (access("/proc/self/exe", R_OK) != 0) ERROR("uprintf only supports Linux: expected \"/proc/self/exe\" to be a valid path.\n");
     if (access("/proc/self/maps", R_OK) != 0) ERROR("uprintf only supports Linux: expected \"/proc/self/maps\" to be a valid path.\n");
 
-    _upf_arena_init(&_upf_vec_arena);
+    _upf_arena_init(&_upf_arena);
 
     _upf_dwarf.this_file = _upf_get_this_file_address();
 
@@ -1746,7 +1746,7 @@ __attribute__((destructor)) void _upf_fini(void) {
     // Must be unloaded at the end of the program because many variables point
     // into the _upf_dwarf.file to avoid unnecessarily copying date.
     munmap(_upf_dwarf.file, _upf_dwarf.file_size);
-    _upf_arena_free(&_upf_vec_arena);
+    _upf_arena_free(&_upf_arena);
 }
 
 enum _upf_token_kind {
@@ -1787,7 +1787,7 @@ static _upf_tokenizer _upf_tokenize(const char *string) {
                                        {_UPF_TOK_COMMA, {","}},         {_UPF_TOK_DOT, {"."}},         {_UPF_TOK_PTR_MEMBER, {"->"}}};
     static const char *keywords[] = {"struct", "union", "enum"};
 
-    _upf_token_vec tokens = VECTOR_CSTR_ARENA(&_upf_vec_arena);
+    _upf_token_vec tokens = VECTOR_CSTR_ARENA(&_upf_arena);
 
     const char *ch = string;
     while (*ch != '\0') {
@@ -1827,7 +1827,7 @@ static _upf_tokenizer _upf_tokenize(const char *string) {
             const char *end = ch;
             while (('a' <= *end && *end <= 'z') || ('A' <= *end && *end <= 'Z') || ('0' <= *end && *end <= '9') || *end == '_') end++;
 
-            const char *string = _upf_arena_string(&_upf_vec_arena, ch, end);
+            const char *string = _upf_arena_string(&_upf_arena, ch, end);
 
             enum _upf_token_kind kind = _UPF_TOK_ID;
             for (size_t i = 0; i < sizeof(keywords) / sizeof(*keywords); i++) {
@@ -1856,7 +1856,7 @@ static _upf_tokenizer _upf_tokenize(const char *string) {
 
             _upf_token token = {
                 .kind = _UPF_TOK_STRING,
-                .as = { .string = _upf_arena_string(&_upf_vec_arena, ch, end), },
+                .as = { .string = _upf_arena_string(&_upf_arena, ch, end), },
             };
             VECTOR_PUSH(&tokens, token);
 
@@ -1927,10 +1927,10 @@ VECTOR_TYPEDEF(_upf_idx_vec, size_t);
 VECTOR_TYPEDEF(_upf_cstr_vec, const char *);
 
 static _upf_idx_vec _upf_parse_args(uint64_t pc, const char *args) {
-    _upf_idx_vec types = VECTOR_CSTR_ARENA(&_upf_vec_arena);
+    _upf_idx_vec types = VECTOR_CSTR_ARENA(&_upf_arena);
     _upf_tokenizer t = _upf_tokenize(args);
 
-    _upf_cstr_vec vars = VECTOR_CSTR_ARENA(&_upf_vec_arena);
+    _upf_cstr_vec vars = VECTOR_CSTR_ARENA(&_upf_arena);
     while (_upf_can_consume(&t)) {
         vars.length = 0;
         bool is_casted = false;
