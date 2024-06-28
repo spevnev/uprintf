@@ -57,6 +57,7 @@ void _upf_uprintf(const char *file, uint64_t line, uint64_t counter, const char 
 
 #ifdef UPRINTF_IMPLEMENTATION
 
+#define __USE_XOPEN_EXTENDED
 #include <assert.h>
 #include <dwarf.h>
 #include <elf.h>
@@ -70,6 +71,14 @@ void _upf_uprintf(const char *file, uint64_t line, uint64_t counter, const char 
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <unistd.h>
+
+
+// Feature test macros might not work since it is possible that the header has
+// been included before this one and thus expanded without the macro, so the
+// functions must be declared here.
+
+ssize_t readlink(const char *path, char *buf, size_t bufsiz);
+ssize_t getline(char **lineptr, size_t *n, FILE *stream);
 
 
 // number of spaces of indentation per each layer of nesting
@@ -377,7 +386,8 @@ typedef struct {
 } _upf_uprintf_info;
 
 struct _upf_dwarf {
-    int64_t base_address;
+    void *this_file;
+
     uint8_t *file;
     off_t file_size;
 
@@ -401,7 +411,6 @@ static _upf_arena _upf_vec_arena = {0};
 static struct _upf_dwarf _upf_dwarf = {0};
 static _upf_arg_vec _upf_args_map = VECTOR_CSTR_ARENA(&_upf_vec_arena);   // TODO: rename
 static _upf_type_vec _upf_type_map = VECTOR_CSTR_ARENA(&_upf_vec_arena);  // TODO: rename
-int64_t _upf_prev_rsp = 0;
 
 
 // Converts unsigned LEB128 to uint64_t and returns the size of LEB in bytes
@@ -1566,14 +1575,12 @@ static void _upf_parse_dwarf(void) {
 }
 
 static void _upf_parse_elf(void) {
-    static const char *THIS_FILE_PATH = "/proc/self/exe";
-
     struct stat file_info;
-    if (stat(THIS_FILE_PATH, &file_info) == -1) abort();
+    if (stat("/proc/self/exe", &file_info) == -1) ERROR("Unable to stat \"/proc/self/exe\": %s.\n", strerror(errno));
     size_t size = file_info.st_size;
     _upf_dwarf.file_size = size;
 
-    int fd = open(THIS_FILE_PATH, O_RDONLY);
+    int fd = open("/proc/self/exe", O_RDONLY);
     assert(fd != -1);
 
     uint8_t *file = (uint8_t *) mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
@@ -1822,37 +1829,53 @@ static char *_upf_print_type(char *p, const uint8_t *data, const _upf_type *type
 }
 
 // TODO: assert everywhere where address_size is set?
-// Addresses of static variables are stored in bss segment, and static const
-// variables are stored in data segment. DWARF's `DW_OP_addr`es pointing to
-// them are all relative to the beginning of the process's address space,
-// which we get from `/proc/self/maps`. It is the one with the executable
-// name to its right, but since it usually comes first we can just read first
-// address.
-static int64_t _upf_get_address_space_base(void) {
-    char buffer[18];  // per 2 for at most 8 bytes, 1 for -, 1 for \0
+// Function returns the address to which this executable is mapped to.
+// It is retrieved by reading `/proc/self/maps` (see `man proc_pid_maps`).
+// It is used to convert between DWARF addresses and runtime/real ones: DWARF
+// addresses are relative to the beginning of the file, thus real = base + dwarf.
+static void *_upf_get_this_file_address(void) {
+    static const size_t PATH_BUFFER_SIZE = 1024;
 
-    int fd = open("/proc/self/maps", O_RDONLY);
-    if (read(fd, buffer, 17) == -1) goto error;
-    close(fd);
+    char this_path[PATH_BUFFER_SIZE];
+    ssize_t read = readlink("/proc/self/exe", this_path, PATH_BUFFER_SIZE);
+    if (read == -1) ERROR("Unable to readlink \"/proc/self/exe\": %s.\n", strerror(errno));
+    if (read == PATH_BUFFER_SIZE) ERROR("Unable to readlink \"/proc/self/exe\": path is too long.\n");
+    this_path[read] = '\0';
 
-    char *ch = buffer;
-    while (*ch != '\0' && *ch != '-') ch++;
-    if (*ch == '\0') goto error;
-    *ch = '\0';
+    FILE *file = fopen("/proc/self/maps", "r");
+    if (file == NULL) ERROR("Unable to open \"/proc/self/maps\": %s.\n", strerror(errno));
 
-    return strtol(buffer, NULL, 16);
-error:
-    fprintf(stderr, "[WARN] uprintf: Unable to get base of address space. Runtime type deduction isn't possible.");
-    return 0;
+    uint64_t address = INVALID;
+    size_t length = 0;
+    char *line = NULL;
+    while ((read = getline(&line, &length, file)) != -1) {
+        if (read == 0) continue;
+        if (line[read - 1] == '\n') line[read - 1] = '\0';
+
+        int path_offset;
+        if (sscanf(line, "%lx-%*x %*s %*x %*x:%*x %*u %n", &address, &path_offset) != 1)
+            ERROR("Unable to parse \"/proc/self/maps\": invalid format.\n");
+
+        if (strcmp(this_path, line + path_offset) == 0) break;
+    }
+    if (line) free(line);
+    fclose(file);
+
+    assert(address != INVALID);
+    return (void *) address;
 }
 
 
 __attribute__((constructor)) void _upf_init(void) {
+    if (access("/proc/self/exe", R_OK) != 0) ERROR("uprintf only supports Linux: expected \"/proc/self/exe\" to be a valid path.\n");
+    if (access("/proc/self/maps", R_OK) != 0) ERROR("uprintf only supports Linux: expected \"/proc/self/maps\" to be a valid path.\n");
+
     _upf_arena_init(&_upf_vec_arena);
+
+    _upf_dwarf.this_file = _upf_get_this_file_address();
 
     _upf_parse_elf();
     _upf_parse_dwarf();
-    _upf_dwarf.base_address = _upf_get_address_space_base();
 }
 
 __attribute__((destructor)) void _upf_fini(void) {
