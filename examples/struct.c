@@ -36,7 +36,6 @@ typedef struct {
 
 
 static int i = 5;
-static char c = 'c';
 
 static MyStruct gs = {
     .u8 = 255,
@@ -58,7 +57,6 @@ static MyStruct gs = {
     .void_ptr = &i,
     .int_ptr = &i,
     .null_ptr = NULL,
-    .ch_ptr = &c,
     .str = "const char *str",
     .const_str = "const_str",
 };
@@ -72,7 +70,6 @@ void print_void(void *v) { uprintf("parameter `v` contains %S\n", (MyStruct *) v
 
 int main(void) {
     int i = 5;
-    char c = 'c';
     char *str = "string";
 
     MyStruct s = {
@@ -95,7 +92,6 @@ int main(void) {
         .void_ptr = &i,
         .int_ptr = &i,
         .null_ptr = NULL,
-        .ch_ptr = &c,
         .str = str,
         .const_str = "constant string",
     };
@@ -106,6 +102,6 @@ int main(void) {
     print_struct_ptr(&s);
     print_void(&s);
 
-    return 0;
+    return EXIT_SUCCESS;
 }
 

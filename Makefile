@@ -3,7 +3,7 @@ EXAMPLES := struct
 
 CC     := gcc
 FLAGS  := -g3 -O2 -std=c17
-CFLAGS := -Wall -Wextra -pedantic -Isrc -fsanitize=undefined
+CFLAGS := -Wall -Wextra -pedantic -Isrc -fsanitize=undefined,address,leak
 
 BUILD_DIR := build
 SRC_DIR   := examples
@@ -11,7 +11,7 @@ BIN_DIR   := $(BUILD_DIR)/examples
 
 COMPILERS := clang-18 gcc
 O_LEVELS  := -O0 -O1 -O2 -O3 -Os
-G_LEVELS  := -g1 -g2 -g3
+G_LEVELS  := -g2 -g3
 C_STDS    := -std=c99 -std=c11 -std=c17
 
 
