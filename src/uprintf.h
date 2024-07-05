@@ -122,7 +122,7 @@ static void _upf_arena_init(struct _upf_arena *arena) {
     arena->tail = region;
 }
 
-static uint8_t *_upf_arena_alloc(struct _upf_arena *arena, size_t size) {
+static void *_upf_arena_alloc(struct _upf_arena *arena, size_t size) {
     assert(arena->head != NULL && arena->tail != NULL);
 
     size_t alignment = (arena->head->length % sizeof(void *));
@@ -142,7 +142,7 @@ static uint8_t *_upf_arena_alloc(struct _upf_arena *arena, size_t size) {
         alignment = 0;
     }
 
-    uint8_t *memory = arena->head->data + arena->head->length + alignment;
+    void *memory = arena->head->data + arena->head->length + alignment;
     arena->head->length += alignment + size;
     return memory;
 }
@@ -178,12 +178,12 @@ static char *_upf_arena_string(struct _upf_arena *arena, const char *begin, cons
 
 #define INITIAL_VECTOR_CAPACITY 16
 
-#define VECTOR_CSTR_ARENA(a) \
-    {                        \
-        .arena = (a),        \
-        .capacity = 0,       \
-        .length = 0,         \
-        .data = NULL,        \
+#define VECTOR_NEW(a)  \
+    {                  \
+        .arena = (a),  \
+        .capacity = 0, \
+        .length = 0,   \
+        .data = NULL,  \
     }
 
 #define VECTOR_TYPEDEF(name, type) \
@@ -194,35 +194,25 @@ static char *_upf_arena_string(struct _upf_arena *arena, const char *begin, cons
         type *data;                \
     } name
 
-#define VECTOR_PUSH(vec, element)                                                             \
-    do {                                                                                      \
-        if ((vec)->capacity == 0) {                                                           \
-            (vec)->capacity = INITIAL_VECTOR_CAPACITY;                                        \
-            size_t size = (vec)->capacity * sizeof(*(vec)->data);                             \
-            (vec)->data = (vec)->arena ? _upf_arena_alloc((vec)->arena, size) : malloc(size); \
-            if ((vec)->data == NULL) OUT_OF_MEMORY();                                         \
-        } else if ((vec)->length == (vec)->capacity) {                                        \
-            size_t old_size = (vec)->capacity * sizeof(*(vec)->data);                         \
-            (vec)->capacity *= 2;                                                             \
-            size_t new_size = (vec)->capacity * sizeof(*(vec)->data);                         \
-            if ((vec)->arena == NULL) (vec)->data = realloc((vec)->data, new_size);           \
-            else {                                                                            \
-                void *new_data = _upf_arena_alloc((vec)->arena, new_size);                    \
-                memcpy(new_data, (vec)->data, old_size);                                      \
-                (vec)->data = new_data;                                                       \
-            }                                                                                 \
-            if ((vec)->data == NULL) OUT_OF_MEMORY();                                         \
-        }                                                                                     \
-        (vec)->data[(vec)->length++] = (element);                                             \
-    } while (0)
-
-#define VECTOR_FREE(vec)                             \
-    do {                                             \
-        if ((vec)->arena == NULL) free((vec)->data); \
-        (vec)->length = 0;                           \
-        (vec)->capacity = 0;                         \
-        (vec)->data = NULL;                          \
+#define VECTOR_PUSH(vec, element)                                          \
+    do {                                                                   \
+        if ((vec)->capacity == 0) {                                        \
+            (vec)->capacity = INITIAL_VECTOR_CAPACITY;                     \
+            size_t size = (vec)->capacity * sizeof(*(vec)->data);          \
+            (vec)->data = _upf_arena_alloc((vec)->arena, size);            \
+        } else if ((vec)->capacity == (vec)->length) {                     \
+            size_t old_size = (vec)->capacity * sizeof(*(vec)->data);      \
+            (vec)->capacity *= 2;                                          \
+            void *new_data = _upf_arena_alloc((vec)->arena, old_size * 2); \
+            memcpy(new_data, (vec)->data, old_size);                       \
+            (vec)->data = new_data;                                        \
+        }                                                                  \
+        (vec)->data[(vec)->length++] = (element);                          \
     } while (0);
+
+#define VECTOR_TOP(vec) (vec)->data[(vec)->length - 1]
+
+#define VECTOR_POP(vec) (vec)->length--
 
 
 #define bool int8_t
@@ -370,8 +360,8 @@ struct _upf_dwarf {
 
 static struct _upf_arena _upf_arena = {0};
 static struct _upf_dwarf _upf_dwarf = {0};
-static _upf_type_vec _upf_type_map = VECTOR_CSTR_ARENA(&_upf_arena);  // TODO: rename
-static _upf_cu_vec _upf_cus = VECTOR_CSTR_ARENA(&_upf_arena);         // TODO: rename
+static _upf_type_vec _upf_type_map = VECTOR_NEW(&_upf_arena);  // TODO: rename
+static _upf_cu_vec _upf_cus = VECTOR_NEW(&_upf_arena);         // TODO: rename
 
 
 // Converts unsigned LEB128 to uint64_t and returns the size of LEB in bytes
@@ -428,11 +418,11 @@ static uint64_t _upf_get_address(const uint8_t *info) {
 }
 
 static _upf_abbrev_vec _upf_parse_abbrevs(const uint8_t *abbrev_table) {
-    _upf_abbrev_vec abbrevs = VECTOR_CSTR_ARENA(&_upf_arena);
+    _upf_abbrev_vec abbrevs = VECTOR_NEW(&_upf_arena);
 
     while (1) {
         _upf_abbrev abbrev = {
-            .attrs = VECTOR_CSTR_ARENA(&_upf_arena),
+            .attrs = VECTOR_NEW(&_upf_arena),
         };
         abbrev_table += _upf_uLEB_to_uint64(abbrev_table, &abbrev.code);
         if (abbrev.code == 0) break;
@@ -781,7 +771,7 @@ static size_t _upf_get_type(const _upf_cu *cu, const uint8_t *info) {
             _upf_type type = {
                 .name = NULL,
                 .kind = abbrev->tag == DW_TAG_structure_type ? _UPF_TK_STRUCT : _UPF_TK_UNION,
-                .fields = VECTOR_CSTR_ARENA(&_upf_arena),
+                .fields = VECTOR_NEW(&_upf_arena),
                 .is_pointer = false,
                 .is_const = false,
             };
@@ -842,11 +832,11 @@ static size_t _upf_get_type(const _upf_cu *cu, const uint8_t *info) {
             _upf_type type = {
                 .name = NULL,  // TODO: default name e.g. "enum"?
                 .kind = _UPF_TK_ENUM,
-                .fields = VECTOR_CSTR_ARENA(&_upf_arena),
+                .fields = VECTOR_NEW(&_upf_arena),
                 .is_pointer = false,
                 .is_const = false,
                 .enum_type = INVALID,
-                .enum_values = VECTOR_CSTR_ARENA(&_upf_arena),
+                .enum_values = VECTOR_NEW(&_upf_arena),
             };
 
             for (size_t i = 0; i < abbrev->attrs.length; i++) {
@@ -909,7 +899,7 @@ static size_t _upf_get_type(const _upf_cu *cu, const uint8_t *info) {
             _upf_type type = {
                 .name = NULL,
                 .kind = _UPF_TK_ARRAY,
-                .fields = VECTOR_CSTR_ARENA(&_upf_arena),
+                .fields = VECTOR_NEW(&_upf_arena),
                 .is_pointer = false,
                 .is_const = false,
                 .element_type = INVALID,
@@ -985,7 +975,7 @@ static size_t _upf_get_type(const _upf_cu *cu, const uint8_t *info) {
             _upf_type type = {
                 .name = NULL,
                 .kind = _UPF_TK_UNKNOWN,
-                .fields = {0},
+                .fields = VECTOR_NEW(&_upf_arena),
                 .is_pointer = false,
                 .is_const = false,
             };
@@ -1032,7 +1022,7 @@ static size_t _upf_get_type(const _upf_cu *cu, const uint8_t *info) {
                     .type = {
                         .name = "void",
                         .kind = _UPF_TK_VOID,
-                        .fields = {0},
+                        .fields = VECTOR_NEW(&_upf_arena),
                         .is_pointer = true,
                         .is_const = false,
                     },
@@ -1095,7 +1085,7 @@ static _upf_range_vec _upf_get_ranges(const _upf_cu *cu, const uint8_t *info, ui
     }
     assert(rnglist != NULL);
 
-    _upf_range_vec ranges = VECTOR_CSTR_ARENA(&_upf_arena);
+    _upf_range_vec ranges = VECTOR_NEW(&_upf_arena);
     uint64_t base = cu->low_pc == INVALID ? 0 : cu->low_pc;
     while (*rnglist != DW_RLE_end_of_list) {
         switch (*rnglist++) {
@@ -1201,8 +1191,6 @@ static const char *_upf_get_type_name(const _upf_cu *cu, const uint8_t *info) {
 // #define DW_TAG_atomic_type              0x47  /* DWARF5 */
 // #define DW_TAG_immutable_type           0x4b  /* DWARF5 */
 
-VECTOR_TYPEDEF(_upf_scope_stack, _upf_scope *);
-
 static _upf_type2 _upf_get_var(const _upf_cu *cu, const uint8_t *info) {
     uint64_t code;
     info += _upf_uLEB_to_uint64(info, &code);
@@ -1236,16 +1224,16 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *info, const uin
     _upf_cu cu = {
         .base = cu_base,
         .abbrevs = _upf_parse_abbrevs(abbrev_table),
-        .types = VECTOR_CSTR_ARENA(&_upf_arena),
-        .scopes = VECTOR_CSTR_ARENA(&_upf_arena),
+        .types = VECTOR_NEW(&_upf_arena),
+        .scopes = VECTOR_NEW(&_upf_arena),
         .str_offsets_base = INVALID,
         .addr_base = 0,
         .low_pc = INVALID,
         .high_pc = INVALID,
     };
 
-    _upf_scope_stack scope_stack = VECTOR_CSTR_ARENA(&_upf_arena);
-    _upf_idx_vec scope_depth = VECTOR_CSTR_ARENA(&_upf_arena);
+    _upf_scope_stack scope_stack = VECTOR_NEW(&_upf_arena);
+    _upf_idx_vec scope_depth = VECTOR_NEW(&_upf_arena);
     size_t depth = 0;
     while (info < info_end) {
         const uint8_t *die_base = info;
@@ -1254,9 +1242,9 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *info, const uin
         info += _upf_uLEB_to_uint64(info, &code);
         if (code == 0) {
             assert(scope_depth.length > 0);
-            if (depth == scope_depth.data[scope_depth.length - 1]) {
-                scope_stack.length--;
-                scope_depth.length--;
+            if (depth == VECTOR_TOP(&scope_depth)) {
+                VECTOR_POP(&scope_stack);
+                VECTOR_POP(&scope_depth);
             }
             depth--;
             continue;
@@ -1271,9 +1259,9 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *info, const uin
                 assert(scope_stack.length > 0);
 
                 _upf_scope new_scope = {
-                    .ranges = VECTOR_CSTR_ARENA(&_upf_arena),
-                    .vars = VECTOR_CSTR_ARENA(&_upf_arena),
-                    .scopes = VECTOR_CSTR_ARENA(&_upf_arena),
+                    .ranges = VECTOR_NEW(&_upf_arena),
+                    .vars = VECTOR_NEW(&_upf_arena),
+                    .scopes = VECTOR_NEW(&_upf_arena),
                 };
 
                 const uint8_t *info2 = info;
@@ -1313,10 +1301,10 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *info, const uin
                 }
 
                 if (new_scope.ranges.length > 0) {
-                    if (scope_stack.data[scope_stack.length - 1] != NULL) {
-                        _upf_scope_vec *scopes = &scope_stack.data[scope_stack.length - 1]->scopes;
+                    if (VECTOR_TOP(&scope_stack) != NULL) {
+                        _upf_scope_vec *scopes = &VECTOR_TOP(&scope_stack)->scopes;
                         VECTOR_PUSH(scopes, new_scope);
-                        VECTOR_PUSH(&scope_stack, &scopes->data[scopes->length - 1]);
+                        VECTOR_PUSH(&scope_stack, &VECTOR_TOP(scopes));
                         VECTOR_PUSH(&scope_depth, depth);
                     }
                 } else {
@@ -1328,11 +1316,11 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *info, const uin
 
         if (abbrev->tag == DW_TAG_variable || abbrev->tag == DW_TAG_formal_parameter) {
             assert(scope_stack.length > 0);
-            if (scope_stack.data[scope_stack.length - 1] != NULL) {
+            if (VECTOR_TOP(&scope_stack) != NULL) {
                 _upf_type2 var = _upf_get_var(&cu, die_base);
                 if (var.name != NULL) {
                     assert(var.type_die != NULL);
-                    VECTOR_PUSH(&scope_stack.data[scope_stack.length - 1]->vars, var);
+                    VECTOR_PUSH(&VECTOR_TOP(&scope_stack)->vars, var);
                 }
             }
         }
@@ -1374,9 +1362,9 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *info, const uin
             }
 
             _upf_scope global = {
-                .ranges = VECTOR_CSTR_ARENA(&_upf_arena),
-                .vars = VECTOR_CSTR_ARENA(&_upf_arena),
-                .scopes = VECTOR_CSTR_ARENA(&_upf_arena),
+                .ranges = VECTOR_NEW(&_upf_arena),
+                .vars = VECTOR_NEW(&_upf_arena),
+                .scopes = VECTOR_NEW(&_upf_arena),
             };
 
             _upf_range range = {
@@ -1836,7 +1824,7 @@ static _upf_tokenizer _upf_tokenize(const char *string) {
                                        {_UPF_TOK_COMMA, {","}},         {_UPF_TOK_DOT, {"."}},         {_UPF_TOK_PTR_MEMBER, {"->"}}};
     static const char *keywords[] = {"struct", "union", "enum"};
 
-    _upf_token_vec tokens = VECTOR_CSTR_ARENA(&_upf_arena);
+    _upf_token_vec tokens = VECTOR_NEW(&_upf_arena);
 
     const char *ch = string;
     while (*ch != '\0') {
@@ -2002,10 +1990,10 @@ static size_t _upf_get_nested_type(_upf_cstr_vec vars, size_t idx, size_t type_i
 }
 
 static _upf_idx_vec _upf_parse_args(uint64_t pc, const char *args) {
-    _upf_idx_vec types = VECTOR_CSTR_ARENA(&_upf_arena);
+    _upf_idx_vec types = VECTOR_NEW(&_upf_arena);
     _upf_tokenizer t = _upf_tokenize(args);
 
-    _upf_cstr_vec vars = VECTOR_CSTR_ARENA(&_upf_arena);
+    _upf_cstr_vec vars = VECTOR_NEW(&_upf_arena);
     while (_upf_can_consume(&t)) {
         vars.length = 0;
         bool is_casted = false;
@@ -2061,7 +2049,7 @@ static _upf_idx_vec _upf_parse_args(uint64_t pc, const char *args) {
                 _upf_cu cu = _upf_cus.data[i];
                 if (!(cu.low_pc <= pc && pc < cu.high_pc)) continue;
 
-                _upf_scope_stack scope_stack = VECTOR_CSTR_ARENA(&_upf_arena);
+                _upf_scope_stack scope_stack = VECTOR_NEW(&_upf_arena);
                 _upf_get_scopes(&scope_stack, pc, cu.scopes);
                 // NOTE: returned scope_stack is from smallest(local) to biggest(global)
                 const uint8_t *type_die = NULL;
@@ -2144,10 +2132,11 @@ __attribute__((noinline)) void _upf_uprintf(const char *file, uint64_t line, con
 #undef false
 #undef true
 #undef bool
-#undef VECTOR_FREE
+#undef VECTOR_POP
+#undef VECTOR_TOP
 #undef VECTOR_PUSH
 #undef VECTOR_TYPEDEF
-#undef VECTOR_CSTR_ARENA
+#undef VECTOR_NEW
 #undef INITIAL_VECTOR_CAPACITY
 #undef INITIAL_ARENA_SIZE
 #undef UNREACHABLE
