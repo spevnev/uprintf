@@ -97,6 +97,13 @@ ssize_t getline(char **lineptr, size_t *n, FILE *stream);
 #define OUT_OF_MEMORY() ERROR("Process ran out of memory.")
 #define UNREACHABLE() ERROR("Unreachable.");
 
+#define WARN(...)                             \
+    do {                                      \
+        fprintf(stderr, "[WARN] (uprintf) "); \
+        fprintf(stderr, __VA_ARGS__);         \
+        fprintf(stderr, "\n");                \
+    } while (0)
+
 
 #define INITIAL_ARENA_SIZE 4096
 
@@ -178,6 +185,38 @@ static char *_upf_arena_string(struct _upf_arena *arena, const char *begin, cons
     return string;
 }
 
+static char *_upf_arena_concat2(struct _upf_arena *arena, ...) {
+    va_list va_args;
+
+    size_t size = 0;
+    va_start(va_args, arena);
+    while (1) {
+        const char *str = va_arg(va_args, const char *);
+        if (str == NULL) break;
+        size += strlen(str);
+    }
+    va_end(va_args);
+
+    char *result = _upf_arena_alloc(arena, size + 1);
+    result[size] = '\0';
+
+    char *p = result;
+    va_start(va_args, arena);
+    while (1) {
+        const char *str = va_arg(va_args, const char *);
+        if (str == NULL) break;
+
+        size_t len = strlen(str);
+        memcpy(p, str, len);
+        p += len;
+    }
+    va_end(va_args);
+
+    return result;
+}
+
+#define _upf_arena_concat(arena, ...) _upf_arena_concat2(arena, __VA_ARGS__, NULL)
+
 
 #define INITIAL_VECTOR_CAPACITY 16
 
@@ -223,7 +262,7 @@ static char *_upf_arena_string(struct _upf_arena *arena, const char *begin, cons
 #define false 0
 
 
-VECTOR_TYPEDEF(_upf_idx_vec, size_t);
+VECTOR_TYPEDEF(_upf_size_t_vec, size_t);
 VECTOR_TYPEDEF(_upf_cstr_vec, const char *);
 
 typedef struct {
@@ -268,28 +307,36 @@ enum _upf_type_kind {
 typedef struct {
     int64_t value;
     const char *name;
-} _upf_enum_entry;
+} _upf_enum;
 
-VECTOR_TYPEDEF(_upf_enum_vec, _upf_enum_entry);
+VECTOR_TYPEDEF(_upf_enum_vec, _upf_enum);
 
 typedef struct {
     const char *name;
     size_t type;
     size_t offset;
-} _upf_field;
+} _upf_member;
 
-VECTOR_TYPEDEF(_upf_field_vec, _upf_field);
+VECTOR_TYPEDEF(_upf_member_vec, _upf_member);
 
 typedef struct {
     const char *name;
     enum _upf_type_kind kind;
-    _upf_field_vec fields;
     bool is_pointer;
     bool is_const;
-    size_t enum_type;
-    _upf_enum_vec enum_values;
-    size_t length;
-    size_t element_type;
+    union {
+        struct {
+            _upf_member_vec members;
+        } cstruct;
+        struct {
+            size_t underlying_type;
+            _upf_enum_vec enums;
+        } cenum;
+        struct {
+            size_t element_type;
+            _upf_size_t_vec lengths;
+        } array;
+    } as;
 } _upf_type;
 
 typedef struct {
@@ -622,6 +669,22 @@ static uint64_t _upf_get_ref(const uint8_t *info, uint64_t form) {
     return ref;
 }
 
+static bool _upf_is_form_data(uint64_t form) {
+    switch (form) {
+        case DW_FORM_data1:
+        case DW_FORM_data2:
+        case DW_FORM_data4:
+        case DW_FORM_data8:
+        case DW_FORM_data16:
+        case DW_FORM_implicit_const:
+        case DW_FORM_sdata:
+        case DW_FORM_udata:
+            return true;
+        default:
+            return false;
+    }
+}
+
 static int64_t _upf_get_data(const uint8_t *info, _upf_attr attr) {
     switch (attr.form) {
         case DW_FORM_data1:
@@ -632,6 +695,8 @@ static int64_t _upf_get_data(const uint8_t *info, _upf_attr attr) {
             memcpy(&data, info, _upf_get_attr_size(info, attr.form));
             return data;
         } break;
+        case DW_FORM_data16:
+            UNREACHABLE();  // TODO:
         case DW_FORM_implicit_const:
             return attr.implicit_const;
         case DW_FORM_sdata: {
@@ -644,8 +709,21 @@ static int64_t _upf_get_data(const uint8_t *info, _upf_attr attr) {
             _upf_uLEB_to_uint64(info, &data);
             return data;
         } break;
+    }
+    UNREACHABLE();
+}
+
+static bool _upf_is_form_addr(uint64_t form) {
+    switch (form) {
+        case DW_FORM_addr:
+        case DW_FORM_addrx:
+        case DW_FORM_addrx1:
+        case DW_FORM_addrx2:
+        case DW_FORM_addrx3:
+        case DW_FORM_addrx4:
+            return true;
         default:
-            assert(0 && "TODO: handle other data types");  // TODO:
+            return false;
     }
 }
 
@@ -653,6 +731,10 @@ static uint64_t _upf_get_addr(const _upf_cu *cu, const uint8_t *info, uint64_t f
     switch (form) {
         case DW_FORM_addr:
             return _upf_get_address(info);
+        case DW_FORM_addrx1:
+        case DW_FORM_addrx2:
+        case DW_FORM_addrx3:
+        case DW_FORM_addrx4:
         case DW_FORM_addrx: {
             assert(_upf_dwarf.addr != NULL && cu->addr_base != INVALID);
             uint64_t offset = cu->addr_base + _upf_get_x_offset(info, form) * _upf_dwarf.address_size;
@@ -674,12 +756,12 @@ static enum _upf_type_kind _upf_get_type_kind(int64_t encoding, int64_t size) {
     switch (encoding) {
         case DW_ATE_boolean:
             if (size == 1) return _UPF_TK_BOOL;
-            fprintf(stderr, "[WARN] uprintf: expected boolean to be 1 byte long. Ignoring this type.\n");
+            WARN("Expected boolean to be 1 byte long. Ignoring this type.");
             return _UPF_TK_UNKNOWN;
         case DW_ATE_address:
-            fprintf(stderr,
-                    "[WARN] uprintf: segmented addresses aren't supported since x86_64/amd64 (the only supported architecture) doesn't "
-                    "have them. Ignoring this type.\n");
+            WARN(
+                "Segmented addresses aren't supported since x86_64/amd64 (the only supported architecture) doesn't have them. "
+                "Ignoring this type.");
             return _UPF_TK_UNKNOWN;
         case DW_ATE_signed:
             if (size == 1) return _UPF_TK_S1;
@@ -690,14 +772,14 @@ static enum _upf_type_kind _upf_get_type_kind(int64_t encoding, int64_t size) {
                 uint32_t x = 1;
                 assert(*((uint8_t *) (&x)) == 1 && "uprintf only support x86_64/amd64 which is little-endian");
 
-                fprintf(stderr, "[WARN] uprintf: 16 byte integers aren't supported. Truncating to 8 bytes.\n");
+                WARN("16 byte integers aren't supported. Truncating to 8 bytes.");
                 return _UPF_TK_S8;
             }
-            fprintf(stderr, "[WARN] uprintf: expected signed integer to be 1, 2, 4, 8 or 16 bytes long. Ignoring this type.\n");
+            WARN("Expected signed integer to be 1, 2, 4, 8 or 16 bytes long. Ignoring this type.");
             return _UPF_TK_UNKNOWN;
         case DW_ATE_signed_char:
             if (size == 1) return _UPF_TK_SCHAR;
-            fprintf(stderr, "[WARN] uprintf: expected char to be 1 byte long. Ignoring this type.\n");
+            WARN("Expected char to be 1 byte long. Ignoring this type.");
             return _UPF_TK_UNKNOWN;
         case DW_ATE_unsigned:
             if (size == 1) return _UPF_TK_U1;
@@ -708,61 +790,67 @@ static enum _upf_type_kind _upf_get_type_kind(int64_t encoding, int64_t size) {
                 uint32_t x = 1;
                 assert(*((uint8_t *) (&x)) == 1 && "uprintf only support x86_64/amd64 which is little-endian");
 
-                fprintf(stderr, "[WARN] uprintf: 16 byte unsigned integers aren't supported. Truncating to 8 bytes.\n");
+                WARN("16 byte unsigned integers aren't supported. Truncating to 8 bytes.");
                 return _UPF_TK_U8;
             }
-            fprintf(stderr, "[WARN] uprintf: expected unsigned integer to be 1, 2, 4, 8 or 16 bytes long. Ignoring this type.\n");
+            WARN("Expected unsigned integer to be 1, 2, 4, 8 or 16 bytes long. Ignoring this type.");
             return _UPF_TK_UNKNOWN;
         case DW_ATE_unsigned_char:
             if (size == 1) return _UPF_TK_UCHAR;
-            fprintf(stderr, "[WARN] uprintf: expected char to be 1 byte long. Ignoring this type.\n");
+            WARN("Expected char to be 1 byte long. Ignoring this type.");
             return _UPF_TK_UNKNOWN;
         case DW_ATE_ASCII:
         case DW_ATE_UCS:
         case DW_ATE_UTF:
-            fprintf(stderr, "[WARN] uprintf: C shouldn't have character encodings besides DW_ATE_(un)signed_char. Ignoring this type.\n");
+            WARN("C shouldn't have character encodings besides DW_ATE_(un)signed_char. Ignoring this type.");
             return _UPF_TK_UNKNOWN;
         case DW_ATE_signed_fixed:
         case DW_ATE_unsigned_fixed:
-            fprintf(stderr, "[WARN] uprintf: C shouldn't have fixed-point decimals. Ignoring this type.\n");
+            WARN("C shouldn't have fixed-point decimals. Ignoring this type.");
             return _UPF_TK_UNKNOWN;
         case DW_ATE_float:
             if (size == 4) return _UPF_TK_F4;
             if (size == 8) return _UPF_TK_F8;
             if (size == 16) {
-                fprintf(stderr, "[WARN] uprintf: 16 byte floats aren't supported. Ignoring this type.\n");
+                WARN("16 byte floats aren't supported. Ignoring this type.");
                 return _UPF_TK_UNKNOWN;
             }
-            fprintf(stderr, "[WARN] uprintf: expected floats to be 4, 8 or 16 bytes long. Ignoring this type.\n");
+            WARN("Expected floats to be 4, 8 or 16 bytes long. Ignoring this type.");
             return _UPF_TK_UNKNOWN;
         case DW_ATE_complex_float:
             // TODO:
-            fprintf(stderr, "[WARN] uprintf: complex floats aren't supported. Ignoring this type.\n");
+            WARN("Complex floats aren't supported. Ignoring this type.");
             return _UPF_TK_UNKNOWN;
         case DW_ATE_imaginary_float:
-            fprintf(stderr, "[WARN] uprintf: imaginary floats aren't supported. Ignoring this type.\n");
+            WARN("Imaginary floats aren't supported. Ignoring this type.");
             return _UPF_TK_UNKNOWN;
         case DW_ATE_decimal_float:
             // TODO:
-            fprintf(stderr, "[WARN] uprintf: decimal floats aren't supported. Ignoring this type.\n");
+            WARN("Decimal floats aren't supported. Ignoring this type.");
             return _UPF_TK_UNKNOWN;
         case DW_ATE_packed_decimal:
-            fprintf(stderr, "[WARN] uprintf: C shouldn't have packed decimals. Ignoring this type.\n");
+            WARN("C shouldn't have packed decimals. Ignoring this type.");
             return _UPF_TK_UNKNOWN;
         case DW_ATE_numeric_string:
-            fprintf(stderr, "[WARN] uprintf: C shouldn't have numeric strings. Ignoring this type.\n");
+            WARN("C shouldn't have numeric strings. Ignoring this type.");
             return _UPF_TK_UNKNOWN;
         case DW_ATE_edited:
-            fprintf(stderr, "[WARN] uprintf: C shouldn't have edited strings. Ignoring this type.\n");
+            WARN("C shouldn't have edited strings. Ignoring this type.");
             return _UPF_TK_UNKNOWN;
         default:
-            fprintf(stderr, "[WARN] uprintf: skipping unkown DWARF type encoding (0x%02lx)\n", encoding);
+            WARN("Skipping unkown DWARF type encoding (0x%02lx)", encoding);
             return _UPF_TK_UNKNOWN;
     }
     UNREACHABLE();
 }
 
-static size_t _upf_get_type(const _upf_cu *cu, const uint8_t *info) {
+static const _upf_type *_upf_get_type(size_t type_idx) {
+    assert(type_idx != INVALID);
+    assert(type_idx < _upf_type_map.length);
+    return &_upf_type_map.data[type_idx].type;
+}
+
+static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
     // TODO: try to reduce size, esp of const/pointer/typedef, since they don't change much
     for (size_t i = 0; i < _upf_type_map.length; i++) {
         if (_upf_type_map.data[i].type_die == info) {
@@ -780,18 +868,18 @@ static size_t _upf_get_type(const _upf_cu *cu, const uint8_t *info) {
     switch (abbrev->tag) {
         case DW_TAG_typedef: {
             const char *name = NULL;
-            const uint8_t *next_info = NULL;
+            const uint8_t *type_die = NULL;
             for (size_t i = 0; i < abbrev->attrs.length; i++) {
                 _upf_attr attr = abbrev->attrs.data[i];
 
-                if (attr.name == DW_AT_type) next_info = cu->base + _upf_get_ref(info, attr.form);
+                if (attr.name == DW_AT_type) type_die = cu->base + _upf_get_ref(info, attr.form);
                 else if (attr.name == DW_AT_name) name = _upf_get_string(cu, info, attr.form);
 
                 info += _upf_get_attr_size(info, attr.form);
             }
-            assert(next_info != NULL && name != NULL);
+            assert(type_die != NULL && name != NULL);
 
-            size_t type_idx = _upf_get_type(cu, next_info);
+            size_t type_idx = _upf_parse_type(cu, type_die);
             _upf_type_entry entry = _upf_type_map.data[type_idx];
             entry.type.name = name;
             entry.type_die = base;
@@ -802,12 +890,15 @@ static size_t _upf_get_type(const _upf_cu *cu, const uint8_t *info) {
         }
         case DW_TAG_union_type:
         case DW_TAG_structure_type: {
+            bool is_struct = abbrev->tag == DW_TAG_structure_type;
             _upf_type type = {
-                .name = NULL,
-                .kind = abbrev->tag == DW_TAG_structure_type ? _UPF_TK_STRUCT : _UPF_TK_UNION,
-                .fields = VECTOR_NEW(&_upf_arena),
+                .name = is_struct ? "struct" : "union",
+                .kind = is_struct ? _UPF_TK_STRUCT : _UPF_TK_UNION,
                 .is_pointer = false,
                 .is_const = false,
+                .as.cstruct = {
+                    .members = VECTOR_NEW(&_upf_arena),
+                },
             };
 
             for (size_t i = 0; i < abbrev->attrs.length; i++) {
@@ -830,28 +921,28 @@ static size_t _upf_get_type(const _upf_cu *cu, const uint8_t *info) {
                     continue;
                 }
 
-                _upf_field field = {
+                _upf_member member = {
                     .name = NULL,
                     .type = INVALID,
-                    .offset = 0,
+                    .offset = is_struct ? INVALID : 0,
                 };
                 for (size_t i = 0; i < abbrev->attrs.length; i++) {
                     _upf_attr attr = abbrev->attrs.data[i];
 
                     if (attr.name == DW_AT_name) {
-                        field.name = _upf_get_string(cu, info, attr.form);
+                        member.name = _upf_get_string(cu, info, attr.form);
                     } else if (attr.name == DW_AT_type) {
                         const uint8_t *type_die = cu->base + _upf_get_ref(info, attr.form);
-                        field.type = _upf_get_type(cu, type_die);
+                        member.type = _upf_parse_type(cu, type_die);
                     } else if (attr.name == DW_AT_data_member_location) {
-                        field.offset = _upf_get_data(info, attr);
+                        member.offset = _upf_get_data(info, attr);
                     }
 
                     info += _upf_get_attr_size(info, attr.form);
                 }
-                assert(field.name != NULL && field.type != INVALID);
+                assert(member.name != NULL && member.type != INVALID && member.offset != INVALID);
 
-                VECTOR_PUSH(&type.fields, field);
+                VECTOR_PUSH(&type.as.cstruct.members, member);
             }
 
             _upf_type_entry entry = {
@@ -864,13 +955,14 @@ static size_t _upf_get_type(const _upf_cu *cu, const uint8_t *info) {
         }
         case DW_TAG_enumeration_type: {
             _upf_type type = {
-                .name = NULL,  // TODO: default name e.g. "enum"?
+                .name = "enum",
                 .kind = _UPF_TK_ENUM,
-                .fields = VECTOR_NEW(&_upf_arena),
                 .is_pointer = false,
                 .is_const = false,
-                .enum_type = INVALID,
-                .enum_values = VECTOR_NEW(&_upf_arena),
+                .as.cenum = {
+                    .underlying_type = INVALID,
+                    .enums = VECTOR_NEW(&_upf_arena),
+                },
             };
 
             for (size_t i = 0; i < abbrev->attrs.length; i++) {
@@ -880,12 +972,12 @@ static size_t _upf_get_type(const _upf_cu *cu, const uint8_t *info) {
                     type.name = _upf_get_string(cu, info, attr.form);
                 } else if (attr.name == DW_AT_type) {
                     const uint8_t *new_info = cu->base + _upf_get_ref(info, attr.form);
-                    type.enum_type = _upf_get_type(cu, new_info);
+                    type.as.cenum.underlying_type = _upf_parse_type(cu, new_info);
                 }
 
                 info += _upf_get_attr_size(info, attr.form);
             };
-            assert(type.enum_type != INVALID);
+            assert(type.as.cenum.underlying_type != INVALID);
 
             while (1) {
                 info += _upf_uLEB_to_uint64(info, &code);
@@ -914,11 +1006,11 @@ static size_t _upf_get_type(const _upf_cu *cu, const uint8_t *info) {
                 }
                 assert(found == 2);
 
-                _upf_enum_entry enumerator = {
+                _upf_enum cenum = {
                     .value = value,
                     .name = name,
                 };
-                VECTOR_PUSH(&type.enum_values, enumerator);
+                VECTOR_PUSH(&type.as.cenum.enums, cenum);
             }
 
             _upf_type_entry entry = {
@@ -930,40 +1022,35 @@ static size_t _upf_get_type(const _upf_cu *cu, const uint8_t *info) {
             return _upf_type_map.length - 1;
         }
         case DW_TAG_array_type: {
-            _upf_type type = {
+            _upf_type array = {
                 .name = NULL,
                 .kind = _UPF_TK_ARRAY,
-                .fields = VECTOR_NEW(&_upf_arena),
                 .is_pointer = false,
                 .is_const = false,
-                .element_type = INVALID,
-                .length = INVALID,
+                .as.array = {
+                    .element_type = INVALID,
+                    .lengths = VECTOR_NEW(&_upf_arena),
+                },
             };
 
             for (size_t i = 0; i < abbrev->attrs.length; i++) {
                 _upf_attr attr = abbrev->attrs.data[i];
 
                 if (attr.name == DW_AT_name) {
-                    type.name = _upf_get_string(cu, info, attr.form);
+                    array.name = _upf_get_string(cu, info, attr.form);
                 } else if (attr.name == DW_AT_type) {
                     const uint8_t *new_info = cu->base + _upf_get_ref(info, attr.form);
-                    type.element_type = _upf_get_type(cu, new_info);
+                    array.as.array.element_type = _upf_parse_type(cu, new_info);
                 }
 
                 info += _upf_get_attr_size(info, attr.form);
             };
-            assert(type.element_type != INVALID);
+            assert(array.as.array.element_type != INVALID);
 
-            _upf_type subtype = _upf_type_map.data[type.element_type].type;
-            if (subtype.name != NULL && type.name == NULL) {
-                size_t len = strlen(subtype.name);
-                char *name = (char *) _upf_arena_alloc(&_upf_arena, len + 3);
-                memcpy(name, subtype.name, len);
-                name[len] = '[';
-                name[len + 1] = ']';
-                name[len + 2] = '\0';
-                type.name = name;
-            }
+            const _upf_type *element_type = _upf_get_type(array.as.array.element_type);
+            bool generate_name = element_type->name != NULL && array.name == NULL;
+            if (generate_name) array.name = element_type->name;
+
             while (1) {
                 info += _upf_uLEB_to_uint64(info, &code);
                 if (code == 0) break;
@@ -971,11 +1058,11 @@ static size_t _upf_get_type(const _upf_cu *cu, const uint8_t *info) {
                 assert(code <= cu->abbrevs.length);
                 abbrev = &cu->abbrevs.data[code - 1];
                 if (abbrev->tag == DW_TAG_enumeration_type) {
-                    fprintf(stderr, "[WARN] uprintf: array subranges specified with enumerators are unsupported. Ignoring this type.\n");
+                    WARN("Enumerator array subranges aren't unsupported. Ignoring this type.");
                     _upf_type_entry entry = {
                         .type_die = base,
                         .type = {
-                            .name = type.name,
+                            .name = array.name,
                             .kind = _UPF_TK_UNKNOWN,
                         },
                     };
@@ -985,21 +1072,28 @@ static size_t _upf_get_type(const _upf_cu *cu, const uint8_t *info) {
                 }
                 assert(abbrev->tag == DW_TAG_subrange_type);
 
+                size_t length = INVALID;
                 for (size_t i = 0; i < abbrev->attrs.length; i++) {
                     _upf_attr attr = abbrev->attrs.data[i];
 
                     if (attr.name == DW_AT_count) {
-                        // TODO: handle other types? or at least assert/error
-                        type.length = _upf_get_data(info, attr);
+                        if (_upf_is_form_data(attr.form)) {
+                            length = _upf_get_data(info, attr);
+                        } else {
+                            WARN("Non-constant array lengths aren't supported. Marking it unkown.");
+                        }
                     }
 
                     info += _upf_get_attr_size(info, attr.form);
                 }
+
+                VECTOR_PUSH(&array.as.array.lengths, length);
+                if (generate_name) array.name = _upf_arena_concat(&_upf_arena, array.name, "[]");
             }
 
             _upf_type_entry entry = {
                 .type_die = base,
-                .type = type,
+                .type = array,
             };
             VECTOR_PUSH(&_upf_type_map, entry);
 
@@ -1009,19 +1103,39 @@ static size_t _upf_get_type(const _upf_cu *cu, const uint8_t *info) {
             _upf_type type = {
                 .name = NULL,
                 .kind = _UPF_TK_UNKNOWN,
-                .fields = VECTOR_NEW(&_upf_arena),
                 .is_pointer = false,
                 .is_const = false,
             };
+
             uint64_t size = INVALID;
             uint64_t encoding = INVALID;
-            // TODO: rename _OFFSET
             for (size_t i = 0; i < abbrev->attrs.length; i++) {
                 _upf_attr attr = abbrev->attrs.data[i];
 
-                if (attr.name == DW_AT_byte_size) size = _upf_get_data(info, attr);  // TODO: may be exprloc or ref
-                else if (attr.name == DW_AT_encoding) encoding = _upf_get_data(info, attr);
-                else if (attr.name == DW_AT_name) type.name = _upf_get_string(cu, info, attr.form);
+                if (attr.name == DW_AT_byte_size) {
+                    if (_upf_is_form_data(attr.form)) {
+                        size = _upf_get_data(info, attr);  // TODO: may be exprloc or ref
+                    } else {
+                        WARN("Non-constant base type sizes aren't supported. Ignoring this type.");
+
+                        _upf_type_entry entry = {
+                            .type_die = base,
+                            .type = {
+                                .name = NULL,
+                                .kind = _UPF_TK_UNKNOWN,
+                                .is_pointer = false,
+                                .is_const = false,
+                            },
+                        };
+                        VECTOR_PUSH(&_upf_type_map, entry);
+
+                        return _upf_type_map.length - 1;
+                    }
+                } else if (attr.name == DW_AT_encoding) {
+                    encoding = _upf_get_data(info, attr);
+                } else if (attr.name == DW_AT_name) {
+                    type.name = _upf_get_string(cu, info, attr.form);
+                }
 
                 info += _upf_get_attr_size(info, attr.form);
             }
@@ -1029,8 +1143,6 @@ static size_t _upf_get_type(const _upf_cu *cu, const uint8_t *info) {
 
             type.kind = _upf_get_type_kind(encoding, size);
 
-            // TODO: don't add base types to the map?
-            // TODO: use real hash map?
             _upf_type_entry entry = {
                 .type_die = base,
                 .type = type,
@@ -1056,7 +1168,6 @@ static size_t _upf_get_type(const _upf_cu *cu, const uint8_t *info) {
                     .type = {
                         .name = "void",
                         .kind = _UPF_TK_VOID,
-                        .fields = VECTOR_NEW(&_upf_arena),
                         .is_pointer = true,
                         .is_const = false,
                     },
@@ -1066,7 +1177,7 @@ static size_t _upf_get_type(const _upf_cu *cu, const uint8_t *info) {
                 return _upf_type_map.length - 1;
             }
 
-            size_t type_idx = _upf_get_type(cu, cu->base + offset);
+            size_t type_idx = _upf_parse_type(cu, cu->base + offset);
             _upf_type_entry entry = _upf_type_map.data[type_idx];
             entry.type_die = base;
             entry.type.is_pointer = true;
@@ -1075,7 +1186,6 @@ static size_t _upf_get_type(const _upf_cu *cu, const uint8_t *info) {
             return _upf_type_map.length - 1;
         }
         case DW_TAG_const_type: {
-            // TODO: display const?
             uint64_t offset = INVALID;
             for (size_t i = 0; i < abbrev->attrs.length; i++) {
                 _upf_attr attr = abbrev->attrs.data[i];
@@ -1086,7 +1196,7 @@ static size_t _upf_get_type(const _upf_cu *cu, const uint8_t *info) {
             }
             assert(offset != INVALID);
 
-            size_t type_idx = _upf_get_type(cu, cu->base + offset);
+            size_t type_idx = _upf_parse_type(cu, cu->base + offset);
             _upf_type_entry entry = _upf_type_map.data[type_idx];
             entry.type_die = base;
             entry.type.is_const = true;
@@ -1158,20 +1268,6 @@ static _upf_range_vec _upf_get_ranges(const _upf_cu *cu, const uint8_t *info, ui
         }
     }
     return ranges;
-}
-
-static bool _upf_is_form_addr(uint64_t form) {
-    switch (form) {
-        case DW_FORM_addr:
-        case DW_FORM_addrx:
-        case DW_FORM_addrx1:
-        case DW_FORM_addrx2:
-        case DW_FORM_addrx3:
-        case DW_FORM_addrx4:
-            return true;
-        default:
-            return false;
-    }
 }
 
 static const char *_upf_get_type_name(const _upf_cu *cu, const uint8_t *info) {
@@ -1267,7 +1363,7 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *info, const uin
     };
 
     _upf_scope_stack scope_stack = VECTOR_NEW(&_upf_arena);
-    _upf_idx_vec scope_depth = VECTOR_NEW(&_upf_arena);
+    _upf_size_t_vec scope_depth = VECTOR_NEW(&_upf_arena);
     size_t depth = 0;
     while (info < info_end) {
         const uint8_t *die_base = info;
@@ -1606,29 +1702,23 @@ static void _upf_parse_elf(void) {
 }
 
 static const char *_upf_escape_char(char ch) {
+    // clang-format off
     switch (ch) {
-        case '\a':
-            return "\\a";
-        case '\b':
-            return "\\b";
-        case '\f':
-            return "\\f";
-        case '\n':
-            return "\\n";
-        case '\r':
-            return "\\r";
-        case '\t':
-            return "\\t";
-        case '\v':
-            return "\\v";
-        case '\\':
-            return "\\\\";
-        default: {
-            static char str[2] = {0};
-            str[0] = ch;
-            return str;
-        }
+        case '\a': return "\\a";
+        case '\b': return "\\b";
+        case '\f': return "\\f";
+        case '\n': return "\\n";
+        case '\r': return "\\r";
+        case '\t': return "\\t";
+        case '\v': return "\\v";
+        case '\\': return "\\\\";
     }
+    // clang-format on
+
+    static char str[2];
+    str[0] = ch;
+    str[1] = '\0';
+    return str;
 }
 
 static bool _upf_is_printable(char c) { return ' ' <= c && c <= '~'; }
@@ -1676,37 +1766,41 @@ static char *_upf_print_type(char *p, const uint8_t *data, const _upf_type *type
 
     switch (type->kind) {
         case _UPF_TK_UNION:
-        case _UPF_TK_STRUCT:
+            p += sprintf(p, "(union) ");
+            __attribute__((fallthrough));  // Handle union as struct
+        case _UPF_TK_STRUCT: {
             p += sprintf(p, "%s {\n", type->name);
-            for (size_t i = 0; i < type->fields.length; i++) {
-                _upf_field *field = &type->fields.data[i];
-                _upf_type field_type = _upf_type_map.data[field->type].type;
+            _upf_member_vec members = type->as.cstruct.members;
+            for (size_t i = 0; i < members.length; i++) {
+                _upf_member *member = &members.data[i];
+                const _upf_type *member_type = _upf_get_type(member->type);
 
                 int indent = UPRINTF_INDENT * (depth + 1);
                 memset(p, ' ', indent);
                 p += indent;
 
-                p += sprintf(p, "%s%s %s%s = ", field_type.is_const ? "const " : "", field_type.name, field_type.is_pointer ? "*" : "",
-                             field->name);
-                p = _upf_print_type(p, data + field->offset, &field_type, depth + 1);
+                p += sprintf(p, "%s%s %s%s = ", member_type->is_const ? "const " : "", member_type->name,
+                             member_type->is_pointer ? "*" : "", member->name);
+                p = _upf_print_type(p, data + member->offset, member_type, depth + 1);
                 *p++ = '\n';
             }
             p += sprintf(p, "};");
-            break;
+        } break;
         case _UPF_TK_ENUM: {
             int32_t enum_value;
             memcpy(&enum_value, data, sizeof(enum_value));
-            for (size_t i = 0; i < type->enum_values.length; i++) {
-                if (enum_value == type->enum_values.data[i].value) {
-                    p += sprintf(p, "%s (", type->enum_values.data[i].name);
+            _upf_enum_vec enums = type->as.cenum.enums;
+            for (size_t i = 0; i < enums.length; i++) {
+                if (enum_value != enums.data[i].value) {
+                    p += sprintf(p, "%s (", enums.data[i].name);
                     break;
                 }
             }
-            p = _upf_print_type(p, data, &_upf_type_map.data[type->enum_type].type, depth);
+            p = _upf_print_type(p, data, _upf_get_type(type->as.cenum.underlying_type), depth);
             *p++ = ')';
         } break;
         case _UPF_TK_ARRAY:
-            fprintf(stderr, "[WARN] uprintf: Arrays are currently unsupported. Ignoring this type.\n");
+            WARN("Arrays are currently unsupported. Ignoring this type.");
             p += sprintf(p, "(array)");
             break;
         case _UPF_TK_U1:
@@ -1739,14 +1833,17 @@ static char *_upf_print_type(char *p, const uint8_t *data, const _upf_type *type
         case _UPF_TK_F8:
             p += sprintf(p, "%lf", *((double *) data));
             break;
-        case _UPF_TK_UCHAR: {
-            char ch = *((char *) data);
-            p += sprintf(p, "%hhu", ch);
-            if (_upf_is_printable(ch)) p += sprintf(p, " ('%s')", _upf_escape_char(ch));
-        } break;
+        case _UPF_TK_BOOL:
+            p += sprintf(p, "%s", *((int8_t *) data) ? "true" : "false");
+            break;
         case _UPF_TK_SCHAR: {
             char ch = *((char *) data);
             p += sprintf(p, "%hhd", ch);
+            if (_upf_is_printable(ch)) p += sprintf(p, " ('%s')", _upf_escape_char(ch));
+        } break;
+        case _UPF_TK_UCHAR: {
+            char ch = *((char *) data);
+            p += sprintf(p, "%hhu", ch);
             if (_upf_is_printable(ch)) p += sprintf(p, " ('%s')", _upf_escape_char(ch));
         } break;
         case _UPF_TK_VOID:
@@ -1997,21 +2094,28 @@ static void _upf_get_scopes(_upf_scope_stack *scope_stack, uint64_t pc, _upf_sco
 static size_t _upf_get_nested_type(_upf_cstr_vec vars, size_t idx, size_t type_idx) {
     if (idx == vars.length) return type_idx;
 
-    assert(type_idx != INVALID);
-    assert(type_idx < _upf_type_map.length);  // TODO: helper for get_type(type_idx);
-
-    const _upf_type *type = &_upf_type_map.data[type_idx].type;
-    for (size_t i = 0; i < type->fields.length; i++) {
-        if (strcmp(type->fields.data[i].name, vars.data[idx]) == 0) {
-            return _upf_get_nested_type(vars, idx + 1, type->fields.data[i].type);
+    const _upf_type *type = _upf_get_type(type_idx);
+    switch (type->kind) {
+        case _UPF_TK_STRUCT:
+        case _UPF_TK_UNION: {
+            _upf_member_vec members = type->as.cstruct.members;
+            for (size_t i = 0; i < members.length; i++) {
+                if (strcmp(members.data[i].name, vars.data[idx]) == 0) {
+                    return _upf_get_nested_type(vars, idx + 1, members.data[i].type);
+                }
+            }
+            ERROR("Unable to find member \"%s\" in \"%s\".", vars.data[idx], type->name);
+            // TODO: ^ warning + unknown/undefined?
         }
+        default:
+            UNREACHABLE();
     }
 
     return INVALID;
 }
 
-static _upf_idx_vec _upf_parse_args(uint64_t pc, const char *args) {
-    _upf_idx_vec types = VECTOR_NEW(&_upf_arena);
+static _upf_size_t_vec _upf_parse_args(uint64_t pc, const char *args) {
+    _upf_size_t_vec types = VECTOR_NEW(&_upf_arena);
     _upf_tokenizer t = _upf_tokenize(args);
 
     _upf_cstr_vec vars = VECTOR_NEW(&_upf_arena);
@@ -2056,7 +2160,7 @@ static _upf_idx_vec _upf_parse_args(uint64_t pc, const char *args) {
                     for (size_t j = 0; j < cu.types.length && !found; j++) {
                         _upf_type2 type = cu.types.data[j];
                         if (strcmp(type.name, type_name) == 0) {
-                            size_t type_idx = _upf_get_type(&cu, type.type_die);
+                            size_t type_idx = _upf_parse_type(&cu, type.type_die);
                             VECTOR_PUSH(&types, type_idx);
                             found = true;
                         }
@@ -2083,7 +2187,7 @@ static _upf_idx_vec _upf_parse_args(uint64_t pc, const char *args) {
                     }
                 }
                 if (type_die == NULL) ERROR("Unable to find type of \"%s\".", vars.data[0]);
-                size_t base_type_idx = _upf_get_type(&cu, type_die);
+                size_t base_type_idx = _upf_parse_type(&cu, type_die);
                 size_t type_idx = _upf_get_nested_type(vars, 1, base_type_idx);
                 assert(type_idx != INVALID);
                 VECTOR_PUSH(&types, type_idx);
@@ -2112,7 +2216,7 @@ __attribute__((noinline)) void _upf_uprintf(const char *file, uint64_t line, con
     // the call instruction from it, which is at least 1 byte
     pc -= 1;
 
-    _upf_idx_vec types = _upf_parse_args(pc, args);
+    _upf_size_t_vec types = _upf_parse_args(pc, args);
     size_t arg_idx = 0;
 
     va_list va_args;
@@ -2131,7 +2235,7 @@ __attribute__((noinline)) void _upf_uprintf(const char *file, uint64_t line, con
             if (arg_idx >= types.length) ERROR("there are more conversion specifiers than arguments provided at %s:%lu\n", file, line);
 
             void *ptr = va_arg(va_args, void *);
-            _upf_type *type = &_upf_type_map.data[types.data[arg_idx++]].type;
+            const _upf_type *type = _upf_get_type(types.data[arg_idx++]);
             p = _upf_print_type(p, ptr, type, 0);
 
             ch++;
@@ -2160,6 +2264,7 @@ __attribute__((noinline)) void _upf_uprintf(const char *file, uint64_t line, con
 #undef VECTOR_NEW
 #undef INITIAL_VECTOR_CAPACITY
 #undef INITIAL_ARENA_SIZE
+#undef WARN
 #undef UNREACHABLE
 #undef OUT_OF_MEMORY
 #undef ERROR
