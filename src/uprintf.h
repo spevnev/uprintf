@@ -313,8 +313,8 @@ typedef struct {
 VECTOR_TYPEDEF(_upf_member_vec, _upf_member);
 
 typedef struct {
-    int64_t value;
     const char *name;
+    int64_t value;
 } _upf_enum;
 
 VECTOR_TYPEDEF(_upf_enum_vec, _upf_enum);
@@ -487,6 +487,16 @@ static size_t _upf_LEB_to_int64(const uint8_t *leb, int64_t *result) {
     if ((shift < sizeof(*result) * 8) && (b & SIGN_MASK)) *result |= -(1 << shift);
 
     return i;
+}
+
+static const _upf_abbrev *_upf_get_abbrev(const _upf_cu *cu, size_t code) {
+    assert(code > 0 && code <= cu->abbrevs.length);
+    return &cu->abbrevs.data[code - 1];
+}
+
+static const _upf_type *_upf_get_type(size_t type_idx) {
+    assert(type_idx != INVALID && type_idx < _upf_type_map.length);
+    return &_upf_type_map.data[type_idx].type;
 }
 
 static uint64_t _upf_offset_cast(const uint8_t *info) {
@@ -665,7 +675,7 @@ static int64_t _upf_get_data(const uint8_t *info, _upf_attr attr) {
             return data;
         } break;
         case DW_FORM_data16:
-            UNREACHABLE();  // TODO:
+            ERROR("16 byte data blocks aren't supported.");
         case DW_FORM_implicit_const:
             return attr.implicit_const;
         case DW_FORM_sdata: {
@@ -787,14 +797,12 @@ static enum _upf_type_kind _upf_get_type_kind(int64_t encoding, int64_t size) {
             WARN("Expected floats to be 4, 8 or 16 bytes long. Ignoring this type.");
             return _UPF_TK_UNKNOWN;
         case DW_ATE_complex_float:
-            // TODO:
             WARN("Complex floats aren't supported. Ignoring this type.");
             return _UPF_TK_UNKNOWN;
         case DW_ATE_imaginary_float:
             WARN("Imaginary floats aren't supported. Ignoring this type.");
             return _UPF_TK_UNKNOWN;
         case DW_ATE_decimal_float:
-            // TODO:
             WARN("Decimal floats aren't supported. Ignoring this type.");
             return _UPF_TK_UNKNOWN;
         case DW_ATE_packed_decimal:
@@ -813,12 +821,6 @@ static enum _upf_type_kind _upf_get_type_kind(int64_t encoding, int64_t size) {
     UNREACHABLE();
 }
 
-static const _upf_type *_upf_get_type(size_t type_idx) {
-    assert(type_idx != INVALID);
-    assert(type_idx < _upf_type_map.length);
-    return &_upf_type_map.data[type_idx].type;
-}
-
 static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
     // TODO: try to reduce size, esp of const/pointer/typedef, since they don't change much
     for (size_t i = 0; i < _upf_type_map.length; i++) {
@@ -831,8 +833,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
 
     uint64_t code;
     info += _upf_uLEB_to_uint64(info, &code);
-    assert(code > 0 && code <= cu->abbrevs.length);
-    const _upf_abbrev *abbrev = &cu->abbrevs.data[code - 1];
+    const _upf_abbrev *abbrev = _upf_get_abbrev(cu, code);
 
     switch (abbrev->tag) {
         case DW_TAG_typedef: {
@@ -882,9 +883,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
                 info += _upf_uLEB_to_uint64(info, &code);
                 if (code == 0) break;
 
-                assert(code <= cu->abbrevs.length);
-                abbrev = &cu->abbrevs.data[code - 1];
-
+                abbrev = _upf_get_abbrev(cu, code);
                 if (abbrev->tag != DW_TAG_member) {
                     info = _upf_skip_die(info, abbrev);
                     continue;
@@ -952,33 +951,29 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
                 info += _upf_uLEB_to_uint64(info, &code);
                 if (code == 0) break;
 
-                assert(code <= cu->abbrevs.length);
-                abbrev = &cu->abbrevs.data[code - 1];
+                abbrev = _upf_get_abbrev(cu, code);
                 assert(abbrev->tag == DW_TAG_enumerator);
 
-                int64_t value = 0;
-                const char *name = NULL;  // TODO: rename
-                int found = 0;
+                bool found_value = false;
+                _upf_enum cenum = {
+                    .name = NULL,
+                    .value = 0,
+                };
                 for (size_t i = 0; i < abbrev->attrs.length; i++) {
                     _upf_attr attr = abbrev->attrs.data[i];
 
                     if (attr.name == DW_AT_name) {
-                        name = _upf_get_str(cu, info, attr.form);
-                        found++;
+                        cenum.name = _upf_get_str(cu, info, attr.form);
                     } else if (attr.name == DW_AT_const_value) {
-                        // TODO: handle other 2 types
-                        value = _upf_get_data(info, attr);
-                        found++;
+                        // TODO: handle other 2 types?
+                        cenum.value = _upf_get_data(info, attr);
+                        found_value = true;
                     }
 
                     info += _upf_get_attr_size(info, attr.form);
                 }
-                assert(found == 2);
+                assert(cenum.name != NULL && found_value);
 
-                _upf_enum cenum = {
-                    .value = value,
-                    .name = name,
-                };
                 VECTOR_PUSH(&type.as.cenum.enums, cenum);
             }
 
@@ -1024,8 +1019,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
                 info += _upf_uLEB_to_uint64(info, &code);
                 if (code == 0) break;
 
-                assert(code <= cu->abbrevs.length);
-                abbrev = &cu->abbrevs.data[code - 1];
+                abbrev = _upf_get_abbrev(cu, code);
                 if (abbrev->tag == DW_TAG_enumeration_type) {
                     WARN("Enumerator array subranges aren't unsupported. Ignoring this type.");
                     _upf_type_map_entry entry = {
@@ -1185,8 +1179,7 @@ static const char *_upf_get_type_name(const _upf_cu *cu, const uint8_t *info) {
     uint64_t code;
     info += _upf_uLEB_to_uint64(info, &code);
 
-    assert(code > 0 && code <= cu->abbrevs.length);
-    const _upf_abbrev *abbrev = &cu->abbrevs.data[code - 1];
+    const _upf_abbrev *abbrev = _upf_get_abbrev(cu, code);
     for (size_t i = 0; i < abbrev->attrs.length; i++) {
         _upf_attr attr = abbrev->attrs.data[i];
 
@@ -1198,7 +1191,7 @@ static const char *_upf_get_type_name(const _upf_cu *cu, const uint8_t *info) {
 
         info += _upf_get_attr_size(info, attr.form);
     }
-    if (abbrev->tag == DW_TAG_pointer_type) return "void";  // TODO: void*
+    if (abbrev->tag == DW_TAG_pointer_type) return "void";
 
     return NULL;
 }
@@ -1263,7 +1256,7 @@ static _upf_range_vec _upf_get_ranges(const _upf_cu *cu, const uint8_t *info, ui
     return ranges;
 }
 
-// TODO: handle all of these (check whether they can be generated in C with gcc/clang):
+// TODO: handle all of these in _upf_get_type_name _upf_parse_type _upf_parse_cu
 // #define DW_TAG_array_type               0x01
 // #define DW_TAG_class_type               0x02
 // #define DW_TAG_enumeration_type         0x04
@@ -1295,9 +1288,7 @@ static _upf_range_vec _upf_get_ranges(const _upf_cu *cu, const uint8_t *info, ui
 static _upf_named_type _upf_get_var(const _upf_cu *cu, const uint8_t *info) {
     uint64_t code;
     info += _upf_uLEB_to_uint64(info, &code);
-
-    assert(code > 0 && code <= cu->abbrevs.length);
-    const _upf_abbrev *abbrev = &cu->abbrevs.data[code - 1];
+    const _upf_abbrev *abbrev = _upf_get_abbrev(cu, code);
 
     _upf_named_type var = {
         .name = NULL,
@@ -1362,26 +1353,89 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *info, const uin
         .high_pc = INVALID,
     };
 
-    _upf_scope_ptr_vec scope_stack = VECTOR_NEW(&_upf_arena);
-    _upf_size_t_vec scope_depth = VECTOR_NEW(&_upf_arena);
+    uint64_t code;
+    info += _upf_uLEB_to_uint64(info, &code);
+    const _upf_abbrev *abbrev = _upf_get_abbrev(&cu, code);
+    assert(abbrev->tag == DW_TAG_compile_unit);
+
+    // Save to parse after the initializing str_offsets, addr_base and rnglists_base
+    const uint8_t *low_pc_info = NULL;
+    uint64_t low_pc_form = INVALID;
+    const uint8_t *high_pc_info = NULL;
+    _upf_attr high_pc_attr;
+    for (size_t i = 0; i < abbrev->attrs.length; i++) {
+        _upf_attr attr = abbrev->attrs.data[i];
+
+        if (attr.name == DW_AT_low_pc) {
+            low_pc_info = info;
+            low_pc_form = attr.form;
+        } else if (attr.name == DW_AT_high_pc) {
+            high_pc_info = info;
+            high_pc_attr = attr;
+        } else if (attr.name == DW_AT_str_offsets_base) {
+            cu.str_offsets_base = _upf_offset_cast(info);
+        } else if (attr.name == DW_AT_addr_base) {
+            cu.addr_base = _upf_offset_cast(info);
+        } else if (attr.name == DW_AT_rnglists_base) {
+            cu.rnglists_base = _upf_offset_cast(info);
+        }
+
+        info += _upf_get_attr_size(info, attr.form);
+    }
+
+    if (low_pc_info != NULL) cu.low_pc = _upf_get_addr(&cu, low_pc_info, low_pc_form);
+    else if (_upf_cus.length == 0) cu.low_pc = 0;
+    else if (VECTOR_TOP(&_upf_cus).high_pc != INVALID) cu.low_pc = VECTOR_TOP(&_upf_cus).high_pc;
+
+    if (high_pc_info != NULL) {
+        if (_upf_is_addr(high_pc_attr.form)) {
+            cu.high_pc = _upf_get_addr(&cu, high_pc_info, high_pc_attr.form);
+        } else {
+            assert(cu.low_pc != INVALID);
+            cu.high_pc = cu.low_pc + _upf_get_data(high_pc_info, high_pc_attr);
+        }
+    }
+
+    if (_upf_cus.length > 0) {
+        assert(cu.low_pc != INVALID);
+        VECTOR_TOP(&_upf_cus).high_pc = cu.low_pc;
+    }
+
+    _upf_scope global = {
+        .ranges = VECTOR_NEW(&_upf_arena),
+        .vars = VECTOR_NEW(&_upf_arena),
+        .scopes = VECTOR_NEW(&_upf_arena),
+    };
+
+    _upf_range range = {
+        .from = 0,
+        .to = UINT64_MAX,
+    };
+
+    VECTOR_PUSH(&global.ranges, range);
+    VECTOR_PUSH(&cu.scopes, global);
+
     size_t depth = 0;
+    _upf_scope_ptr_vec scope_stack = VECTOR_NEW(&_upf_arena);
+    VECTOR_PUSH(&scope_stack, cu.scopes.data);
+    _upf_size_t_vec depth_stack = VECTOR_NEW(&_upf_arena);
+    VECTOR_PUSH(&depth_stack, depth);
+
     while (info < info_end) {
         const uint8_t *die_base = info;
 
-        uint64_t code;
         info += _upf_uLEB_to_uint64(info, &code);
         if (code == 0) {
-            assert(scope_depth.length > 0);
-            if (depth == VECTOR_TOP(&scope_depth)) {
+            assert(depth_stack.length > 0);
+            if (depth == VECTOR_TOP(&depth_stack)) {
                 VECTOR_POP(&scope_stack);
-                VECTOR_POP(&scope_depth);
+                VECTOR_POP(&depth_stack);
             }
             depth--;
             continue;
         }
 
-        assert(code <= cu.abbrevs.length);
-        const _upf_abbrev *abbrev = &cu.abbrevs.data[code - 1];
+        abbrev = _upf_get_abbrev(&cu, code);
         if (abbrev->has_children) depth++;
 
         if (abbrev->tag == DW_TAG_lexical_block || abbrev->tag == DW_TAG_subprogram || abbrev->tag == DW_TAG_inlined_subroutine) {
@@ -1435,11 +1489,11 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *info, const uin
                         _upf_scope_vec *scopes = &VECTOR_TOP(&scope_stack)->scopes;
                         VECTOR_PUSH(scopes, new_scope);
                         VECTOR_PUSH(&scope_stack, &VECTOR_TOP(scopes));
-                        VECTOR_PUSH(&scope_depth, depth);
+                        VECTOR_PUSH(&depth_stack, depth);
                     }
                 } else {
                     VECTOR_PUSH(&scope_stack, NULL);
-                    VECTOR_PUSH(&scope_depth, depth);
+                    VECTOR_PUSH(&depth_stack, depth);
                 }
             }
         }
@@ -1454,62 +1508,9 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *info, const uin
                 }
             }
         }
-        if (abbrev->tag == DW_TAG_compile_unit) {
-            // save to parse after the loop because they require str_offsets and addr bases
-            const uint8_t *low_pc_info = NULL;
-            uint64_t low_pc_form = INVALID;
-            const uint8_t *high_pc_info = NULL;
-            _upf_attr high_pc_attr;
 
-            for (size_t i = 0; i < abbrev->attrs.length; i++) {
-                _upf_attr attr = abbrev->attrs.data[i];
-
-                if (attr.name == DW_AT_low_pc) {
-                    low_pc_info = info;
-                    low_pc_form = attr.form;
-                } else if (attr.name == DW_AT_high_pc) {
-                    high_pc_info = info;
-                    high_pc_attr = attr;
-                } else if (attr.name == DW_AT_str_offsets_base) {
-                    cu.str_offsets_base = _upf_offset_cast(info);
-                } else if (attr.name == DW_AT_addr_base) {
-                    cu.addr_base = _upf_offset_cast(info);
-                } else if (attr.name == DW_AT_rnglists_base) {
-                    cu.rnglists_base = _upf_offset_cast(info);
-                }
-
-                info += _upf_get_attr_size(info, attr.form);
-            }
-
-            if (low_pc_info != NULL && low_pc_form != INVALID) cu.low_pc = _upf_get_addr(&cu, low_pc_info, low_pc_form);
-            if (high_pc_info != NULL && high_pc_attr.form != INVALID) {
-                if (_upf_is_addr(high_pc_attr.form)) {
-                    cu.high_pc = _upf_get_addr(&cu, high_pc_info, high_pc_attr.form);
-                } else {
-                    assert(cu.low_pc != INVALID);
-                    cu.high_pc = cu.low_pc + _upf_get_data(high_pc_info, high_pc_attr);
-                }
-            }
-
-            _upf_scope global = {
-                .ranges = VECTOR_NEW(&_upf_arena),
-                .vars = VECTOR_NEW(&_upf_arena),
-                .scopes = VECTOR_NEW(&_upf_arena),
-            };
-
-            _upf_range range = {
-                .from = cu.low_pc == INVALID ? 0 : cu.low_pc,
-                .to = cu.high_pc == INVALID ? UINT64_MAX : cu.high_pc,
-            };
-
-            VECTOR_PUSH(&global.ranges, range);
-            assert(cu.scopes.length == 0);
-            VECTOR_PUSH(&cu.scopes, global);
-            assert(scope_stack.length == 0);
-            VECTOR_PUSH(&scope_stack, cu.scopes.data);
-            VECTOR_PUSH(&scope_depth, depth);
-        } else if (abbrev->tag == DW_TAG_typedef || abbrev->tag == DW_TAG_pointer_type || abbrev->tag == DW_TAG_const_type
-                   || abbrev->tag == DW_TAG_structure_type || abbrev->tag == DW_TAG_base_type || abbrev->tag == DW_TAG_array_type) {
+        if (abbrev->tag == DW_TAG_typedef || abbrev->tag == DW_TAG_pointer_type || abbrev->tag == DW_TAG_const_type
+            || abbrev->tag == DW_TAG_structure_type || abbrev->tag == DW_TAG_base_type || abbrev->tag == DW_TAG_array_type) {
             const char *name = _upf_get_type_name(&cu, die_base);
             if (name != NULL) {
                 _upf_named_type type = {
@@ -1518,11 +1519,11 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *info, const uin
                 };
                 VECTOR_PUSH(&cu.types, type);
             }
-            info = _upf_skip_die(info, abbrev);
-        } else {
-            info = _upf_skip_die(info, abbrev);
         }
+
+        info = _upf_skip_die(info, abbrev);
     }
+
     VECTOR_PUSH(&_upf_cus, cu);
 }
 
@@ -1569,21 +1570,8 @@ static void _upf_parse_dwarf(void) {
         info = next;
     }
 
-    for (size_t i = 0; i < _upf_cus.length; i++) {
-        _upf_cu *cu = &_upf_cus.data[i];
-        if (cu->low_pc == INVALID) {
-            if (i == 0) cu->low_pc = 0;
-            else cu->low_pc = _upf_cus.data[i - 1].high_pc;
-        }
-
-        if (cu->high_pc == INVALID) {
-            if (i + 1 == _upf_cus.length) cu->high_pc = UINT64_MAX;
-            else {
-                uint64_t next_low_pc = _upf_cus.data[i + 1].low_pc;
-                assert(next_low_pc != INVALID);
-                cu->high_pc = next_low_pc;
-            }
-        }
+    if (_upf_cus.length > 0 && VECTOR_TOP(&_upf_cus).high_pc == INVALID) {
+        VECTOR_TOP(&_upf_cus).high_pc = UINT64_MAX;
     }
 }
 
