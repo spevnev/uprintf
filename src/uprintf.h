@@ -319,6 +319,40 @@ typedef struct _upf_scope {
     _upf_scope_vec scopes;
 } _upf_scope;
 
+VECTOR_TYPEDEF(_upf_scope_stack, _upf_scope *);
+
+enum _upf_token_kind {
+    _UPF_TOK_NONE,
+    _UPF_TOK_OPEN_PAREN,
+    _UPF_TOK_CLOSE_PAREN,
+    _UPF_TOK_OPEN_BRACKET,
+    _UPF_TOK_CLOSE_BRACKET,
+    _UPF_TOK_STAR,
+    _UPF_TOK_AMPERSAND,
+    _UPF_TOK_COMMA,
+    _UPF_TOK_DOT,
+    _UPF_TOK_ARROW,
+    _UPF_TOK_NUMBER,
+    _UPF_TOK_ID,
+    _UPF_TOK_STRING,
+    _UPF_TOK_KEYWORD
+};
+
+typedef struct {
+    enum _upf_token_kind kind;
+    union {
+        const char *string;
+        long num;
+    } as;
+} _upf_token;
+
+VECTOR_TYPEDEF(_upf_token_vec, _upf_token);
+
+typedef struct {
+    _upf_token_vec tokens;
+    size_t idx;
+} _upf_tokenizer;
+
 typedef struct {
     const uint8_t *base;
 
@@ -1786,42 +1820,10 @@ __attribute__((destructor)) void _upf_fini(void) {
     _upf_arena_free(&_upf_arena);
 }
 
-enum _upf_token_kind {
-    _UPF_TOK_NONE,
-    _UPF_TOK_OPEN_PAREN,
-    _UPF_TOK_CLOSE_PAREN,
-    _UPF_TOK_OPEN_BRACKET,
-    _UPF_TOK_CLOSE_BRACKET,
-    _UPF_TOK_STAR,
-    _UPF_TOK_AMPERSAND,
-    _UPF_TOK_COMMA,
-    _UPF_TOK_DOT,
-    _UPF_TOK_PTR_MEMBER,
-    _UPF_TOK_NUMBER,
-    _UPF_TOK_ID,
-    _UPF_TOK_STRING,
-    _UPF_TOK_KEYWORD
-};
-
-typedef struct {
-    enum _upf_token_kind kind;
-    union {
-        const char *string;
-        long num;
-    } as;
-} _upf_token;
-
-VECTOR_TYPEDEF(_upf_token_vec, _upf_token);
-
-typedef struct {
-    _upf_token_vec tokens;
-    size_t idx;
-} _upf_tokenizer;
-
 static _upf_tokenizer _upf_tokenize(const char *string) {
     static const _upf_token signs[] = {{_UPF_TOK_OPEN_PAREN, {"("}},    {_UPF_TOK_CLOSE_PAREN, {")"}}, {_UPF_TOK_OPEN_BRACKET, {"["}},
                                        {_UPF_TOK_CLOSE_BRACKET, {"]"}}, {_UPF_TOK_STAR, {"*"}},        {_UPF_TOK_AMPERSAND, {"&"}},
-                                       {_UPF_TOK_COMMA, {","}},         {_UPF_TOK_DOT, {"."}},         {_UPF_TOK_PTR_MEMBER, {"->"}}};
+                                       {_UPF_TOK_COMMA, {","}},         {_UPF_TOK_DOT, {"."}},         {_UPF_TOK_ARROW, {"->"}}};
     static const char *keywords[] = {"struct", "union", "enum"};
 
     _upf_token_vec tokens = VECTOR_NEW(&_upf_arena);
@@ -2022,7 +2024,7 @@ static _upf_idx_vec _upf_parse_args(uint64_t pc, const char *args) {
                     if (!_upf_can_consume(&t) || _upf_try_consume(&t, _UPF_TOK_COMMA)) break;
                 }
 
-                _upf_consume_any(&t, _UPF_TOK_DOT, _UPF_TOK_PTR_MEMBER);
+                _upf_consume_any(&t, _UPF_TOK_DOT, _UPF_TOK_ARROW);
                 VECTOR_PUSH(&vars, _upf_consume(&t, _UPF_TOK_ID).as.string);
             }
         }
