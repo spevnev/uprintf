@@ -23,13 +23,15 @@
 // SOFTWARE.
 
 
+// clang-format off
 #ifndef __linux__
-#error ERROR: uprintf only supports Linux
+#error [ERROR] uprintf only supports Linux
 #endif
 
 #ifdef __cplusplus
-#error ERROR: uprintf does NOT support C++
+#error [ERROR] uprintf does NOT support C++
 #endif
+// clang-format on
 
 
 #ifndef UPRINTF_H
@@ -84,15 +86,16 @@ ssize_t getline(char **lineptr, size_t *n, FILE *stream);
 
 #define INVALID -1UL
 
-#define ERROR(...)                            \
-    do {                                      \
-        fprintf(stderr, "[ERROR] uprintf: "); \
-        fprintf(stderr, __VA_ARGS__);         \
-        exit(1);                              \
+#define ERROR(...)                             \
+    do {                                       \
+        fprintf(stderr, "[ERROR] (uprintf) "); \
+        fprintf(stderr, __VA_ARGS__);          \
+        fprintf(stderr, "\n");                 \
+        exit(1);                               \
     } while (0)
 
-#define OUT_OF_MEMORY() ERROR("process ran out of memory.\n")
-#define UNREACHABLE() assert(0 && "Unreachable.\n");
+#define OUT_OF_MEMORY() ERROR("Process ran out of memory.")
+#define UNREACHABLE() ERROR("Unreachable.");
 
 
 #define INITIAL_ARENA_SIZE 4096
@@ -548,9 +551,8 @@ static size_t _upf_get_attr_size(const uint8_t *info, uint64_t form) {
         case DW_FORM_flag_present:
         case DW_FORM_implicit_const:
             return 0;
-        default:
-            UNREACHABLE();
     }
+    UNREACHABLE();
 }
 
 static uint64_t _upf_get_x_offset(const uint8_t *info, uint64_t form) {
@@ -576,9 +578,8 @@ static uint64_t _upf_get_x_offset(const uint8_t *info, uint64_t form) {
         case DW_FORM_strx:
             _upf_uLEB_to_uint64(info, &offset);
             return offset;
-        default:
-            UNREACHABLE();
     }
+    UNREACHABLE();
 }
 
 static const char *_upf_get_string(const _upf_cu *cu, const uint8_t *info, uint64_t form) {
@@ -599,9 +600,8 @@ static const char *_upf_get_string(const _upf_cu *cu, const uint8_t *info, uint6
             uint64_t offset = cu->str_offsets_base + _upf_get_x_offset(info, form) * _upf_dwarf.offset_size;
             return _upf_dwarf.str + _upf_get_offset(_upf_dwarf.str_offsets + offset);
         }
-        default:
-            UNREACHABLE();
     }
+    UNREACHABLE();
 }
 
 static uint64_t _upf_get_ref(const uint8_t *info, uint64_t form) {
@@ -658,9 +658,8 @@ static uint64_t _upf_get_addr(const _upf_cu *cu, const uint8_t *info, uint64_t f
             uint64_t offset = cu->addr_base + _upf_get_x_offset(info, form) * _upf_dwarf.address_size;
             return _upf_get_address(_upf_dwarf.addr + offset);
         }
-        default:
-            assert(0 && "TODO: handle other address types");  // TODO:
     }
+    UNREACHABLE();
 }
 
 static const uint8_t *_upf_skip_die(const uint8_t *info, const _upf_abbrev *abbrev) {
@@ -760,6 +759,7 @@ static enum _upf_type_kind _upf_get_type_kind(int64_t encoding, int64_t size) {
             fprintf(stderr, "[WARN] uprintf: skipping unkown DWARF type encoding (0x%02lx)\n", encoding);
             return _UPF_TK_UNKNOWN;
     }
+    UNREACHABLE();
 }
 
 static size_t _upf_get_type(const _upf_cu *cu, const uint8_t *info) {
@@ -1095,7 +1095,7 @@ static size_t _upf_get_type(const _upf_cu *cu, const uint8_t *info) {
             return _upf_type_map.length - 1;
         }
         default:
-            ERROR("Unhandled DWARF type 0x%lx\n", abbrev->tag);
+            ERROR("Unhandled DWARF type 0x%lx.", abbrev->tag);
     }
     UNREACHABLE();
 }
@@ -1454,7 +1454,7 @@ static void _upf_parse_dwarf(void) {
         uint16_t version = 0;
         memcpy(&version, info, sizeof(version));
         info += sizeof(version);
-        if (version != 5) ERROR("uprintf only supports DWARF version 5.\n");
+        if (version != 5) ERROR("uprintf only supports DWARF version 5.");
 
         uint8_t type = *info;
         info += sizeof(type);
@@ -1493,7 +1493,7 @@ static void _upf_parse_dwarf(void) {
 
 static void _upf_parse_elf(void) {
     struct stat file_info;
-    if (stat("/proc/self/exe", &file_info) == -1) ERROR("Unable to stat \"/proc/self/exe\": %s.\n", strerror(errno));
+    if (stat("/proc/self/exe", &file_info) == -1) ERROR("Unable to stat \"/proc/self/exe\": %s.", strerror(errno));
     size_t size = file_info.st_size;
     _upf_dwarf.file_size = size;
 
@@ -1750,12 +1750,10 @@ static char *_upf_print_type(char *p, const uint8_t *data, const _upf_type *type
             if (_upf_is_printable(ch)) p += sprintf(p, " ('%s')", _upf_escape_char(ch));
         } break;
         case _UPF_TK_VOID:
-            ERROR("`void` type isn't valid if it isn't a pointer.\n");
+            ERROR("`void` type must be a pointer.");
         case _UPF_TK_UNKNOWN:
             p += sprintf(p, "(unkown)");
             break;
-        default:
-            UNREACHABLE();
     }
 
     if (type->is_pointer) *p++ = ')';
@@ -1773,12 +1771,12 @@ static void *_upf_get_this_file_address(void) {
 
     char this_path[PATH_BUFFER_SIZE];
     ssize_t read = readlink("/proc/self/exe", this_path, PATH_BUFFER_SIZE);
-    if (read == -1) ERROR("Unable to readlink \"/proc/self/exe\": %s.\n", strerror(errno));
-    if (read == PATH_BUFFER_SIZE) ERROR("Unable to readlink \"/proc/self/exe\": path is too long.\n");
+    if (read == -1) ERROR("Unable to readlink \"/proc/self/exe\": %s.", strerror(errno));
+    if (read == PATH_BUFFER_SIZE) ERROR("Unable to readlink \"/proc/self/exe\": path is too long.");
     this_path[read] = '\0';
 
     FILE *file = fopen("/proc/self/maps", "r");
-    if (file == NULL) ERROR("Unable to open \"/proc/self/maps\": %s.\n", strerror(errno));
+    if (file == NULL) ERROR("Unable to open \"/proc/self/maps\": %s.", strerror(errno));
 
     uint64_t address = INVALID;
     size_t length = 0;
@@ -1789,7 +1787,7 @@ static void *_upf_get_this_file_address(void) {
 
         int path_offset;
         if (sscanf(line, "%lx-%*x %*s %*x %*x:%*x %*u %n", &address, &path_offset) != 1)
-            ERROR("Unable to parse \"/proc/self/maps\": invalid format.\n");
+            ERROR("Unable to parse \"/proc/self/maps\": invalid format.");
 
         if (strcmp(this_path, line + path_offset) == 0) break;
     }
@@ -1802,8 +1800,8 @@ static void *_upf_get_this_file_address(void) {
 
 
 __attribute__((constructor)) void _upf_init(void) {
-    if (access("/proc/self/exe", R_OK) != 0) ERROR("uprintf only supports Linux: expected \"/proc/self/exe\" to be a valid path.\n");
-    if (access("/proc/self/maps", R_OK) != 0) ERROR("uprintf only supports Linux: expected \"/proc/self/maps\" to be a valid path.\n");
+    if (access("/proc/self/exe", R_OK) != 0) ERROR("uprintf only supports Linux: expected \"/proc/self/exe\" to be a valid path.");
+    if (access("/proc/self/maps", R_OK) != 0) ERROR("uprintf only supports Linux: expected \"/proc/self/maps\" to be a valid path.");
 
     _upf_arena_init(&_upf_arena);
 
@@ -1903,7 +1901,7 @@ static _upf_tokenizer _upf_tokenize(const char *string) {
             continue;
         }
 
-        ERROR("Unkown character when parsing arguments '%c'.\n", *ch);  // TODO: don't crash?
+        ERROR("Unkown character when parsing arguments '%c'.", *ch);  // TODO: don't crash?
     }
 
     _upf_tokenizer tokenizer = {
@@ -1913,19 +1911,40 @@ static _upf_tokenizer _upf_tokenize(const char *string) {
     return tokenizer;
 }
 
+static const char *_upf_tok_to_str(enum _upf_token_kind kind) {
+    // clang-format off
+    switch (kind) {
+        case _UPF_TOK_NONE:          return "none";
+        case _UPF_TOK_OPEN_PAREN:    return "open paren";
+        case _UPF_TOK_CLOSE_PAREN:   return "close paren";
+        case _UPF_TOK_OPEN_BRACKET:  return "open bracket";
+        case _UPF_TOK_CLOSE_BRACKET: return "close bracket";
+        case _UPF_TOK_STAR:          return "star";
+        case _UPF_TOK_AMPERSAND:     return "ampersand";
+        case _UPF_TOK_COMMA:         return "comma";
+        case _UPF_TOK_DOT:           return "dot";
+        case _UPF_TOK_ARROW:         return "arrow";
+        case _UPF_TOK_NUMBER:        return "number";
+        case _UPF_TOK_ID:            return "identifier";
+        case _UPF_TOK_STRING:        return "string";
+        case _UPF_TOK_KEYWORD:       return "keyword";
+    }
+    // clang-format on
+    UNREACHABLE();
+}
+
 static bool _upf_can_consume(const _upf_tokenizer *t) { return t->idx < t->tokens.length; }
 
 static void _upf_skip(_upf_tokenizer *t) {
-    if (!_upf_can_consume(t)) ERROR("todo1");
-
+    if (!_upf_can_consume(t)) ERROR("Expected a token but reached the end of the input.");
     t->idx++;
 }
 
 static _upf_token _upf_consume(_upf_tokenizer *t, enum _upf_token_kind kind) {
-    if (!_upf_can_consume(t)) ERROR("todo2");
+    if (!_upf_can_consume(t)) ERROR("Expected a token but reached the end of the input.");
 
     _upf_token token = t->tokens.data[t->idx++];
-    if (token.kind != kind) ERROR("expected %d\n", kind);
+    if (token.kind != kind) ERROR("Expected a token of type %s, but found %s.", _upf_tok_to_str(kind), _upf_tok_to_str(token.kind));
 
     return token;
 }
@@ -1941,12 +1960,12 @@ static bool _upf_try_consume(_upf_tokenizer *t, enum _upf_token_kind kind) {
 }
 
 static _upf_token _upf_consume_any2(_upf_tokenizer *t, ...) {
-    va_list va_args;
-    va_start(va_args, t);
+    if (!_upf_can_consume(t)) ERROR("Expected a token but reached the end of the input.");
 
-    if (!_upf_can_consume(t)) ERROR("TODO");
     _upf_token token = t->tokens.data[t->idx++];
 
+    va_list va_args;
+    va_start(va_args, t);
     while (1) {
         enum _upf_token_kind kind = va_arg(va_args, enum _upf_token_kind);
         if (kind == _UPF_TOK_NONE) break;
@@ -1957,7 +1976,7 @@ static _upf_token _upf_consume_any2(_upf_tokenizer *t, ...) {
         }
     }
 
-    ERROR("TODO");
+    UNREACHABLE();
 }
 
 #define _upf_consume_any(t, ...) _upf_consume_any2(t, __VA_ARGS__, _UPF_TOK_NONE)
@@ -2063,7 +2082,7 @@ static _upf_idx_vec _upf_parse_args(uint64_t pc, const char *args) {
                         }
                     }
                 }
-                if (type_die == NULL) ERROR("Can't find \"%s\".\n", vars.data[0]);
+                if (type_die == NULL) ERROR("Unable to find type of \"%s\".", vars.data[0]);
                 size_t base_type_idx = _upf_get_type(&cu, type_die);
                 size_t type_idx = _upf_get_nested_type(vars, 1, base_type_idx);
                 assert(type_idx != INVALID);
@@ -2117,9 +2136,9 @@ __attribute__((noinline)) void _upf_uprintf(const char *file, uint64_t line, con
 
             ch++;
         } else if (next == '\0' || next == '\n') {
-            ERROR("unfinished format at the end of line at %s:%lu\n", file, line);
+            ERROR("Unfinished format specifier at the end of the line at %s:%lu.", file, line);
         } else {
-            ERROR("unkown format '%%%c' at %s:%lu\n", next, file, line);
+            ERROR("Unkown format specifier \"%%%c\" at %s:%lu.", next, file, line);
         }
     }
     va_end(va_args);
