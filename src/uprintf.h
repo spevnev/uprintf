@@ -414,7 +414,6 @@ struct _upf_dwarf {
     const uint8_t *str_offsets;
     const uint8_t *addr;
     const uint8_t *rnglists;
-    const uint8_t *rnglist_offsets;
 };
 
 typedef struct {
@@ -431,8 +430,8 @@ typedef struct {
     _upf_named_type_vec types;
     _upf_scope_vec scopes;
 
-    uint64_t str_offsets_base;
     uint64_t addr_base;
+    uint64_t str_offsets_base;
     uint64_t rnglists_base;
 
     uint64_t low_pc;
@@ -625,8 +624,8 @@ static const char *_upf_get_str(const _upf_cu *cu, const uint8_t *info, uint64_t
         case DW_FORM_strx3:
         case DW_FORM_strx4: {
             assert(_upf_dwarf.str_offsets != NULL && cu->str_offsets_base != INVALID);
-            uint64_t offset = cu->str_offsets_base + _upf_get_x_offset(info, form) * _upf_dwarf.offset_size;
-            return _upf_dwarf.str + _upf_offset_cast(_upf_dwarf.str_offsets + offset);
+            uint64_t offset = _upf_get_x_offset(info, form) * _upf_dwarf.offset_size;
+            return _upf_dwarf.str + _upf_offset_cast(_upf_dwarf.str_offsets + cu->str_offsets_base + offset);
         }
     }
     UNREACHABLE();
@@ -715,7 +714,7 @@ static uint64_t _upf_get_addr(const _upf_cu *cu, const uint8_t *info, uint64_t f
         case DW_FORM_addrx3:
         case DW_FORM_addrx4:
         case DW_FORM_addrx: {
-            assert(_upf_dwarf.addr != NULL && cu->addr_base != INVALID);
+            assert(_upf_dwarf.addr != NULL);
             uint64_t offset = cu->addr_base + _upf_get_x_offset(info, form) * _upf_dwarf.address_size;
             return _upf_address_cast(_upf_dwarf.addr + offset);
         }
@@ -1197,18 +1196,19 @@ static const char *_upf_get_type_name(const _upf_cu *cu, const uint8_t *info) {
 }
 
 static _upf_range_vec _upf_get_ranges(const _upf_cu *cu, const uint8_t *info, uint64_t form) {
+    assert(_upf_dwarf.rnglists != NULL);
+
     const uint8_t *rnglist = NULL;
     switch (form) {
         case DW_FORM_sec_offset:
-            assert(_upf_dwarf.rnglists != NULL);
             rnglist = _upf_dwarf.rnglists + _upf_offset_cast(info);
             break;
         case DW_FORM_rnglistx: {
-            assert(_upf_dwarf.rnglists != NULL && _upf_dwarf.rnglist_offsets != NULL);
+            assert(cu->rnglists_base != INVALID);
             uint64_t index;
             _upf_uLEB_to_uint64(info, &index);
-            uint64_t rnglist_offset = _upf_offset_cast(_upf_dwarf.rnglist_offsets + index * _upf_dwarf.offset_size);
-            rnglist = _upf_dwarf.rnglist_offsets + rnglist_offset;
+            uint64_t rnglist_offset = _upf_offset_cast(_upf_dwarf.rnglists + cu->rnglists_base + index * _upf_dwarf.offset_size);
+            rnglist = _upf_dwarf.rnglists + cu->rnglists_base + rnglist_offset;
         } break;
         default:
             UNREACHABLE();
@@ -1616,72 +1616,11 @@ static void _upf_parse_elf(void) {
         } else if (strcmp(name, ".debug_line_str") == 0) {
             _upf_dwarf.line_str = (const char *) (file + section->sh_offset);
         } else if (strcmp(name, ".debug_str_offsets") == 0) {
-            const uint8_t *temp = file + section->sh_offset;
-            _upf_dwarf.str_offsets = temp;
-
-            uint32_t dwarf64_length = 0xffffffffU;
-            if (memcmp(temp, &dwarf64_length, sizeof(dwarf64_length)) == 0) temp += sizeof(uint64_t);
-            temp += sizeof(uint32_t);
-
-            uint16_t version = 0;
-            memcpy(&version, temp, sizeof(version));
-            assert(version == 5);
-            temp += sizeof(uint16_t);
-
-            uint16_t reserved = 0;
-            memcpy(&reserved, temp, sizeof(reserved));
-            assert(reserved == 0);
-            temp += sizeof(uint16_t);
+            _upf_dwarf.str_offsets = file + section->sh_offset;
         } else if (strcmp(name, ".debug_rnglists") == 0) {
-            const uint8_t *temp = file + section->sh_offset;
-            _upf_dwarf.rnglists = temp;
-
-            uint32_t dwarf64_length = 0xffffffffU;
-            if (memcmp(temp, &dwarf64_length, sizeof(dwarf64_length)) == 0) temp += sizeof(uint64_t);
-            temp += sizeof(uint32_t);
-
-            uint16_t version = 0;
-            memcpy(&version, temp, sizeof(version));
-            assert(version == 5);
-            temp += sizeof(uint16_t);
-
-            uint8_t address_size = *temp;
-            assert(_upf_dwarf.address_size == 0 || _upf_dwarf.address_size == address_size);
-            _upf_dwarf.address_size = address_size;
-            temp += sizeof(uint8_t);
-
-            uint8_t segment_selector_size = *temp;
-            assert(segment_selector_size == 0
-                   && "Segmented addresses aren't supported since x86_64/amd64 (the only supported architecture) doesn't have them");
-            temp += sizeof(uint8_t);
-
-            uint32_t offset_count = 0;
-            memcpy(&offset_count, temp, sizeof(offset_count));
-            temp += sizeof(uint32_t);
-
-            if (offset_count > 0) _upf_dwarf.rnglist_offsets = temp;
+            _upf_dwarf.rnglists = file + section->sh_offset;
         } else if (strcmp(name, ".debug_addr") == 0) {
-            const uint8_t *temp = file + section->sh_offset;
-            _upf_dwarf.addr = temp;
-
-            uint32_t dwarf64_length = 0xffffffffU;
-            if (memcmp(temp, &dwarf64_length, sizeof(dwarf64_length)) == 0) temp += sizeof(uint64_t);
-            temp += sizeof(uint32_t);
-
-            uint16_t version = 0;
-            memcpy(&version, temp, sizeof(version));
-            assert(version == 5);
-            temp += sizeof(uint16_t);
-
-            uint8_t address_size = *temp;
-            assert(_upf_dwarf.address_size == 0 || _upf_dwarf.address_size == address_size);
-            _upf_dwarf.address_size = address_size;
-            temp += sizeof(uint8_t);
-
-            uint8_t segment_selector_size = *temp;
-            assert(segment_selector_size == 0
-                   && "Segmented addresses aren't supported since x86_64/amd64 (the only supported architecture) doesn't have them");
-            temp += sizeof(uint8_t);
+            _upf_dwarf.addr = file + section->sh_offset;
         }
 
         section++;
