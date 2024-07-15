@@ -362,8 +362,6 @@ typedef struct _upf_scope {
     _upf_scope_vec scopes;
 } _upf_scope;
 
-VECTOR_TYPEDEF(_upf_scope_ptr_vec, _upf_scope *);
-
 enum _upf_token_kind {
     _UPF_TOK_NONE,
     _UPF_TOK_OPEN_PAREN,
@@ -428,14 +426,12 @@ typedef struct {
 
     _upf_abbrev_vec abbrevs;
     _upf_named_type_vec types;
-    _upf_scope_vec scopes;
 
     uint64_t addr_base;
     uint64_t str_offsets_base;
     uint64_t rnglists_base;
 
-    uint64_t low_pc;
-    uint64_t high_pc;
+    _upf_scope scope;
 } _upf_cu;
 
 VECTOR_TYPEDEF(_upf_cu_vec, _upf_cu);
@@ -1182,10 +1178,25 @@ static const char *_upf_get_type_name(const _upf_cu *cu, const uint8_t *info) {
     for (size_t i = 0; i < abbrev->attrs.length; i++) {
         _upf_attr attr = abbrev->attrs.data[i];
 
-        if (abbrev->tag == DW_TAG_pointer_type || abbrev->tag == DW_TAG_const_type) {
-            if (attr.name == DW_AT_type) return _upf_get_type_name(cu, cu->base + _upf_get_ref(info, attr.form));
-        } else if (abbrev->tag == DW_TAG_structure_type || abbrev->tag == DW_TAG_typedef || abbrev->tag == DW_TAG_base_type) {
-            if (attr.name == DW_AT_name) return _upf_get_str(cu, info, attr.form);
+        // TODO: test all! esp array_type
+        switch (abbrev->tag) {
+            case DW_TAG_array_type:
+            case DW_TAG_enumeration_type:
+            case DW_TAG_structure_type:
+            case DW_TAG_typedef:
+            case DW_TAG_union_type:
+            case DW_TAG_base_type:
+                if (attr.name == DW_AT_name) return _upf_get_str(cu, info, attr.form);
+                break;
+            case DW_TAG_pointer_type:
+            case DW_TAG_const_type:
+            case DW_TAG_volatile_type:
+            case DW_TAG_restrict_type:
+            case DW_TAG_atomic_type:
+                if (attr.name == DW_AT_type) return _upf_get_type_name(cu, cu->base + _upf_get_ref(info, attr.form));
+                break;
+            default:
+                return NULL;
         }
 
         info += _upf_get_attr_size(info, attr.form);
@@ -1215,8 +1226,12 @@ static _upf_range_vec _upf_get_ranges(const _upf_cu *cu, const uint8_t *info, ui
     }
     assert(rnglist != NULL);
 
+    uint64_t base = 0;
+    if (cu->scope.ranges.length == 1) {
+        base = cu->scope.ranges.data[0].from;
+    }
+
     _upf_range_vec ranges = VECTOR_NEW(&_upf_arena);
-    uint64_t base = cu->low_pc == INVALID ? 0 : cu->low_pc;
     while (*rnglist != DW_RLE_end_of_list) {
         switch (*rnglist++) {
             case DW_RLE_base_address:
@@ -1257,33 +1272,17 @@ static _upf_range_vec _upf_get_ranges(const _upf_cu *cu, const uint8_t *info, ui
 }
 
 // TODO: handle all of these in _upf_get_type_name _upf_parse_type _upf_parse_cu
-// #define DW_TAG_array_type               0x01
-// #define DW_TAG_class_type               0x02
-// #define DW_TAG_enumeration_type         0x04
-// #define DW_TAG_pointer_type             0x0f
-// #define DW_TAG_reference_type           0x10
-// #define DW_TAG_string_type              0x12
-// #define DW_TAG_structure_type           0x13
-// #define DW_TAG_subroutine_type          0x15
-// #define DW_TAG_typedef                  0x16
-// #define DW_TAG_union_type               0x17
-// #define DW_TAG_ptr_to_member_type       0x1f
-// #define DW_TAG_set_type                 0x20
-// #define DW_TAG_subrange_type            0x21
-// #define DW_TAG_base_type                0x24
-// #define DW_TAG_const_type               0x26
-// #define DW_TAG_file_type                0x29
-// #define DW_TAG_packed_type              0x2d
-// #define DW_TAG_volatile_type            0x35
-// #define DW_TAG_restrict_type            0x37  /* DWARF3 */
-// #define DW_TAG_interface_type           0x38  /* DWARF3 */
-// #define DW_TAG_unspecified_type         0x3b  /* DWARF3 */
-// #define DW_TAG_shared_type              0x40  /* DWARF3f */
-// #define DW_TAG_type_unit                0x41  /* DWARF4 */
-// #define DW_TAG_coarray_type             0x44  /* DWARF5 */
-// #define DW_TAG_dynamic_type             0x46  /* DWARF5 */
-// #define DW_TAG_atomic_type              0x47  /* DWARF5 */
-// #define DW_TAG_immutable_type           0x4b  /* DWARF5 */
+// DW_TAG_array_type
+// DW_TAG_enumeration_type
+// DW_TAG_pointer_type
+// DW_TAG_structure_type
+// DW_TAG_typedef
+// DW_TAG_union_type
+// DW_TAG_base_type
+// DW_TAG_const_type
+// DW_TAG_volatile_type
+// DW_TAG_restrict_type
+// DW_TAG_atomic_type
 
 static _upf_named_type _upf_get_var(const _upf_cu *cu, const uint8_t *info) {
     uint64_t code;
@@ -1341,16 +1340,154 @@ static _upf_abbrev_vec _upf_parse_abbrevs(const uint8_t *abbrev_table) {
     return abbrevs;
 }
 
+static bool _upf_is_language_c(int64_t language) {
+    switch (language) {
+        case DW_LANG_C:
+        case DW_LANG_C89:
+        case DW_LANG_C99:
+        case DW_LANG_C11:
+            return true;
+        default:
+            return false;
+    }
+}
+
+static _upf_range_vec _upf_get_cu_ranges(const _upf_cu *cu, const uint8_t *low_pc_info, _upf_attr low_pc_attr, const uint8_t *high_pc_info,
+                                         _upf_attr high_pc_attr, const uint8_t *ranges_info, _upf_attr ranges_attr) {
+    if (ranges_info != NULL) return _upf_get_ranges(cu, ranges_info, ranges_attr.form);
+
+    _upf_range_vec ranges = VECTOR_NEW(&_upf_arena);
+    _upf_range range = {
+        .from = INVALID,
+        .to = INVALID,
+    };
+
+    if (low_pc_info == NULL) {
+        VECTOR_PUSH(&ranges, range);
+        return ranges;
+    }
+
+    range.from = _upf_get_addr(cu, low_pc_info, low_pc_attr.form);
+    if (high_pc_info != NULL) {
+        if (_upf_is_addr(high_pc_attr.form)) {
+            range.to = _upf_get_addr(cu, high_pc_info, high_pc_attr.form);
+        } else {
+            range.to = range.from + _upf_get_data(high_pc_info, high_pc_attr);
+        }
+    }
+
+    VECTOR_PUSH(&ranges, range);
+    return ranges;
+}
+
+typedef struct {
+    int depth;
+    _upf_scope *scope;
+} _upf_scope_stack_entry;
+
+VECTOR_TYPEDEF(_upf_scope_stack, _upf_scope_stack_entry);
+
+static void _upf_parse_cu_scope(const _upf_cu *cu, _upf_scope_stack *scope_stack, int depth, const uint8_t *info,
+                                const _upf_abbrev *abbrev) {
+    if (!abbrev->has_children) return;
+    assert(scope_stack->length > 0);
+
+    _upf_scope new_scope = {
+        .ranges = VECTOR_NEW(&_upf_arena),
+        .vars = VECTOR_NEW(&_upf_arena),
+        .scopes = VECTOR_NEW(&_upf_arena),
+    };
+
+    uint64_t low_pc = INVALID;
+    const uint8_t *high_pc_info = NULL;
+    _upf_attr high_pc_attr = {0};
+    for (size_t i = 0; i < abbrev->attrs.length; i++) {
+        _upf_attr attr = abbrev->attrs.data[i];
+
+        if (attr.name == DW_AT_low_pc) {
+            low_pc = _upf_get_addr(cu, info, attr.form);
+        } else if (attr.name == DW_AT_high_pc) {
+            high_pc_info = info;
+            high_pc_attr = attr;
+        } else if (attr.name == DW_AT_ranges) {
+            new_scope.ranges = _upf_get_ranges(cu, info, attr.form);
+        }
+
+        info += _upf_get_attr_size(info, attr.form);
+    }
+
+    if (low_pc != INVALID) {
+        _upf_range range = {
+            .from = low_pc,
+            .to = INVALID,
+        };
+
+        assert(high_pc_info != NULL);  // TODO:
+        if (_upf_is_addr(high_pc_attr.form)) {
+            range.to = _upf_get_addr(cu, high_pc_info, high_pc_attr.form);
+        } else {
+            range.to = low_pc + _upf_get_data(high_pc_info, high_pc_attr);
+        }
+
+        VECTOR_PUSH(&new_scope.ranges, range);
+    }
+
+    _upf_scope_stack_entry stack_entry = {
+        .depth = depth,
+        .scope = NULL,
+    };
+
+    if (new_scope.ranges.length > 0) {
+        _upf_scope *scope = NULL;
+        for (size_t i = 0; i < scope_stack->length && scope == NULL; i++) {
+            scope = scope_stack->data[scope_stack->length - 1 - i].scope;
+        }
+
+        VECTOR_PUSH(&scope->scopes, new_scope);
+
+        stack_entry.scope = &VECTOR_TOP(&scope->scopes);
+    } else {
+        stack_entry.scope = NULL;
+    }
+
+    VECTOR_PUSH(scope_stack, stack_entry);
+}
+
+static void _upf_parse_cu_var(const _upf_cu *cu, _upf_scope_stack *scope_stack, const uint8_t *die_base) {
+    assert(scope_stack->length > 0);
+    if (VECTOR_TOP(scope_stack).scope == NULL) return;
+
+    _upf_named_type var = _upf_get_var(cu, die_base);
+    if (var.name == NULL) return;
+
+    assert(var.type_die != NULL);
+    VECTOR_PUSH(&VECTOR_TOP(scope_stack).scope->vars, var);
+}
+
+static void _upf_parse_cu_type(_upf_cu *cu, const uint8_t *die_base) {
+    const char *name = _upf_get_type_name(cu, die_base);
+    if (name == NULL) return;
+
+    _upf_named_type type = {
+        .type_die = die_base,
+        .name = name,
+    };
+    VECTOR_PUSH(&cu->types, type);
+}
+
 static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *info, const uint8_t *info_end, const uint8_t *abbrev_table) {
     _upf_cu cu = {
         .base = cu_base,
         .abbrevs = _upf_parse_abbrevs(abbrev_table),
         .types = VECTOR_NEW(&_upf_arena),
-        .scopes = VECTOR_NEW(&_upf_arena),
-        .str_offsets_base = INVALID,
         .addr_base = 0,
-        .low_pc = INVALID,
-        .high_pc = INVALID,
+        .str_offsets_base = INVALID,
+        .rnglists_base = INVALID,
+        .scope = {
+            .ranges = {0},
+            .vars = VECTOR_NEW(&_upf_arena),
+            .scopes = VECTOR_NEW(&_upf_arena),
+        },
     };
 
     uint64_t code;
@@ -1358,79 +1495,57 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *info, const uin
     const _upf_abbrev *abbrev = _upf_get_abbrev(&cu, code);
     assert(abbrev->tag == DW_TAG_compile_unit);
 
-    // Save to parse after the initializing str_offsets, addr_base and rnglists_base
+    // Save to parse after the initializing addr_base, str_offsets, and rnglists_base
     const uint8_t *low_pc_info = NULL;
-    uint64_t low_pc_form = INVALID;
+    _upf_attr low_pc_attr = {0};
     const uint8_t *high_pc_info = NULL;
-    _upf_attr high_pc_attr;
+    _upf_attr high_pc_attr = {0};
+    const uint8_t *ranges_info = NULL;
+    _upf_attr ranges_attr = {0};
     for (size_t i = 0; i < abbrev->attrs.length; i++) {
         _upf_attr attr = abbrev->attrs.data[i];
 
         if (attr.name == DW_AT_low_pc) {
+            low_pc_attr = attr;
             low_pc_info = info;
-            low_pc_form = attr.form;
         } else if (attr.name == DW_AT_high_pc) {
-            high_pc_info = info;
             high_pc_attr = attr;
-        } else if (attr.name == DW_AT_str_offsets_base) {
-            cu.str_offsets_base = _upf_offset_cast(info);
+            high_pc_info = info;
+        } else if (attr.name == DW_AT_ranges) {
+            ranges_attr = attr;
+            ranges_info = info;
         } else if (attr.name == DW_AT_addr_base) {
             cu.addr_base = _upf_offset_cast(info);
+        } else if (attr.name == DW_AT_str_offsets_base) {
+            cu.str_offsets_base = _upf_offset_cast(info);
         } else if (attr.name == DW_AT_rnglists_base) {
             cu.rnglists_base = _upf_offset_cast(info);
+        } else if (attr.name == DW_AT_language) {
+            int64_t language = _upf_get_data(info, attr);
+            if (!_upf_is_language_c(language)) return;
         }
 
         info += _upf_get_attr_size(info, attr.form);
     }
 
-    if (low_pc_info != NULL) cu.low_pc = _upf_get_addr(&cu, low_pc_info, low_pc_form);
-    else if (_upf_cus.length == 0) cu.low_pc = 0;
-    else if (VECTOR_TOP(&_upf_cus).high_pc != INVALID) cu.low_pc = VECTOR_TOP(&_upf_cus).high_pc;
+    cu.scope.ranges = _upf_get_cu_ranges(&cu, low_pc_info, low_pc_attr, high_pc_info, high_pc_attr, ranges_info, ranges_attr);
 
-    if (high_pc_info != NULL) {
-        if (_upf_is_addr(high_pc_attr.form)) {
-            cu.high_pc = _upf_get_addr(&cu, high_pc_info, high_pc_attr.form);
-        } else {
-            assert(cu.low_pc != INVALID);
-            cu.high_pc = cu.low_pc + _upf_get_data(high_pc_info, high_pc_attr);
-        }
-    }
 
-    if (_upf_cus.length > 0) {
-        assert(cu.low_pc != INVALID);
-        VECTOR_TOP(&_upf_cus).high_pc = cu.low_pc;
-    }
+    int depth = 0;
+    _upf_scope_stack scope_stack = VECTOR_NEW(&_upf_arena);
 
-    _upf_scope global = {
-        .ranges = VECTOR_NEW(&_upf_arena),
-        .vars = VECTOR_NEW(&_upf_arena),
-        .scopes = VECTOR_NEW(&_upf_arena),
-    };
-
-    _upf_range range = {
-        .from = 0,
-        .to = UINT64_MAX,
-    };
-
-    VECTOR_PUSH(&global.ranges, range);
-    VECTOR_PUSH(&cu.scopes, global);
-
-    size_t depth = 0;
-    _upf_scope_ptr_vec scope_stack = VECTOR_NEW(&_upf_arena);
-    VECTOR_PUSH(&scope_stack, cu.scopes.data);
-    _upf_size_t_vec depth_stack = VECTOR_NEW(&_upf_arena);
-    VECTOR_PUSH(&depth_stack, depth);
+    _upf_scope_stack_entry stack_entry = {0};
+    stack_entry.depth = depth;
+    stack_entry.scope = &cu.scope;
+    VECTOR_PUSH(&scope_stack, stack_entry);
 
     while (info < info_end) {
         const uint8_t *die_base = info;
 
         info += _upf_uLEB_to_uint64(info, &code);
         if (code == 0) {
-            assert(depth_stack.length > 0);
-            if (depth == VECTOR_TOP(&depth_stack)) {
-                VECTOR_POP(&scope_stack);
-                VECTOR_POP(&depth_stack);
-            }
+            assert(scope_stack.length > 0);
+            if (depth == VECTOR_TOP(&scope_stack).depth) VECTOR_POP(&scope_stack);
             depth--;
             continue;
         }
@@ -1438,90 +1553,54 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *info, const uin
         abbrev = _upf_get_abbrev(&cu, code);
         if (abbrev->has_children) depth++;
 
-        if (abbrev->tag == DW_TAG_lexical_block || abbrev->tag == DW_TAG_subprogram || abbrev->tag == DW_TAG_inlined_subroutine) {
-            if (abbrev->has_children) {  // TODO: this should only be possible with subprogram (mb inlined too) which is external
-                assert(scope_stack.length > 0);
-
-                _upf_scope new_scope = {
-                    .ranges = VECTOR_NEW(&_upf_arena),
-                    .vars = VECTOR_NEW(&_upf_arena),
-                    .scopes = VECTOR_NEW(&_upf_arena),
-                };
-
-                const uint8_t *info2 = info;
-                uint64_t low_pc = INVALID;
-                _upf_attr high_pc_attr;
-                const uint8_t *high_pc_info = NULL;
-                for (size_t i = 0; i < abbrev->attrs.length; i++) {
-                    _upf_attr attr = abbrev->attrs.data[i];
-
-                    if (attr.name == DW_AT_low_pc) {
-                        low_pc = _upf_get_addr(&cu, info2, attr.form);
-                    } else if (attr.name == DW_AT_high_pc) {
-                        high_pc_info = info2;
-                        high_pc_attr = attr;
-                    } else if (attr.name == DW_AT_ranges) {
-                        new_scope.ranges = _upf_get_ranges(&cu, info2, attr.form);
-                    }
-
-                    info2 += _upf_get_attr_size(info2, attr.form);
-                }
-
-                if (low_pc != INVALID) {
-                    assert(high_pc_info != NULL);  // TODO:
-
-                    _upf_range range = {
-                        .from = low_pc,
-                        .to = INVALID,
-                    };
-
-                    if (_upf_is_addr(high_pc_attr.form)) {
-                        range.to = _upf_get_addr(&cu, high_pc_info, high_pc_attr.form);
-                    } else {
-                        range.to = low_pc + _upf_get_data(high_pc_info, high_pc_attr);
-                    }
-
-                    VECTOR_PUSH(&new_scope.ranges, range);
-                }
-
-                if (new_scope.ranges.length > 0) {
-                    if (VECTOR_TOP(&scope_stack) != NULL) {
-                        _upf_scope_vec *scopes = &VECTOR_TOP(&scope_stack)->scopes;
-                        VECTOR_PUSH(scopes, new_scope);
-                        VECTOR_PUSH(&scope_stack, &VECTOR_TOP(scopes));
-                        VECTOR_PUSH(&depth_stack, depth);
-                    }
-                } else {
-                    VECTOR_PUSH(&scope_stack, NULL);
-                    VECTOR_PUSH(&depth_stack, depth);
-                }
-            }
-        }
-
-        if (abbrev->tag == DW_TAG_variable || abbrev->tag == DW_TAG_formal_parameter) {
-            assert(scope_stack.length > 0);
-            if (VECTOR_TOP(&scope_stack) != NULL) {
-                _upf_named_type var = _upf_get_var(&cu, die_base);
-                if (var.name != NULL) {
-                    assert(var.type_die != NULL);
-                    VECTOR_PUSH(&VECTOR_TOP(&scope_stack)->vars, var);
-                }
-            }
-        }
-
-        if (abbrev->tag == DW_TAG_typedef || abbrev->tag == DW_TAG_pointer_type || abbrev->tag == DW_TAG_const_type
-            || abbrev->tag == DW_TAG_structure_type || abbrev->tag == DW_TAG_base_type || abbrev->tag == DW_TAG_array_type) {
-            const char *name = _upf_get_type_name(&cu, die_base);
-            if (name != NULL) {
-                _upf_named_type type = {
-                    .type_die = die_base,
-                    .name = name,
-                };
-                VECTOR_PUSH(&cu.types, type);
-            }
+        switch (abbrev->tag) {
+            case DW_TAG_lexical_block:
+            case DW_TAG_subprogram:
+            case DW_TAG_inlined_subroutine:
+                _upf_parse_cu_scope(&cu, &scope_stack, depth, info, abbrev);
+                break;
+            case DW_TAG_variable:
+            case DW_TAG_formal_parameter:
+                _upf_parse_cu_var(&cu, &scope_stack, die_base);
+                break;
+            case DW_TAG_array_type:
+            case DW_TAG_enumeration_type:
+            case DW_TAG_pointer_type:
+            case DW_TAG_structure_type:
+            case DW_TAG_typedef:
+            case DW_TAG_union_type:
+            case DW_TAG_base_type:
+            case DW_TAG_const_type:
+            case DW_TAG_volatile_type:
+            case DW_TAG_restrict_type:
+            case DW_TAG_atomic_type:
+                _upf_parse_cu_type(&cu, die_base);
+                break;
         }
 
         info = _upf_skip_die(info, abbrev);
+    }
+
+    // TODO: assumed that scopes and their ranges are in sorted order. Check that or sort them!
+    assert(cu.scope.scopes.length > 0);
+    if (cu.scope.ranges.length == 1) {
+        _upf_range *range = &cu.scope.ranges.data[0];
+
+        if (range->from == INVALID) {
+            if (cu.scope.scopes.data[0].ranges.length == 0) {
+                range->from = 0;
+            } else {
+                range->from = cu.scope.scopes.data[0].ranges.data[0].from;
+            }
+        }
+
+        if (range->to == INVALID) {
+            if (VECTOR_TOP(&cu.scope.scopes).ranges.length == 0) {
+                range->to = UINT64_MAX;
+            } else {
+                range->to = VECTOR_TOP(&VECTOR_TOP(&cu.scope.scopes).ranges).to;
+            }
+        }
     }
 
     VECTOR_PUSH(&_upf_cus, cu);
@@ -1568,10 +1647,6 @@ static void _upf_parse_dwarf(void) {
         _upf_parse_cu(cu_base, info, next, _upf_dwarf.abbrev + abbrev_offset);
 
         info = next;
-    }
-
-    if (_upf_cus.length > 0 && VECTOR_TOP(&_upf_cus).high_pc == INVALID) {
-        VECTOR_TOP(&_upf_cus).high_pc = UINT64_MAX;
     }
 }
 
@@ -1633,7 +1708,7 @@ static void _upf_parse_elf(void) {
 // It is used to convert between DWARF addresses and runtime/real ones: DWARF
 // addresses are relative to the beginning of the file, thus real = base + dwarf.
 static void *_upf_get_this_file_address(void) {
-    static const size_t PATH_BUFFER_SIZE = 1024;
+    static const ssize_t PATH_BUFFER_SIZE = 1024;
 
     char this_path[PATH_BUFFER_SIZE];
     ssize_t read = readlink("/proc/self/exe", this_path, PATH_BUFFER_SIZE);
@@ -1984,17 +2059,30 @@ static _upf_token _upf_consume_any2(_upf_tokenizer *t, ...) {
 
 #define _upf_consume_any(t, ...) _upf_consume_any2(t, __VA_ARGS__, _UPF_TOK_NONE)
 
-static void _upf_get_scopes(_upf_scope_ptr_vec *scope_stack, uint64_t pc, _upf_scope_vec scopes) {
-    for (size_t i = 0; i < scopes.length; i++) {
-        _upf_scope *scope = &scopes.data[i];
-        for (size_t j = 0; j < scope->ranges.length; j++) {
-            if (scope->ranges.data[j].from <= pc && pc < scope->ranges.data[j].to) {
-                _upf_get_scopes(scope_stack, pc, scope->scopes);
-                VECTOR_PUSH(scope_stack, scope);
-                return;
-            }
+static bool _upf_is_in_range(uint64_t pc, _upf_range_vec ranges) {
+    for (size_t i = 0; i < ranges.length; i++) {
+        if (ranges.data[i].from <= pc && pc < ranges.data[i].to) {
+            return true;
         }
     }
+    return false;
+}
+
+static const uint8_t *_upf_find_var_type(uint64_t pc, const char *var, const _upf_scope *scope) {
+    if (!_upf_is_in_range(pc, scope->ranges)) return NULL;
+
+    for (size_t i = 0; i < scope->scopes.length; i++) {
+        const uint8_t *result = _upf_find_var_type(pc, var, &scope->scopes.data[i]);
+        if (result != NULL) return result;
+    }
+
+    for (size_t i = 0; i < scope->vars.length; i++) {
+        if (strcmp(scope->vars.data[i].name, var) == 0) {
+            return scope->vars.data[i].type_die;
+        }
+    }
+
+    return NULL;
 }
 
 static size_t _upf_get_nested_type(_upf_cstr_vec vars, size_t idx, size_t type_idx) {
@@ -2062,45 +2150,35 @@ static _upf_size_t_vec _upf_parse_args(uint64_t pc, const char *args) {
             bool found = false;
             for (size_t i = 0; i < _upf_cus.length && !found; i++) {
                 _upf_cu cu = _upf_cus.data[i];
-                if (cu.low_pc <= pc && pc < cu.high_pc) {
-                    for (size_t j = 0; j < cu.types.length && !found; j++) {
-                        _upf_named_type type = cu.types.data[j];
-                        if (strcmp(type.name, type_name) == 0) {
-                            size_t type_idx = _upf_parse_type(&cu, type.type_die);
-                            VECTOR_PUSH(&types, type_idx);
-                            found = true;
-                        }
-                    }
+                if (!_upf_is_in_range(pc, cu.scope.ranges)) continue;
+
+                for (size_t j = 0; j < cu.types.length && !found; j++) {
+                    _upf_named_type type = cu.types.data[j];
+                    if (strcmp(type.name, type_name) != 0) continue;
+
+                    size_t type_idx = _upf_parse_type(&cu, type.type_die);
+                    VECTOR_PUSH(&types, type_idx);
+                    found = true;
                 }
             }
             assert(found);  // TODO: is it even possible?
         } else {
             assert(vars.length > 0);  // TODO: ?
-            for (size_t i = 0; i < _upf_cus.length; i++) {
-                _upf_cu cu = _upf_cus.data[i];
-                if (!(cu.low_pc <= pc && pc < cu.high_pc)) continue;
 
-                _upf_scope_ptr_vec scope_stack = VECTOR_NEW(&_upf_arena);
-                _upf_get_scopes(&scope_stack, pc, cu.scopes);
-                // NOTE: returned scope_stack is from smallest(local) to biggest(global)
-                const uint8_t *type_die = NULL;
-                for (size_t i = 0; i < scope_stack.length && type_die == NULL; i++) {
-                    const _upf_scope *scope = scope_stack.data[i];
-                    for (size_t j = 0; j < scope->vars.length && type_die == NULL; j++) {
-                        if (strcmp(scope->vars.data[j].name, vars.data[0]) == 0) {
-                            type_die = scope->vars.data[j].type_die;
-                        }
-                    }
-                }
-                if (type_die == NULL) ERROR("Unable to find type of \"%s\".", vars.data[0]);
+            bool found = false;
+            for (size_t i = 0; i < _upf_cus.length && !found; i++) {
+                _upf_cu cu = _upf_cus.data[i];
+
+                const uint8_t *type_die = _upf_find_var_type(pc, vars.data[0], &cu.scope);
+                if (type_die == NULL) continue;
+
                 size_t base_type_idx = _upf_parse_type(&cu, type_die);
                 size_t type_idx = _upf_get_nested_type(vars, 1, base_type_idx);
                 assert(type_idx != INVALID);
                 VECTOR_PUSH(&types, type_idx);
-                break;  // TODO: found?
+                found = true;
             }
-
-            // TODO: find variables and then each next one must be its member -> get types recursively
+            if (!found) ERROR("Unable to find type of \"%s\".", vars.data[0]);
         }
     }
 
