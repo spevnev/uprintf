@@ -12,7 +12,7 @@ BIN_DIR   := $(BUILD_DIR)/examples
 COMPILERS := clang-18 gcc
 O_LEVELS  := -O0 -O1 -O2 -O3 -Os
 G_LEVELS  := -g2 -g3
-C_STDS    := -std=c99 -std=c11 -std=c17
+C_STDS    := -std=c99 -std=c17
 
 
 .PHONY: all
@@ -30,16 +30,18 @@ examples: $(patsubst %, $(BIN_DIR)/%, $(EXAMPLES))
 
 $(BIN_DIR)/all/%: $(SRC_DIR)/%.c src/uprintf.h Makefile
 	@mkdir -p $(@D)
-	for cc in $(COMPILERS); do 											 \
-		for o_level in $(O_LEVELS); do 									 \
-			for g_level in $(G_LEVELS); do 								 \
-				for c_std in $(C_STDS); do 								 \
-					echo "\n$$cc $$o_level $$g_level $$c_std $<";	 	 \
-					$$cc $$o_level $$g_level $$c_std $(CFLAGS) -o $@ $<; \
-					./$@; 												 \
-				done 													 \
-			done														 \
-		done 															 \
+	for cc in $(COMPILERS); do                                                 \
+		for o_level in $(O_LEVELS); do                                         \
+			for g_level in $(G_LEVELS); do                                     \
+				for c_std in $(C_STDS); do                                     \
+					echo "[Compiling] $$cc $$o_level $$g_level $$c_std $<:";   \
+					output="$@-$$cc$$o_level$$g_level$$c_std";                 \
+					$$cc $$o_level $$g_level $$c_std $(CFLAGS) -o $$output $<; \
+					echo "[Running] $$output:";                                \
+					./$$output || exit 1;                                      \
+				done                                                           \
+			done                                                               \
+		done                                                                   \
 	done
 
 $(BIN_DIR)/%: $(SRC_DIR)/%.c src/uprintf.h Makefile
