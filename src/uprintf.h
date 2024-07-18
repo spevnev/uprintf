@@ -54,6 +54,16 @@ void _upf_uprintf(const char *file, uint64_t line, const char *fmt, const char *
 
 #ifdef UPRINTF_IMPLEMENTATION
 
+
+#ifndef UPRINTF_INDENTATION_WIDTH
+#define UPRINTF_INDENTATION_WIDTH 4
+#endif
+
+#ifndef UPRINTF_MAX_DEPTH
+#define UPRINTF_MAX_DEPTH 10
+#endif
+
+
 #define __USE_XOPEN_EXTENDED
 #include <assert.h>
 #include <dwarf.h>
@@ -76,12 +86,6 @@ void _upf_uprintf(const char *file, uint64_t line, const char *fmt, const char *
 
 ssize_t readlink(const char *path, char *buf, size_t bufsiz);
 ssize_t getline(char **lineptr, size_t *n, FILE *stream);
-
-
-// number of spaces of indentation per each layer of nesting
-#ifndef UPRINTF_INDENT
-#define UPRINTF_INDENT 4
-#endif
 
 
 #define INVALID -1UL
@@ -1803,6 +1807,17 @@ static char *_upf_print_type(char *p, const uint8_t *data, const _upf_type *type
                 p += sprintf(p, "%p (", ptr);
                 data = ptr;
             } break;
+        }
+    }
+
+    if (UPRINTF_MAX_DEPTH != -1 && depth >= UPRINTF_MAX_DEPTH) {
+        switch (type->kind) {
+            case _UPF_TK_UNION:
+            case _UPF_TK_STRUCT:
+                p += sprintf(p, "{...}");
+                return p;
+            default:
+                break;
         }
     }
 
