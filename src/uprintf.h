@@ -957,7 +957,22 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
                     if (attr.name == DW_AT_name) {
                         cenum.name = _upf_get_str(cu, info, attr.form);
                     } else if (attr.name == DW_AT_const_value) {
-                        // TODO: handle other 2 types?
+                        if (!_upf_is_data(attr.form)) {
+                            WARN("Expected enum value to be of data class. Ignoring this type.");
+                            _upf_type_map_entry entry = {
+                                .type_die = base,
+                                .type = {
+                                    .name = NULL,
+                                    .kind = _UPF_TK_UNKNOWN,
+                                    .is_pointer = false,
+                                    .is_const = false,
+                                },
+                            };
+                            VECTOR_PUSH(&_upf_type_map, entry);
+
+                            return _upf_type_map.length - 1;
+                        }
+
                         cenum.value = _upf_get_data(info, attr);
                         found_value = true;
                     }
@@ -1841,16 +1856,31 @@ static char *_upf_print_type(char *p, const uint8_t *data, const _upf_type *type
             p += sprintf(p, "%*s};", UPRINTF_INDENTATION_WIDTH * depth, "");
         } break;
         case _UPF_TK_ENUM: {
-            int32_t enum_value;
-            memcpy(&enum_value, data, sizeof(enum_value));
             _upf_enum_vec enums = type->as.cenum.enums;
-            for (size_t i = 0; i < enums.length; i++) {
-                if (enum_value != enums.data[i].value) {
-                    p += sprintf(p, "%s (", enums.data[i].name);
-                    break;
+            const _upf_type *underlying_type = _upf_get_type(type->as.cenum.underlying_type);
+
+            int64_t enum_value;
+            if (underlying_type->kind == _UPF_TK_U4) {
+                uint32_t temp;
+                memcpy(&temp, data, sizeof(temp));
+                enum_value = temp;
+            } else if (underlying_type->kind == _UPF_TK_S4) {
+                memcpy(&enum_value, data, sizeof(enum_value));
+            } else {
+                WARN("Expected enum to use int32_t or uint32_t. Ignoring this type.");
+                p += sprintf(p, "(enum)");
+                break;
+            }
+
+            const char *name = NULL;
+            for (size_t i = 0; i < enums.length && name == NULL; i++) {
+                if (enum_value == enums.data[i].value) {
+                    name = enums.data[i].name;
                 }
             }
-            p = _upf_print_type(p, data, _upf_get_type(type->as.cenum.underlying_type), depth);
+
+            p += sprintf(p, "%s (", name ? name : "(unkown)");
+            p = _upf_print_type(p, data, underlying_type, depth);
             *p++ = ')';
         } break;
         case _UPF_TK_ARRAY:
