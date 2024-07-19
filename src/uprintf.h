@@ -319,11 +319,16 @@ typedef struct {
 
 VECTOR_TYPEDEF(_upf_enum_vec, _upf_enum);
 
+#define MOD_CONST 1 << 0
+#define MOD_VOLATILE 1 << 1
+#define MOD_RESTRICT 1 << 2
+#define MOD_ATOMIC 1 << 3
+
 typedef struct {
     const char *name;
     enum _upf_type_kind kind;
     bool is_pointer;
-    bool is_const;
+    int modifiers;
     union {
         struct {
             _upf_member_vec members;
@@ -816,6 +821,20 @@ static enum _upf_type_kind _upf_get_type_kind(int64_t encoding, int64_t size) {
     UNREACHABLE();
 }
 
+static int _upf_get_type_modifier(uint64_t tag) {
+    switch (tag) {
+        case DW_TAG_const_type:
+            return MOD_CONST;
+        case DW_TAG_volatile_type:
+            return MOD_VOLATILE;
+        case DW_TAG_restrict_type:
+            return MOD_RESTRICT;
+        case DW_TAG_atomic_type:
+            return MOD_ATOMIC;
+    }
+    UNREACHABLE();
+}
+
 static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
     for (size_t i = 0; i < _upf_type_map.length; i++) {
         if (_upf_type_map.data[i].type_die == info) {
@@ -835,7 +854,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
                 .name = NULL,
                 .kind = _UPF_TK_ARRAY,
                 .is_pointer = false,
-                .is_const = false,
+                .modifiers = 0,
                 .as.array = {
                     .element_type = INVALID,
                     .lengths = VECTOR_NEW(&_upf_arena),
@@ -903,7 +922,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
                 .name = "enum",
                 .kind = _UPF_TK_ENUM,
                 .is_pointer = false,
-                .is_const = false,
+                .modifiers = 0,
                 .as.cenum = {
                     .underlying_type = INVALID,
                     .enums = VECTOR_NEW(&_upf_arena),
@@ -984,7 +1003,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
                         .name = "void",
                         .kind = _UPF_TK_VOID,
                         .is_pointer = true,
-                        .is_const = false,
+                        .modifiers = 0,
                     },
                 };
                 VECTOR_PUSH(&_upf_type_map, entry);
@@ -1007,7 +1026,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
                 .name = is_struct ? "struct" : "union",
                 .kind = is_struct ? _UPF_TK_STRUCT : _UPF_TK_UNION,
                 .is_pointer = false,
-                .is_const = false,
+                .modifiers = 0,
                 .as.cstruct = {
                     .members = VECTOR_NEW(&_upf_arena),
                 },
@@ -1090,7 +1109,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
                 .name = NULL,
                 .kind = _UPF_TK_UNKNOWN,
                 .is_pointer = false,
-                .is_const = false,
+                .modifiers = 0,
             };
 
             uint64_t size = INVALID;
@@ -1125,7 +1144,10 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
 
             return _upf_type_map.length - 1;
         }
-        case DW_TAG_const_type: {
+        case DW_TAG_const_type:
+        case DW_TAG_volatile_type:
+        case DW_TAG_restrict_type:
+        case DW_TAG_atomic_type: {
             uint64_t offset = INVALID;
             for (size_t i = 0; i < abbrev->attrs.length; i++) {
                 _upf_attr attr = abbrev->attrs.data[i];
@@ -1139,20 +1161,11 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
             size_t type_idx = _upf_parse_type(cu, cu->base + offset);
             _upf_type_map_entry entry = _upf_type_map.data[type_idx];
             entry.type_die = base;
-            entry.type.is_const = true;
+            entry.type.modifiers |= _upf_get_type_modifier(abbrev->tag);
             VECTOR_PUSH(&_upf_type_map, entry);
 
             return _upf_type_map.length - 1;
         }
-        case DW_TAG_volatile_type:
-            UNREACHABLE();  // TODO:
-            break;
-        case DW_TAG_restrict_type:
-            UNREACHABLE();  // TODO:
-            break;
-        case DW_TAG_atomic_type:
-            UNREACHABLE();  // TODO:
-            break;
         default:
             WARN("Found unsupported type (0x%lx). Ignoring it.", abbrev->tag);
             break;
@@ -1164,7 +1177,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
             .name = NULL,
             .kind = _UPF_TK_UNKNOWN,
             .is_pointer = false,
-            .is_const = false,
+            .modifiers = 0,
         },
     };
 unknown_type:
@@ -1412,7 +1425,7 @@ static void _upf_parse_cu_scope(const _upf_cu *cu, _upf_scope_stack *scope_stack
             .to = INVALID,
         };
 
-        assert(high_pc_info != NULL);  // TODO:
+        if (high_pc_info == NULL) ERROR("Expected CU to have both low and high PC.");
         if (_upf_is_addr(high_pc_attr.form)) {
             range.to = _upf_get_addr(cu, high_pc_info, high_pc_attr.form);
         } else {
@@ -1751,6 +1764,14 @@ static const char *_upf_escape_char(char ch) {
 
 static bool _upf_is_printable(char c) { return ' ' <= c && c <= '~'; }
 
+static char *_upf_print_type_modifiers(char *p, int modifiers) {
+    if (modifiers & MOD_CONST) p += sprintf(p, "const ");
+    if (modifiers & MOD_VOLATILE) p += sprintf(p, "volatile ");
+    if (modifiers & MOD_RESTRICT) p += sprintf(p, "restrict ");
+    if (modifiers & MOD_ATOMIC) p += sprintf(p, "atomic ");
+    return p;
+}
+
 static char *_upf_print_type(char *p, const uint8_t *data, const _upf_type *type, int depth) {
     // TODO: add option to align by equals
     // TODO: specify floating point precision
@@ -1811,8 +1832,11 @@ static char *_upf_print_type(char *p, const uint8_t *data, const _upf_type *type
                 _upf_member *member = &members.data[i];
                 const _upf_type *member_type = _upf_get_type(member->type);
 
-                p += sprintf(p, "%*s%s%s %s%s = ", UPRINTF_INDENTATION_WIDTH * (depth + 1), "", member_type->is_const ? "const " : "",
-                             member_type->name, member_type->is_pointer ? "*" : "", member->name);
+                p += sprintf(p, "%*s", UPRINTF_INDENTATION_WIDTH * (depth + 1), "");
+                p = _upf_print_type_modifiers(p, member_type->modifiers);
+                assert(member_type->pointers_num >= 0);
+                p += sprintf(p, "%s ", member_type->name);
+                p += sprintf(p, "%s = ", member->name);
                 p = _upf_print_type(p, data + member->offset, member_type, depth + 1);
                 *p++ = '\n';
             }
@@ -2244,7 +2268,7 @@ __attribute__((noinline)) void _upf_uprintf(const char *file, uint64_t line, con
             *p++ = '%';
             ch++;
         } else if (next == 'S') {
-            if (arg_idx >= types.length) ERROR("there are more conversion specifiers than arguments provided at %s:%lu\n", file, line);
+            if (arg_idx >= types.length) ERROR("There are more conversion specifiers than arguments provided at %s:%lu.", file, line);
 
             void *ptr = va_arg(va_args, void *);
             const _upf_type *type = _upf_get_type(types.data[arg_idx++]);
@@ -2266,6 +2290,10 @@ __attribute__((noinline)) void _upf_uprintf(const char *file, uint64_t line, con
 }
 
 
+#undef MOD_CONST
+#undef MOD_VOLATILE
+#undef MOD_RESTRICT
+#undef MOD_ATOMIC
 #undef VECTOR_POP
 #undef VECTOR_TOP
 #undef VECTOR_PUSH
