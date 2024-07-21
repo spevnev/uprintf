@@ -47,7 +47,7 @@ void _upf_uprintf(const char *file, uint64_t line, const char *fmt, const char *
 // to their real values.
 #define _upf_stringify_va_args(...) #__VA_ARGS__
 
-#define uprintf(fmt, ...) _upf_uprintf(__FILE__, __LINE__, fmt, _upf_stringify_va_args(__VA_ARGS__), __VA_ARGS__);
+#define uprintf(fmt, ...) _upf_uprintf(__FILE__, __LINE__, fmt, _upf_stringify_va_args(__VA_ARGS__), __VA_ARGS__)
 
 #endif  // UPRINTF_H
 
@@ -287,6 +287,7 @@ enum _upf_type_kind {
     _UPF_TK_UNION,
     _UPF_TK_ENUM,
     _UPF_TK_ARRAY,
+    _UPF_TK_POINTER,
     _UPF_TK_U1,
     _UPF_TK_U2,
     _UPF_TK_U4,
@@ -327,7 +328,6 @@ VECTOR_TYPEDEF(_upf_enum_vec, _upf_enum);
 typedef struct {
     const char *name;
     enum _upf_type_kind kind;
-    bool is_pointer;
     int modifiers;
     union {
         struct {
@@ -341,6 +341,9 @@ typedef struct {
             size_t element_type;
             _upf_size_t_vec lengths;
         } array;
+        struct {
+            size_t type;
+        } pointer;
     } as;
 } _upf_type;
 
@@ -853,7 +856,6 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
             _upf_type array = {
                 .name = NULL,
                 .kind = _UPF_TK_ARRAY,
-                .is_pointer = false,
                 .modifiers = 0,
                 .as.array = {
                     .element_type = INVALID,
@@ -921,7 +923,6 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
             _upf_type type = {
                 .name = "enum",
                 .kind = _UPF_TK_ENUM,
-                .is_pointer = false,
                 .modifiers = 0,
                 .as.cenum = {
                     .underlying_type = INVALID,
@@ -986,6 +987,15 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
             return _upf_type_map.length - 1;
         }
         case DW_TAG_pointer_type: {
+            _upf_type type = {
+                .name = NULL,
+                .kind = _UPF_TK_POINTER,
+                .modifiers = 0,
+                .as.pointer = {
+                    .type = INVALID,
+                },
+            };
+
             uint64_t offset = INVALID;
             for (size_t i = 0; i < abbrev->attrs.length; i++) {
                 _upf_attr attr = abbrev->attrs.data[i];
@@ -995,26 +1005,20 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
                 info += _upf_get_attr_size(info, attr.form);
             }
 
-            if (offset == INVALID) {
-                // void*'s pointer DIEs do not contain DW_AT_type, hence offset is invalid
-                _upf_type_map_entry entry = {
-                    .type_die = base,
-                    .type = {
-                        .name = "void",
-                        .kind = _UPF_TK_VOID,
-                        .is_pointer = true,
-                        .modifiers = 0,
-                    },
-                };
-                VECTOR_PUSH(&_upf_type_map, entry);
+            if (offset != INVALID) {
+                // `void*`s have invalid offset (since they don't point to any type), thus
+                // pointer with INVALID type represents `void*`
+                size_t type_idx = _upf_parse_type(cu, cu->base + offset);
+                const _upf_type *pointed_type = _upf_get_type(type_idx);
 
-                return _upf_type_map.length - 1;
+                type.as.pointer.type = type_idx;
+                type.name = pointed_type->name;
             }
 
-            size_t type_idx = _upf_parse_type(cu, cu->base + offset);
-            _upf_type_map_entry entry = _upf_type_map.data[type_idx];
-            entry.type_die = base;
-            entry.type.is_pointer = true;
+            _upf_type_map_entry entry = {
+                .type_die = base,
+                .type = type,
+            };
             VECTOR_PUSH(&_upf_type_map, entry);
 
             return _upf_type_map.length - 1;
@@ -1025,7 +1029,6 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
             _upf_type type = {
                 .name = is_struct ? "struct" : "union",
                 .kind = is_struct ? _UPF_TK_STRUCT : _UPF_TK_UNION,
-                .is_pointer = false,
                 .modifiers = 0,
                 .as.cstruct = {
                     .members = VECTOR_NEW(&_upf_arena),
@@ -1108,7 +1111,6 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
             _upf_type type = {
                 .name = NULL,
                 .kind = _UPF_TK_UNKNOWN,
-                .is_pointer = false,
                 .modifiers = 0,
             };
 
@@ -1156,13 +1158,25 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
 
                 info += _upf_get_attr_size(info, attr.form);
             }
-            assert(offset != INVALID);
 
-            size_t type_idx = _upf_parse_type(cu, cu->base + offset);
-            _upf_type_map_entry entry = _upf_type_map.data[type_idx];
-            entry.type_die = base;
-            entry.type.modifiers |= _upf_get_type_modifier(abbrev->tag);
-            VECTOR_PUSH(&_upf_type_map, entry);
+            if (offset == INVALID) {
+                _upf_type_map_entry entry = {
+                    .type_die = base,
+                    .type = {
+                        .name = "void",
+                        .kind = _UPF_TK_VOID,
+                        .modifiers = _upf_get_type_modifier(abbrev->tag),
+                    },
+                };
+                VECTOR_PUSH(&_upf_type_map, entry);
+            } else {
+                size_t type_idx = _upf_parse_type(cu, cu->base + offset);
+                _upf_type_map_entry entry = _upf_type_map.data[type_idx];
+                entry.type_die = base;
+                entry.type.modifiers |= _upf_get_type_modifier(abbrev->tag);
+                VECTOR_PUSH(&_upf_type_map, entry);
+            }
+
 
             return _upf_type_map.length - 1;
         }
@@ -1176,7 +1190,6 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
         .type = {
             .name = NULL,
             .kind = _UPF_TK_UNKNOWN,
-            .is_pointer = false,
             .modifiers = 0,
         },
     };
@@ -1764,7 +1777,7 @@ static const char *_upf_escape_char(char ch) {
 
 static bool _upf_is_printable(char c) { return ' ' <= c && c <= '~'; }
 
-static char *_upf_print_type_modifiers(char *p, int modifiers) {
+static char *_upf_print_modifiers(char *p, int modifiers) {
     if (modifiers & MOD_CONST) p += sprintf(p, "const ");
     if (modifiers & MOD_VOLATILE) p += sprintf(p, "volatile ");
     if (modifiers & MOD_RESTRICT) p += sprintf(p, "restrict ");
@@ -1772,41 +1785,28 @@ static char *_upf_print_type_modifiers(char *p, int modifiers) {
     return p;
 }
 
+static char *_upf_print_typename(char *p, const _upf_type *type) {
+    if (type->kind == _UPF_TK_POINTER) {
+        if (type->as.pointer.type == INVALID) {
+            p += sprintf(p, "void ");
+        } else {
+            p = _upf_print_typename(p, _upf_get_type(type->as.pointer.type));
+        }
+        p += sprintf(p, "*");
+        p = _upf_print_modifiers(p, type->modifiers);
+    } else {
+        p = _upf_print_modifiers(p, type->modifiers);
+        p += sprintf(p, "%s ", type->name ? type->name : "(unnamed)");
+    }
+
+    return p;
+}
+
 static char *_upf_print_type(char *p, const uint8_t *data, const _upf_type *type, int depth) {
-    // TODO: add option to align by equals
-    // TODO: specify floating point precision
-    // TODO: snprintf
-
-    if (type->is_pointer) {
-        // TODO: check that machine address size == DWARF.type.byte_size
-        const void *ptr = *((void **) data);
-        if (ptr == NULL) {
-            p += sprintf(p, "NULL");
-            return p;
-        }
-
-        switch (type->kind) {
-            case _UPF_TK_STRUCT:
-                // TODO: check that the pointer is not to already seen struct
-                break;
-            case _UPF_TK_SCHAR: {
-                // TODO: what if it is a pointer to a char (or even int8_t) instead of c-style string?
-                // TODO: it might not have a \0
-                p += sprintf(p, "%p (\"", ptr);
-                const char *str = ptr;
-                while (*str != '\0') p += sprintf(p, "%s", _upf_escape_char(*str++));
-                p += sprintf(p, "\")");
-                return p;
-            }
-            case _UPF_TK_VOID:
-                p += sprintf(p, "%p", *((void **) data));
-                return p;
-            default: {
-                // TODO: print address and value in parentheses
-                p += sprintf(p, "%p (", ptr);
-                data = ptr;
-            } break;
-        }
+    assert(type != NULL);
+    if (type->kind == _UPF_TK_UNKNOWN) {
+        p += sprintf(p, "(unknown)");
+        return p;
     }
 
     if (UPRINTF_MAX_DEPTH != -1 && depth >= UPRINTF_MAX_DEPTH) {
@@ -1820,6 +1820,7 @@ static char *_upf_print_type(char *p, const uint8_t *data, const _upf_type *type
         }
     }
 
+    assert(data != NULL);
     switch (type->kind) {
         case _UPF_TK_UNION:
             p += sprintf(p, "(union) ");
@@ -1833,9 +1834,7 @@ static char *_upf_print_type(char *p, const uint8_t *data, const _upf_type *type
                 const _upf_type *member_type = _upf_get_type(member->type);
 
                 p += sprintf(p, "%*s", UPRINTF_INDENTATION_WIDTH * (depth + 1), "");
-                p = _upf_print_type_modifiers(p, member_type->modifiers);
-                assert(member_type->pointers_num >= 0);
-                p += sprintf(p, "%s ", member_type->name);
+                p = _upf_print_typename(p, member_type);
                 p += sprintf(p, "%s = ", member->name);
                 p = _upf_print_type(p, data + member->offset, member_type, depth + 1);
                 *p++ = '\n';
@@ -1866,7 +1865,7 @@ static char *_upf_print_type(char *p, const uint8_t *data, const _upf_type *type
                 }
             }
 
-            p += sprintf(p, "%s (", name ? name : "(unkown)");
+            p += sprintf(p, "%s (", name ? name : "(unknown)");
             p = _upf_print_type(p, data, underlying_type, depth);
             *p++ = ')';
         } break;
@@ -1874,6 +1873,36 @@ static char *_upf_print_type(char *p, const uint8_t *data, const _upf_type *type
             WARN("Arrays are currently unsupported. Ignoring this type.");
             p += sprintf(p, "(array)");
             break;
+        case _UPF_TK_POINTER: {
+            const void *ptr = *((void **) data);
+            if (ptr == NULL) {
+                p += sprintf(p, "NULL");
+                return p;
+            }
+
+            if (type->as.pointer.type == INVALID) {
+                p += sprintf(p, "%p", ptr);
+                return p;
+            }
+
+            const _upf_type *pointed_type = _upf_get_type(type->as.pointer.type);
+            if (pointed_type->kind == _UPF_TK_POINTER || pointed_type->kind == _UPF_TK_VOID) {
+                p += sprintf(p, "%p", ptr);
+                return p;
+            }
+
+            if (pointed_type->kind == _UPF_TK_SCHAR || pointed_type->kind == _UPF_TK_UCHAR) {
+                p += sprintf(p, "%p (\"", ptr);
+                const char *str = ptr;
+                while (*str != '\0') p += sprintf(p, "%s", _upf_escape_char(*str++));
+                p += sprintf(p, "\")");
+                return p;
+            }
+
+            p += sprintf(p, "%p (", ptr);
+            p = _upf_print_type(p, ptr, pointed_type, depth + 1);
+            p += sprintf(p, ")");
+        } break;
         case _UPF_TK_U1:
             p += sprintf(p, "%hhu", *data);
             break;
@@ -1918,13 +1947,12 @@ static char *_upf_print_type(char *p, const uint8_t *data, const _upf_type *type
             if (_upf_is_printable(ch)) p += sprintf(p, " ('%s')", _upf_escape_char(ch));
         } break;
         case _UPF_TK_VOID:
-            ERROR("`void` type must be a pointer.");
+            WARN("void must be a pointer. Ignoring this type.");
+            break;
         case _UPF_TK_UNKNOWN:
             p += sprintf(p, "(unkown)");
             break;
     }
-
-    if (type->is_pointer) *p++ = ')';
 
     return p;
 }
@@ -2209,6 +2237,37 @@ static _upf_size_t_vec _upf_parse_args(uint64_t pc, const char *args) {
             }
 
             if (type_idx == INVALID) ERROR("Unable to find type of \"%s\".", vars.data[0]);
+        }
+
+        // Arguments are pointers to data that should be printed, so they get dereferenced
+        // in order not to be interpreted as actual pointers.
+        dereference++;
+
+        if (dereference < 0) {
+            _upf_type_map_entry entry = {
+                .type_die = NULL,
+                .type = {
+                    .name = NULL,
+                    .kind = _UPF_TK_POINTER,
+                    .modifiers = 0,
+                    .as.pointer = {
+                        .type = type_idx,
+                    },
+                },
+            };
+
+            VECTOR_PUSH(&_upf_type_map, entry);
+
+            type_idx = _upf_type_map.length - 1;
+        } else {
+            while (dereference > 0) {
+                const _upf_type *type = _upf_get_type(type_idx);
+                if (type->kind != _UPF_TK_POINTER) {
+                    ERROR("Arguments must be pointers to data that should be printed. You must dereference \"%s\".", args);
+                }
+                type_idx = type->as.pointer.type;
+                dereference--;
+            }
         }
 
         VECTOR_PUSH(&types, type_idx);
