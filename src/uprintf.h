@@ -2150,6 +2150,11 @@ static size_t _upf_get_member_type(_upf_cstr_vec member_names, size_t idx, size_
     if (idx == member_names.length) return type_idx;
 
     const _upf_type *type = _upf_get_type(type_idx);
+
+    if (type->kind == _UPF_TK_POINTER) {
+        return _upf_get_member_type(member_names, idx, type->as.pointer.type);
+    }
+
     if (type->kind != _UPF_TK_STRUCT && type->kind != _UPF_TK_UNION) return INVALID;
 
     _upf_member_vec members = type->as.cstruct.members;
@@ -2170,9 +2175,8 @@ static size_t _upf_get_expression_type(const _upf_cu *cu, const uint8_t *type_di
 
 static _upf_size_t_vec _upf_parse_args(uint64_t pc, const char *args) {
     _upf_size_t_vec types = VECTOR_NEW(&_upf_arena);
-    _upf_tokenizer t = _upf_tokenize(args);
-
     _upf_cstr_vec vars = VECTOR_NEW(&_upf_arena);
+    _upf_tokenizer t = _upf_tokenize(args);
     while (_upf_can_consume(&t)) {
         vars.length = 0;
         const char *casted_type_name = NULL;
@@ -2183,7 +2187,7 @@ static _upf_size_t_vec _upf_parse_args(uint64_t pc, const char *args) {
 
             casted_type_name = _upf_consume(&t, _UPF_TOK_ID).as.string;
 
-            _upf_consume(&t, _UPF_TOK_STAR);
+            while (_upf_try_consume(&t, _UPF_TOK_STAR)) dereference--;
             _upf_consume(&t, _UPF_TOK_CLOSE_PAREN);
 
             while (_upf_can_consume(&t) && !_upf_try_consume(&t, _UPF_TOK_COMMA)) _upf_skip(&t);
@@ -2222,8 +2226,6 @@ static _upf_size_t_vec _upf_parse_args(uint64_t pc, const char *args) {
                     }
                 }
             }
-
-            if (type_idx == INVALID) ERROR("Unable to find type of \"%s\".", vars.data[0]);
         } else {
             if (vars.length == 0) ERROR("Unable to find variable name while parsing \"%s\".", args);
 
@@ -2235,39 +2237,27 @@ static _upf_size_t_vec _upf_parse_args(uint64_t pc, const char *args) {
 
                 type_idx = _upf_get_expression_type(&cu, type_die, vars);
             }
-
-            if (type_idx == INVALID) ERROR("Unable to find type of \"%s\".", vars.data[0]);
         }
+        if (type_idx == INVALID) ERROR("Unable to find type of \"%s\".", vars.data[0]);
 
         // Arguments are pointers to data that should be printed, so they get dereferenced
         // in order not to be interpreted as actual pointers.
         dereference++;
 
-        if (dereference < 0) {
-            _upf_type_map_entry entry = {
-                .type_die = NULL,
-                .type = {
-                    .name = NULL,
-                    .kind = _UPF_TK_POINTER,
-                    .modifiers = 0,
-                    .as.pointer = {
-                        .type = type_idx,
-                    },
-                },
-            };
-
-            VECTOR_PUSH(&_upf_type_map, entry);
-
-            type_idx = _upf_type_map.length - 1;
-        } else {
-            while (dereference > 0) {
-                const _upf_type *type = _upf_get_type(type_idx);
-                if (type->kind != _UPF_TK_POINTER) {
-                    ERROR("Arguments must be pointers to data that should be printed. You must dereference \"%s\".", args);
-                }
-                type_idx = type->as.pointer.type;
-                dereference--;
+        while (dereference > 0) {
+            const _upf_type *type = _upf_get_type(type_idx);
+            if (type->kind != _UPF_TK_POINTER) {
+                ERROR("Arguments must be pointers to data that should be printed. You must take pointer (&) of \"%s\".", args);
             }
+
+            type_idx = type->as.pointer.type;
+            if (type_idx == INVALID) {
+                ERROR(
+                    "Unable to print void* because it can point to arbitrary data of any length. To print the pointer itself, you must "
+                    "take pointer (&) of \"%s\".",
+                    args);
+            }
+            dereference--;
         }
 
         VECTOR_PUSH(&types, type_idx);
