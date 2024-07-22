@@ -415,6 +415,11 @@ VECTOR_TYPEDEF(_upf_token_vec, _upf_token);
 typedef struct {
     _upf_token_vec tokens;
     size_t idx;
+    // debug info
+    const char *file;
+    size_t line;
+    _upf_cstr_vec args;
+    size_t arg_idx;
 } _upf_tokenizer;
 
 struct _upf_dwarf {
@@ -1922,13 +1927,20 @@ static const char *_upf_tok_to_str(enum _upf_token_kind kind) {
     UNREACHABLE();
 }
 
-static _upf_tokenizer _upf_tokenize(const char *string) {
+static _upf_tokenizer _upf_tokenize(const char *file, size_t line, const char *string) {
     static const _upf_token signs[] = {{_UPF_TOK_OPEN_PAREN, {"("}},    {_UPF_TOK_CLOSE_PAREN, {")"}}, {_UPF_TOK_OPEN_BRACKET, {"["}},
                                        {_UPF_TOK_CLOSE_BRACKET, {"]"}}, {_UPF_TOK_STAR, {"*"}},        {_UPF_TOK_AMPERSAND, {"&"}},
                                        {_UPF_TOK_COMMA, {","}},         {_UPF_TOK_DOT, {"."}},         {_UPF_TOK_ARROW, {"->"}}};
     static const char *keywords[] = {"struct", "union", "enum"};
 
-    _upf_token_vec tokens = VECTOR_NEW(&_upf_arena);
+    _upf_tokenizer tokenizer = {
+        .tokens = VECTOR_NEW(&_upf_arena),
+        .idx = 0,
+        .file = file,
+        .line = line,
+        .args = VECTOR_NEW(&_upf_arena),
+        .arg_idx = 0,
+    };
 
     const char *ch = string;
     while (*ch != '\0') {
@@ -1941,7 +1953,7 @@ static _upf_tokenizer _upf_tokenize(const char *string) {
         for (size_t i = 0; i < sizeof(signs) / sizeof(*signs) && !found; i++) {
             size_t len = strlen(signs[i].as.string);
             if (strncmp(ch, signs[i].as.string, len) == 0) {
-                VECTOR_PUSH(&tokens, signs[i]);
+                VECTOR_PUSH(&tokenizer.tokens, signs[i]);
                 ch += len;
                 found = true;
             }
@@ -1956,9 +1968,9 @@ static _upf_tokenizer _upf_tokenize(const char *string) {
 
             _upf_token token = {
                 .kind = _UPF_TOK_NUMBER,
-                .as = { .num = num, },
+                .as.num = num,
             };
-            VECTOR_PUSH(&tokens, token);
+            VECTOR_PUSH(&tokenizer.tokens, token);
 
             ch = end;
             continue;
@@ -1980,9 +1992,9 @@ static _upf_tokenizer _upf_tokenize(const char *string) {
 
             _upf_token token = {
                 .kind = kind,
-                .as = { .string = string, },
+                .as.string = string,
             };
-            VECTOR_PUSH(&tokens, token);
+            VECTOR_PUSH(&tokenizer.tokens, token);
 
             ch = end;
             continue;
@@ -1997,36 +2009,47 @@ static _upf_tokenizer _upf_tokenize(const char *string) {
 
             _upf_token token = {
                 .kind = _UPF_TOK_STRING,
-                .as = { .string = _upf_arena_string(&_upf_arena, ch, end), },
+                .as.string = _upf_arena_string(&_upf_arena, ch, end),
             };
-            VECTOR_PUSH(&tokens, token);
+            VECTOR_PUSH(&tokenizer.tokens, token);
 
             ch = end + 1;
             continue;
         }
 
-        ERROR("Unkown character when parsing arguments '%c'.", *ch);  // TODO: don't crash?
+        ERROR("Unknown character '%c' when parsing arguments \"%s\" at %s:%lu.", *ch, string, file, line);
     }
 
-    _upf_tokenizer tokenizer = {
-        .tokens = tokens,
-        .idx = 0,
-    };
+    const char *prev = string;
+    ch = string;
+    do {
+        if (*ch == ',' || *ch == '\0') {
+            const char *arg = _upf_arena_string(&_upf_arena, prev, ch);
+            VECTOR_PUSH(&tokenizer.args, arg);
+            prev = ch;
+        }
+    } while (*ch++ != '\0');
+
     return tokenizer;
 }
 
 static bool _upf_can_consume(const _upf_tokenizer *t) { return t->idx < t->tokens.length; }
 
 static void _upf_skip(_upf_tokenizer *t) {
-    if (!_upf_can_consume(t)) ERROR("Expected a token but reached the end of the input.");
+    if (!_upf_can_consume(t))
+        ERROR("Expected a token but reached the end of the input(\"%s\") at %s:%lu.", t->args.data[t->arg_idx], t->file, t->line);
     t->idx++;
 }
 
 static _upf_token _upf_consume(_upf_tokenizer *t, enum _upf_token_kind kind) {
-    if (!_upf_can_consume(t)) ERROR("Expected a token but reached the end of the input.");
+    if (!_upf_can_consume(t))
+        ERROR("Expected a token but reached the end of the input(\"%s\") at %s:%lu.", t->args.data[t->arg_idx], t->file, t->line);
 
     _upf_token token = t->tokens.data[t->idx++];
-    if (token.kind != kind) ERROR("Expected a token of type %s, but found %s.", _upf_tok_to_str(kind), _upf_tok_to_str(token.kind));
+    if (token.kind != kind) {
+        ERROR("Expected a token of type %s, but found %s in \"%s\" at %s:%lu.", _upf_tok_to_str(kind), _upf_tok_to_str(token.kind),
+              t->args.data[t->arg_idx], t->file, t->line);
+    }
 
     return token;
 }
@@ -2042,7 +2065,9 @@ static bool _upf_try_consume(_upf_tokenizer *t, enum _upf_token_kind kind) {
 }
 
 static _upf_token _upf_consume_any2(_upf_tokenizer *t, ...) {
-    if (!_upf_can_consume(t)) ERROR("Expected a token but reached the end of the input.");
+    if (!_upf_can_consume(t)) {
+        ERROR("Expected a token but reached the end of the input(\"%s\") at %s:%lu.", t->args.data[t->arg_idx], t->file, t->line);
+    }
 
     _upf_token token = t->tokens.data[t->idx++];
 
@@ -2107,72 +2132,76 @@ static size_t _upf_get_expression_type(const _upf_cu *cu, const uint8_t *type_di
     return _upf_get_member_type(vars, 1, base_type);
 }
 
-static _upf_size_t_vec _upf_parse_args(uint64_t pc, const char *args) {
+static _upf_size_t_vec _upf_parse_args(_upf_tokenizer *t, uint64_t pc) {
     _upf_size_t_vec types = VECTOR_NEW(&_upf_arena);
     _upf_cstr_vec vars = VECTOR_NEW(&_upf_arena);
-    _upf_tokenizer t = _upf_tokenize(args);
-    while (_upf_can_consume(&t)) {
-        vars.length = 0;
+    while (_upf_can_consume(t)) {
         const char *casted_type_name = NULL;
         int dereference = 0;
+        vars.length = 0;
 
-        if (_upf_try_consume(&t, _UPF_TOK_OPEN_PAREN)) {
-            _upf_try_consume(&t, _UPF_TOK_KEYWORD);
+        if (_upf_try_consume(t, _UPF_TOK_OPEN_PAREN)) {
+            _upf_try_consume(t, _UPF_TOK_KEYWORD);
 
-            casted_type_name = _upf_consume(&t, _UPF_TOK_ID).as.string;
+            casted_type_name = _upf_consume(t, _UPF_TOK_ID).as.string;
 
-            while (_upf_try_consume(&t, _UPF_TOK_STAR)) dereference--;
-            _upf_consume(&t, _UPF_TOK_CLOSE_PAREN);
+            while (_upf_try_consume(t, _UPF_TOK_STAR)) dereference--;
+            _upf_consume(t, _UPF_TOK_CLOSE_PAREN);
 
-            while (_upf_can_consume(&t) && !_upf_try_consume(&t, _UPF_TOK_COMMA)) _upf_skip(&t);
+            while (_upf_can_consume(t) && !_upf_try_consume(t, _UPF_TOK_COMMA)) _upf_skip(t);
         } else {
-            if (_upf_try_consume(&t, _UPF_TOK_AMPERSAND)) dereference--;
-            while (_upf_can_consume(&t) && _upf_try_consume(&t, _UPF_TOK_STAR)) dereference++;
+            if (_upf_try_consume(t, _UPF_TOK_AMPERSAND)) dereference--;
+            while (_upf_can_consume(t) && _upf_try_consume(t, _UPF_TOK_STAR)) dereference++;
 
-            VECTOR_PUSH(&vars, _upf_consume(&t, _UPF_TOK_ID).as.string);
-            while (_upf_can_consume(&t) && !_upf_try_consume(&t, _UPF_TOK_COMMA)) {
+
+            VECTOR_PUSH(&vars, _upf_consume(t, _UPF_TOK_ID).as.string);
+            while (_upf_can_consume(t) && !_upf_try_consume(t, _UPF_TOK_COMMA)) {
+                // TODO: test multiple array-indexing operators: arr[0][1][2]
                 int array_count = 0;
-                while (_upf_try_consume(&t, _UPF_TOK_OPEN_BRACKET)) {
-                    _upf_consume(&t, _UPF_TOK_NUMBER);
-                    _upf_consume(&t, _UPF_TOK_CLOSE_BRACKET);
+                while (_upf_try_consume(t, _UPF_TOK_OPEN_BRACKET)) {
+                    _upf_consume(t, _UPF_TOK_NUMBER);
+                    _upf_consume(t, _UPF_TOK_CLOSE_BRACKET);
                     array_count++;
                 }
 
-                if (!_upf_can_consume(&t) || _upf_try_consume(&t, _UPF_TOK_COMMA)) {
+                if (!_upf_can_consume(t) || _upf_try_consume(t, _UPF_TOK_COMMA)) {
                     dereference += array_count;
                     break;
                 }
 
-                _upf_consume_any(&t, _UPF_TOK_DOT, _UPF_TOK_ARROW);
-                VECTOR_PUSH(&vars, _upf_consume(&t, _UPF_TOK_ID).as.string);
+                _upf_consume_any(t, _UPF_TOK_DOT, _UPF_TOK_ARROW);
+                VECTOR_PUSH(&vars, _upf_consume(t, _UPF_TOK_ID).as.string);
             }
         }
 
         size_t type_idx = INVALID;
         if (casted_type_name != NULL) {
             for (size_t i = 0; i < _upf_cus.length && type_idx == INVALID; i++) {
-                _upf_cu cu = _upf_cus.data[i];
-                if (!_upf_is_in_range(pc, cu.scope.ranges)) continue;
+                const _upf_cu *cu = &_upf_cus.data[i];
+                if (!_upf_is_in_range(pc, cu->scope.ranges)) continue;
 
-                for (size_t j = 0; j < cu.types.length && type_idx == INVALID; j++) {
-                    if (strcmp(cu.types.data[j].name, casted_type_name) == 0) {
-                        type_idx = _upf_parse_type(&cu, cu.types.data[j].type_die);
+                for (size_t j = 0; j < cu->types.length && type_idx == INVALID; j++) {
+                    if (strcmp(cu->types.data[j].name, casted_type_name) == 0) {
+                        type_idx = _upf_parse_type(cu, cu->types.data[j].type_die);
                     }
                 }
             }
         } else {
-            if (vars.length == 0) ERROR("Unable to find variable name while parsing \"%s\".", args);
+            if (vars.length == 0)
+                ERROR("Unable to find variable name while parsing \"%s\" at %s:%lu.", t->args.data[t->arg_idx], t->file, t->line);
 
             for (size_t i = 0; i < _upf_cus.length && type_idx == INVALID; i++) {
-                _upf_cu cu = _upf_cus.data[i];
+                const _upf_cu *cu = &_upf_cus.data[i];
 
-                const uint8_t *type_die = _upf_find_var_type(pc, vars.data[0], &cu.scope);
+                const uint8_t *type_die = _upf_find_var_type(pc, vars.data[0], &cu->scope);
                 if (type_die == NULL) continue;
 
-                type_idx = _upf_get_expression_type(&cu, type_die, vars);
+                type_idx = _upf_get_expression_type(cu, type_die, vars);
             }
         }
-        if (type_idx == INVALID) ERROR("Unable to find type of \"%s\".", vars.data[0]);
+        if (type_idx == INVALID) {
+            ERROR("Unable to find type of \"%s\" in \"%s\" at %s:%lu.", vars.data[0], t->args.data[t->arg_idx], t->file, t->line);
+        }
 
         // Arguments are pointers to data that should be printed, so they get dereferenced
         // in order not to be interpreted as actual pointers.
@@ -2181,20 +2210,22 @@ static _upf_size_t_vec _upf_parse_args(uint64_t pc, const char *args) {
         while (dereference > 0) {
             const _upf_type *type = _upf_get_type(type_idx);
             if (type->kind != _UPF_TK_POINTER) {
-                ERROR("Arguments must be pointers to data that should be printed. You must take pointer (&) of \"%s\".", args);
+                ERROR("Arguments must be pointers to data that should be printed. You must take pointer (&) of \"%s\" at %s:%lu.",
+                      t->args.data[t->arg_idx], t->file, t->line);
             }
 
             type_idx = type->as.pointer.type;
             if (type_idx == INVALID) {
                 ERROR(
                     "Unable to print void* because it can point to arbitrary data of any length. To print the pointer itself, you must "
-                    "take pointer (&) of \"%s\".",
-                    args);
+                    "take pointer (&) of \"%s\" at %s:%lu.",
+                    t->args.data[t->arg_idx], t->file, t->line);
             }
             dereference--;
         }
 
-        VECTOR_PUSH(&types, type_idx);
+        VECTOR_PUSH(&types, type_idx)
+        t->arg_idx++;
     }
 
     return types;
@@ -2324,7 +2355,8 @@ __attribute__((noinline)) void _upf_uprintf(const char *file, uint64_t line, con
     uint64_t pc = (uint64_t) return_pc;
 #endif
 
-    _upf_size_t_vec types = _upf_parse_args(pc, args);
+    _upf_tokenizer t = _upf_tokenize(file, line, args);
+    _upf_size_t_vec types = _upf_parse_args(&t, pc);
     size_t arg_idx = 0;
 
     va_list va_args;
@@ -2342,7 +2374,7 @@ __attribute__((noinline)) void _upf_uprintf(const char *file, uint64_t line, con
         } else if (next == 'S') {
             if (arg_idx >= types.length) ERROR("There are more conversion specifiers than arguments provided at %s:%lu.", file, line);
 
-            void *ptr = va_arg(va_args, void *);
+            const void *ptr = va_arg(va_args, void *);
             const _upf_type *type = _upf_get_type(types.data[arg_idx++]);
             p = _upf_print_type(p, ptr, type, 0);
 
