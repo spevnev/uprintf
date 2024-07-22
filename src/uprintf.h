@@ -47,7 +47,15 @@ void _upf_uprintf(const char *file, uint64_t line, const char *fmt, const char *
 // to their real values.
 #define _upf_stringify_va_args(...) #__VA_ARGS__
 
-#define uprintf(fmt, ...) _upf_uprintf(__FILE__, __LINE__, fmt, _upf_stringify_va_args(__VA_ARGS__), __VA_ARGS__)
+// The noop following uprintf is required to guarantee that return PC of the
+// function is within the same scope. This is especially problematic if uprintf
+// is the last call in the function because then its return PC is that of the
+// caller, which optimizes two returns to one.
+#define uprintf(fmt, ...)                                                                        \
+    do {                                                                                         \
+        _upf_uprintf(__FILE__, __LINE__, fmt, _upf_stringify_va_args(__VA_ARGS__), __VA_ARGS__); \
+        __asm__("nop\n\t");                                                                      \
+    } while (0)
 
 #endif  // UPRINTF_H
 
@@ -2291,15 +2299,12 @@ __attribute__((noinline)) void _upf_uprintf(const char *file, uint64_t line, con
     char *p = buffer;
 
     void *return_pc = __builtin_extract_return_addr(__builtin_return_address(0));
+
 #ifdef __clang__
     uint64_t pc = ((char *) return_pc) - ((char *) _upf_dwarf.this_file);
 #else
     uint64_t pc = (uint64_t) return_pc;
 #endif
-
-    // NOTE: PC is computed from the return PC, so we must subtract the size of
-    // the call instruction from it, which is at least 1 byte
-    pc -= 1;
 
     _upf_size_t_vec types = _upf_parse_args(pc, args);
     size_t arg_idx = 0;
