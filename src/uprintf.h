@@ -62,6 +62,7 @@ void _upf_uprintf(const char *file, uint64_t line, const char *fmt, const char *
 
 #ifdef UPRINTF_IMPLEMENTATION
 
+// ===================== OPTIONS ==========================
 
 #ifndef UPRINTF_INDENTATION_WIDTH
 #define UPRINTF_INDENTATION_WIDTH 4
@@ -71,6 +72,7 @@ void _upf_uprintf(const char *file, uint64_t line, const char *fmt, const char *
 #define UPRINTF_MAX_DEPTH 10
 #endif
 
+// ===================== INCLUDES =========================
 
 #define __USE_XOPEN_EXTENDED
 #include <assert.h>
@@ -88,6 +90,7 @@ void _upf_uprintf(const char *file, uint64_t line, const char *fmt, const char *
 #include <sys/stat.h>
 #include <unistd.h>
 
+// =================== DECLARATIONS =======================
 
 // Feature test macros might not work since it is possible that the header has
 // been included before this one and thus expanded without the macro, so the
@@ -96,6 +99,7 @@ void _upf_uprintf(const char *file, uint64_t line, const char *fmt, const char *
 ssize_t readlink(const char *path, char *buf, size_t bufsiz);
 ssize_t getline(char **lineptr, size_t *n, FILE *stream);
 
+// ====================== ERRORS ==========================
 
 #define INVALID -1UL
 
@@ -117,6 +121,7 @@ ssize_t getline(char **lineptr, size_t *n, FILE *stream);
         fprintf(stderr, "\n");                \
     } while (0)
 
+// ====================== ARENA ===========================
 
 #define INITIAL_ARENA_SIZE 4096
 
@@ -230,6 +235,7 @@ static char *_upf_arena_concat2(struct _upf_arena *a, ...) {
 
 #define _upf_arena_concat(a, ...) _upf_arena_concat2(a, __VA_ARGS__, NULL)
 
+// ====================== VECTOR ==========================
 
 #define INITIAL_VECTOR_CAPACITY 16
 
@@ -269,6 +275,7 @@ static char *_upf_arena_concat2(struct _upf_arena *a, ...) {
 
 #define VECTOR_POP(vec) (vec)->length--
 
+// ====================== TYPES ===========================
 
 VECTOR_TYPEDEF(_upf_size_t_vec, size_t);
 VECTOR_TYPEDEF(_upf_cstr_vec, const char *);
@@ -452,12 +459,14 @@ typedef struct {
 
 VECTOR_TYPEDEF(_upf_cu_vec, _upf_cu);
 
+// ================= GLOBAL VARIABLES =====================
 
 static struct _upf_arena _upf_arena = {0};
 static struct _upf_dwarf _upf_dwarf = {0};
 static _upf_type_map_vec _upf_type_map = VECTOR_NEW(&_upf_arena);
 static _upf_cu_vec _upf_cus = VECTOR_NEW(&_upf_arena);
 
+// ====================== HELPERS =========================
 
 // Converts unsigned LEB128 to uint64_t and returns the size of LEB in bytes
 static size_t _upf_uLEB_to_uint64(const uint8_t *leb, uint64_t *result) {
@@ -509,6 +518,17 @@ static const _upf_type *_upf_get_type(size_t type_idx) {
     assert(type_idx != INVALID && type_idx < _upf_type_map.length);
     return &_upf_type_map.data[type_idx].type;
 }
+
+static bool _upf_is_in_range(uint64_t pc, _upf_range_vec ranges) {
+    for (size_t i = 0; i < ranges.length; i++) {
+        if (ranges.data[i].from <= pc && pc < ranges.data[i].to) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// ================== DWARF PARSING =======================
 
 static uint64_t _upf_offset_cast(const uint8_t *info) {
     uint64_t offset = 0;
@@ -1674,94 +1694,7 @@ static void _upf_parse_dwarf(void) {
     }
 }
 
-static void _upf_parse_elf(void) {
-    struct stat file_info;
-    if (stat("/proc/self/exe", &file_info) == -1) ERROR("Unable to stat \"/proc/self/exe\": %s.", strerror(errno));
-    size_t size = file_info.st_size;
-    _upf_dwarf.file_size = size;
-
-    int fd = open("/proc/self/exe", O_RDONLY);
-    assert(fd != -1);
-
-    uint8_t *file = (uint8_t *) mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
-    assert(file != MAP_FAILED);
-    _upf_dwarf.file = file;
-
-    close(fd);
-
-    const Elf64_Ehdr *header = (Elf64_Ehdr *) file;
-
-    assert(memcmp(header->e_ident, ELFMAG, SELFMAG) == 0);
-    assert(header->e_ident[EI_CLASS] == ELFCLASS64);
-    assert(header->e_ident[EI_VERSION] == 1);
-    assert(header->e_machine == EM_X86_64);
-    assert(header->e_version == 1);
-    assert(header->e_shentsize == sizeof(Elf64_Shdr));
-
-    const Elf64_Shdr *string_section = (Elf64_Shdr *) (file + header->e_shoff + header->e_shstrndx * header->e_shentsize);
-    const char *string_table = (char *) (file + string_section->sh_offset);
-
-    const Elf64_Shdr *section = (Elf64_Shdr *) (file + header->e_shoff);
-    for (size_t i = 0; i < header->e_shnum; i++) {
-        const char *name = string_table + section->sh_name;
-
-        if (strcmp(name, ".debug_info") == 0) {
-            _upf_dwarf.info = file + section->sh_offset;
-            _upf_dwarf.info_size = section->sh_size;
-        } else if (strcmp(name, ".debug_abbrev") == 0) {
-            _upf_dwarf.abbrev = file + section->sh_offset;
-        } else if (strcmp(name, ".debug_str") == 0) {
-            _upf_dwarf.str = (const char *) (file + section->sh_offset);
-        } else if (strcmp(name, ".debug_line_str") == 0) {
-            _upf_dwarf.line_str = (const char *) (file + section->sh_offset);
-        } else if (strcmp(name, ".debug_str_offsets") == 0) {
-            _upf_dwarf.str_offsets = file + section->sh_offset;
-        } else if (strcmp(name, ".debug_rnglists") == 0) {
-            _upf_dwarf.rnglists = file + section->sh_offset;
-        } else if (strcmp(name, ".debug_addr") == 0) {
-            _upf_dwarf.addr = file + section->sh_offset;
-        }
-
-        section++;
-    }
-    assert(_upf_dwarf.info != NULL && _upf_dwarf.abbrev != NULL && _upf_dwarf.str != NULL);
-}
-
-// Function returns the address to which this executable is mapped to.
-// It is retrieved by reading `/proc/self/maps` (see `man proc_pid_maps`).
-// It is used to convert between DWARF addresses and runtime/real ones: DWARF
-// addresses are relative to the beginning of the file, thus real = base + dwarf.
-static void *_upf_get_this_file_address(void) {
-    static const ssize_t PATH_BUFFER_SIZE = 1024;
-
-    char this_path[PATH_BUFFER_SIZE];
-    ssize_t read = readlink("/proc/self/exe", this_path, PATH_BUFFER_SIZE);
-    if (read == -1) ERROR("Unable to readlink \"/proc/self/exe\": %s.", strerror(errno));
-    if (read == PATH_BUFFER_SIZE) ERROR("Unable to readlink \"/proc/self/exe\": path is too long.");
-    this_path[read] = '\0';
-
-    FILE *file = fopen("/proc/self/maps", "r");
-    if (file == NULL) ERROR("Unable to open \"/proc/self/maps\": %s.", strerror(errno));
-
-    uint64_t address = INVALID;
-    size_t length = 0;
-    char *line = NULL;
-    while ((read = getline(&line, &length, file)) != -1) {
-        if (read == 0) continue;
-        if (line[read - 1] == '\n') line[read - 1] = '\0';
-
-        int path_offset;
-        if (sscanf(line, "%lx-%*x %*s %*x %*x:%*x %*u %n", &address, &path_offset) != 1)
-            ERROR("Unable to parse \"/proc/self/maps\": invalid format.");
-
-        if (strcmp(this_path, line + path_offset) == 0) break;
-    }
-    if (line) free(line);
-    fclose(file);
-
-    assert(address != INVALID);
-    return (void *) address;
-}
+// ===================== PRINTING =========================
 
 static const char *_upf_escape_char(char ch) {
     // clang-format off
@@ -1965,6 +1898,8 @@ static char *_upf_print_type(char *p, const uint8_t *data, const _upf_type *type
     return p;
 }
 
+// ====================== PARSER ==========================
+
 static const char *_upf_tok_to_str(enum _upf_token_kind kind) {
     // clang-format off
     switch (kind) {
@@ -2128,15 +2063,6 @@ static _upf_token _upf_consume_any2(_upf_tokenizer *t, ...) {
 
 #define _upf_consume_any(t, ...) _upf_consume_any2(t, __VA_ARGS__, _UPF_TOK_NONE)
 
-static bool _upf_is_in_range(uint64_t pc, _upf_range_vec ranges) {
-    for (size_t i = 0; i < ranges.length; i++) {
-        if (ranges.data[i].from <= pc && pc < ranges.data[i].to) {
-            return true;
-        }
-    }
-    return false;
-}
-
 static const uint8_t *_upf_find_var_type(uint64_t pc, const char *var, const _upf_scope *scope) {
     if (!_upf_is_in_range(pc, scope->ranges)) return NULL;
 
@@ -2274,6 +2200,98 @@ static _upf_size_t_vec _upf_parse_args(uint64_t pc, const char *args) {
     return types;
 }
 
+// ====================== OTHER ===========================
+
+static void _upf_parse_elf(void) {
+    struct stat file_info;
+    if (stat("/proc/self/exe", &file_info) == -1) ERROR("Unable to stat \"/proc/self/exe\": %s.", strerror(errno));
+    size_t size = file_info.st_size;
+    _upf_dwarf.file_size = size;
+
+    int fd = open("/proc/self/exe", O_RDONLY);
+    assert(fd != -1);
+
+    uint8_t *file = (uint8_t *) mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
+    assert(file != MAP_FAILED);
+    _upf_dwarf.file = file;
+
+    close(fd);
+
+    const Elf64_Ehdr *header = (Elf64_Ehdr *) file;
+
+    assert(memcmp(header->e_ident, ELFMAG, SELFMAG) == 0);
+    assert(header->e_ident[EI_CLASS] == ELFCLASS64);
+    assert(header->e_ident[EI_VERSION] == 1);
+    assert(header->e_machine == EM_X86_64);
+    assert(header->e_version == 1);
+    assert(header->e_shentsize == sizeof(Elf64_Shdr));
+
+    const Elf64_Shdr *string_section = (Elf64_Shdr *) (file + header->e_shoff + header->e_shstrndx * header->e_shentsize);
+    const char *string_table = (char *) (file + string_section->sh_offset);
+
+    const Elf64_Shdr *section = (Elf64_Shdr *) (file + header->e_shoff);
+    for (size_t i = 0; i < header->e_shnum; i++) {
+        const char *name = string_table + section->sh_name;
+
+        if (strcmp(name, ".debug_info") == 0) {
+            _upf_dwarf.info = file + section->sh_offset;
+            _upf_dwarf.info_size = section->sh_size;
+        } else if (strcmp(name, ".debug_abbrev") == 0) {
+            _upf_dwarf.abbrev = file + section->sh_offset;
+        } else if (strcmp(name, ".debug_str") == 0) {
+            _upf_dwarf.str = (const char *) (file + section->sh_offset);
+        } else if (strcmp(name, ".debug_line_str") == 0) {
+            _upf_dwarf.line_str = (const char *) (file + section->sh_offset);
+        } else if (strcmp(name, ".debug_str_offsets") == 0) {
+            _upf_dwarf.str_offsets = file + section->sh_offset;
+        } else if (strcmp(name, ".debug_rnglists") == 0) {
+            _upf_dwarf.rnglists = file + section->sh_offset;
+        } else if (strcmp(name, ".debug_addr") == 0) {
+            _upf_dwarf.addr = file + section->sh_offset;
+        }
+
+        section++;
+    }
+    assert(_upf_dwarf.info != NULL && _upf_dwarf.abbrev != NULL && _upf_dwarf.str != NULL);
+}
+
+// Function returns the address to which this executable is mapped to.
+// It is retrieved by reading `/proc/self/maps` (see `man proc_pid_maps`).
+// It is used to convert between DWARF addresses and runtime/real ones: DWARF
+// addresses are relative to the beginning of the file, thus real = base + dwarf.
+static void *_upf_get_this_file_address(void) {
+    static const ssize_t PATH_BUFFER_SIZE = 1024;
+
+    char this_path[PATH_BUFFER_SIZE];
+    ssize_t read = readlink("/proc/self/exe", this_path, PATH_BUFFER_SIZE);
+    if (read == -1) ERROR("Unable to readlink \"/proc/self/exe\": %s.", strerror(errno));
+    if (read == PATH_BUFFER_SIZE) ERROR("Unable to readlink \"/proc/self/exe\": path is too long.");
+    this_path[read] = '\0';
+
+    FILE *file = fopen("/proc/self/maps", "r");
+    if (file == NULL) ERROR("Unable to open \"/proc/self/maps\": %s.", strerror(errno));
+
+    uint64_t address = INVALID;
+    size_t length = 0;
+    char *line = NULL;
+    while ((read = getline(&line, &length, file)) != -1) {
+        if (read == 0) continue;
+        if (line[read - 1] == '\n') line[read - 1] = '\0';
+
+        int path_offset;
+        if (sscanf(line, "%lx-%*x %*s %*x %*x:%*x %*u %n", &address, &path_offset) != 1)
+            ERROR("Unable to parse \"/proc/self/maps\": invalid format.");
+
+        if (strcmp(this_path, line + path_offset) == 0) break;
+    }
+    if (line) free(line);
+    fclose(file);
+
+    assert(address != INVALID);
+    return (void *) address;
+}
+
+// =================== ENTRY POINTS =======================
 
 __attribute__((constructor)) void _upf_init(void) {
     if (access("/proc/self/exe", R_OK) != 0) ERROR("uprintf only supports Linux: expected \"/proc/self/exe\" to be a valid path.");
@@ -2344,6 +2362,7 @@ __attribute__((noinline)) void _upf_uprintf(const char *file, uint64_t line, con
 }
 
 
+#undef _upf_consume_any
 #undef MOD_CONST
 #undef MOD_VOLATILE
 #undef MOD_RESTRICT
@@ -2354,6 +2373,7 @@ __attribute__((noinline)) void _upf_uprintf(const char *file, uint64_t line, con
 #undef VECTOR_TYPEDEF
 #undef VECTOR_NEW
 #undef INITIAL_VECTOR_CAPACITY
+#undef _upf_arena_concat
 #undef INITIAL_ARENA_SIZE
 #undef WARN
 #undef UNREACHABLE
