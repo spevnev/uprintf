@@ -1916,19 +1916,6 @@ static char *_upf_print_type(char *p, const uint8_t *data, const _upf_type *type
                     p += sprintf(p, "\n%*s]", UPRINTF_INDENTATION_WIDTH * depth, "");
                 }
             }
-
-            if (type->as.array.lengths.length == 1 && _upf_is_primitive(element_type)) {
-                *p++ = '[';
-                for (size_t i = 0; i < type->as.array.lengths.data[0]; i++) {
-                    if (i > 0) {
-                        *p++ = ',';
-                        *p++ = ' ';
-                    }
-                    p = _upf_print_type(p, array + element_type->size * i, element_type, depth);
-                }
-                *p++ = ']';
-            } else {
-            }
         } break;
         case _UPF_TK_POINTER: {
             const void *ptr = *((void **) data);
@@ -2137,7 +2124,7 @@ static _upf_tokenizer _upf_tokenize(const char *file, int line, const char *stri
         if (*ch == ',' || *ch == '\0') {
             const char *arg = _upf_arena_string(&_upf_arena, prev, ch);
             VECTOR_PUSH(&tokenizer.args, arg);
-            prev = ch;
+            prev = ch + 1;
         }
     } while (*ch++ != '\0');
 
@@ -2289,7 +2276,7 @@ static _upf_size_t_vec _upf_parse_args(_upf_tokenizer *t, uint64_t pc) {
         vars.length = 0;
 
         bool paren = false;
-        while (_upf_can_consume(t) && _upf_get_next(t).kind != _UPF_TOK_ID) {
+        while (_upf_can_consume(t) && _upf_get_next(t).kind != _UPF_TOK_ID && _upf_get_next(t).kind != _UPF_TOK_KEYWORD) {
             _upf_token token = _upf_consume_any(t, _UPF_TOK_AMPERSAND, _UPF_TOK_STAR, _UPF_TOK_OPEN_PAREN);
             if (token.kind == _UPF_TOK_AMPERSAND) dereference--;
             if (token.kind == _UPF_TOK_STAR) dereference++;
@@ -2308,7 +2295,6 @@ static _upf_size_t_vec _upf_parse_args(_upf_tokenizer *t, uint64_t pc) {
 
             while (_upf_can_consume(t) && !_upf_try_consume(t, _UPF_TOK_COMMA)) _upf_skip(t);
         } else {
-
             VECTOR_PUSH(&vars, type_or_var);
             while (_upf_can_consume(t) && !_upf_try_consume(t, _UPF_TOK_COMMA)) {
                 while (_upf_try_consume(t, _UPF_TOK_CLOSE_PAREN)) continue;
