@@ -22,6 +22,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+// ====================== CHECKS ==========================
 
 // clang-format off
 #ifndef __linux__
@@ -33,6 +34,7 @@
 #endif
 // clang-format on
 
+// ====================== HEADER ==========================
 
 #ifndef UPRINTF_H
 #define UPRINTF_H
@@ -59,6 +61,7 @@ void _upf_uprintf(const char *file, int line, const char *fmt, const char *args,
 
 #endif  // UPRINTF_H
 
+// ====================== SOURCE ==========================
 
 #ifdef UPRINTF_IMPLEMENTATION
 
@@ -1576,7 +1579,6 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *info, const uin
 
     cu.scope.ranges = _upf_get_cu_ranges(&cu, low_pc_info, low_pc_attr, high_pc_info, high_pc_attr, ranges_info, ranges_attr);
 
-
     int depth = 0;
     _upf_scope_stack scope_stack = VECTOR_NEW(&_upf_arena);
 
@@ -2534,8 +2536,10 @@ __attribute__((noinline)) void _upf_uprintf(const char *file, int line, const ch
 
     *p = '\0';
     printf("%s", buffer);
+    // TODO: should this somehow be force-flushed?
 }
 
+// ====================== UNDEF ===========================
 
 #undef _upf_consume_any
 #undef MOD_CONST
