@@ -869,6 +869,26 @@ static int _upf_get_type_modifier(uint64_t tag) {
     UNREACHABLE();
 }
 
+static _upf_type _upf_get_subarray(const _upf_type *array, int count) {
+    _upf_type subarray = *array;
+    if (array->name != NULL) {
+        subarray.name = _upf_arena_string(&_upf_arena, array->name, array->name + strlen(array->name) - 2 * count);
+    }
+    subarray.as.array.lengths.length -= count;
+    subarray.as.array.lengths.data += count;
+    return subarray;
+}
+
+static size_t _upf_add_type(const uint8_t *type_die, _upf_type type) {
+    _upf_type_map_entry entry = {
+        .type_die = type_die,
+        .type = type,
+    };
+    VECTOR_PUSH(&_upf_type_map, entry);
+
+    return _upf_type_map.length - 1;
+}
+
 static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
     for (size_t i = 0; i < _upf_type_map.length; i++) {
         if (_upf_type_map.data[i].type_die == info) {
@@ -950,13 +970,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
                 type.size = element_type->size * type.as.array.lengths.data[0];
             }
 
-            _upf_type_map_entry entry = {
-                .type_die = base,
-                .type = type,
-            };
-            VECTOR_PUSH(&_upf_type_map, entry);
-
-            return _upf_type_map.length - 1;
+            return _upf_add_type(base, type);
         }
         case DW_TAG_enumeration_type: {
             _upf_type type = {
@@ -1019,13 +1033,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
                 VECTOR_PUSH(&type.as.cenum.enums, cenum);
             }
 
-            _upf_type_map_entry entry = {
-                .type_die = base,
-                .type = type,
-            };
-            VECTOR_PUSH(&_upf_type_map, entry);
-
-            return _upf_type_map.length - 1;
+            return _upf_add_type(base, type);
         }
         case DW_TAG_pointer_type: {
             _upf_type type = {
@@ -1057,13 +1065,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
                 type.name = pointed_type->name;
             }
 
-            _upf_type_map_entry entry = {
-                .type_die = base,
-                .type = type,
-            };
-            VECTOR_PUSH(&_upf_type_map, entry);
-
-            return _upf_type_map.length - 1;
+            return _upf_add_type(base, type);
         }
         case DW_TAG_structure_type:
         case DW_TAG_union_type: {
@@ -1128,13 +1130,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
                 VECTOR_PUSH(&type.as.cstruct.members, member);
             }
 
-            _upf_type_map_entry entry = {
-                .type_die = base,
-                .type = type,
-            };
-            VECTOR_PUSH(&_upf_type_map, entry);
-
-            return _upf_type_map.length - 1;
+            return _upf_add_type(base, type);
         }
         case DW_TAG_typedef: {
             const char *name = NULL;
@@ -1150,14 +1146,10 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
             assert(type_die != NULL && name != NULL);
 
             size_t type_idx = _upf_parse_type(cu, type_die);
-            assert(type_idx != INVALID && type_idx < _upf_type_map.length);
-            _upf_type_map_entry entry = _upf_type_map.data[type_idx];
-            entry.type.name = name;
-            entry.type_die = base;
+            _upf_type type = *_upf_get_type(type_idx);
+            type.name = name;
 
-            VECTOR_PUSH(&_upf_type_map, entry);
-
-            return _upf_type_map.length - 1;
+            return _upf_add_type(base, type);
         }
         case DW_TAG_base_type: {
             _upf_type type = {
@@ -1190,13 +1182,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
 
             type.kind = _upf_get_type_kind(encoding, type.size);
 
-            _upf_type_map_entry entry = {
-                .type_die = base,
-                .type = type,
-            };
-            VECTOR_PUSH(&_upf_type_map, entry);
-
-            return _upf_type_map.length - 1;
+            return _upf_add_type(base, type);
         }
         case DW_TAG_const_type:
         case DW_TAG_volatile_type:
@@ -1212,46 +1198,35 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
             }
 
             if (offset == INVALID) {
-                _upf_type_map_entry entry = {
-                    .type_die = base,
-                    .type = {
-                        .name = "void",
-                        .kind = _UPF_TK_VOID,
-                        .modifiers = _upf_get_type_modifier(abbrev->tag),
-                        .size = sizeof(void*),
-                    },
+                _upf_type type = {
+                    .name = "void",
+                    .kind = _UPF_TK_VOID,
+                    .modifiers = _upf_get_type_modifier(abbrev->tag),
+                    .size = sizeof(void *),
                 };
-                VECTOR_PUSH(&_upf_type_map, entry);
-            } else {
-                size_t type_idx = _upf_parse_type(cu, cu->base + offset);
-                assert(type_idx != INVALID && type_idx < _upf_type_map.length);
-                _upf_type_map_entry entry = _upf_type_map.data[type_idx];
-                entry.type_die = base;
-                entry.type.modifiers |= _upf_get_type_modifier(abbrev->tag);
-                VECTOR_PUSH(&_upf_type_map, entry);
+
+                return _upf_add_type(base, type);
             }
 
+            size_t type_idx = _upf_parse_type(cu, cu->base + offset);
+            _upf_type type = *_upf_get_type(type_idx);
+            type.modifiers |= _upf_get_type_modifier(abbrev->tag);
 
-            return _upf_type_map.length - 1;
+            return _upf_add_type(base, type);
         }
         default:
             WARN("Found unsupported type (0x%lx). Ignoring it.", abbrev->tag);
             break;
     }
 
-    _upf_type_map_entry entry = {
-        .type_die = base,
-        .type = {
-            .name = NULL,
-            .kind = _UPF_TK_UNKNOWN,
-            .modifiers = 0,
-            .size = INVALID,
-        },
+    _upf_type unknown_type = {
+        .name = NULL,
+        .kind = _UPF_TK_UNKNOWN,
+        .modifiers = 0,
+        .size = INVALID,
     };
 unknown_type:
-    VECTOR_PUSH(&_upf_type_map, entry);
-
-    return _upf_type_map.length - 1;
+    return _upf_add_type(base, unknown_type);
 }
 
 static const char *_upf_get_type_name(const _upf_cu *cu, const uint8_t *info) {
@@ -1880,13 +1855,9 @@ static char *_upf_print_type(char *p, const uint8_t *data, const _upf_type *type
             }
 
             if (type->as.array.lengths.length > 1) {
-                _upf_type subarray = *type;
-                // Derive subarray type by popping one of the lengths
-                subarray.as.array.lengths.length--;
-                subarray.as.array.lengths.data++;
+                _upf_type subarray = _upf_get_subarray(type, 1);
 
-                size_t subarray_size = _upf_get_type(subarray.as.array.element_type)->size;
-                assert(subarray_size != INVALID);
+                size_t subarray_size = element_type->size;
                 for (size_t j = 0; j < subarray.as.array.lengths.length; j++) {
                     subarray_size *= subarray.as.array.lengths.data[j];
                 }
@@ -2351,21 +2322,17 @@ static _upf_size_t_vec _upf_parse_args(_upf_tokenizer *t, uint64_t pc) {
         dereference++;
 
         while (dereference < 0) {
-            _upf_type_map_entry entry = {
-                .type_die = NULL,
-                .type = {
-                    .name = NULL,
-                    .kind = _UPF_TK_POINTER,
-                    .modifiers = 0,
-                    .size = sizeof(void*),
-                    .as.pointer = {
-                        .type = type_idx,
-                    },
+            _upf_type type = {
+                .name = NULL,
+                .kind = _UPF_TK_POINTER,
+                .modifiers = 0,
+                .size = sizeof(void*),
+                .as.pointer = {
+                    .type = type_idx,
                 },
             };
-            VECTOR_PUSH(&_upf_type_map, entry);
 
-            type_idx = _upf_type_map.length - 1;
+            type_idx = _upf_add_type(NULL, type);
             dereference++;
         }
 
@@ -2376,21 +2343,16 @@ static _upf_size_t_vec _upf_parse_args(_upf_tokenizer *t, uint64_t pc) {
                 type_idx = type->as.pointer.type;
                 dereference--;
             } else if (type->kind == _UPF_TK_ARRAY) {
-                assert(type_idx != INVALID && type_idx < _upf_type_map.length);
-                _upf_type_map_entry entry = _upf_type_map.data[type_idx];
-                entry.type.name = _upf_arena_string(&_upf_arena, entry.type.name, entry.type.name + strlen(entry.type.name) - 1);
-
-                if (dereference > (int) entry.type.as.array.lengths.length) goto arg_isn_t_pointer_error;
-                entry.type.as.array.lengths.length -= dereference;
-                entry.type.as.array.lengths.data += dereference;
-                dereference = 0;
-
-                if (entry.type.as.array.lengths.length == 0) {
+                int dimensions = type->as.array.lengths.length;
+                if (dereference > dimensions) {
+                    goto arg_isn_t_pointer_error;
+                } else if (dereference == dimensions) {
                     type_idx = type->as.array.element_type;
                 } else {
-                    VECTOR_PUSH(&_upf_type_map, entry);
-                    type_idx = _upf_type_map.length - 1;
+                    type_idx = _upf_add_type(NULL, _upf_get_subarray(type, dereference));
                 }
+
+                dereference = 0;
             } else {
             arg_isn_t_pointer_error:
                 ERROR("Arguments must be pointers to data that should be printed. You must take pointer (&) of \"%s\" at %s:%d.",
