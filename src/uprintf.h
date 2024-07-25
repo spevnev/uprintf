@@ -2204,8 +2204,34 @@ static _upf_token _upf_consume_any2(_upf_tokenizer *t, ...) {
             return token;
         }
     }
+    va_end(va_args);
 
-    UNREACHABLE();
+    va_start(va_args, t);
+    static char tokens[104];
+    char *ch = tokens;
+    while (1) {
+        enum _upf_token_kind kind = va_arg(va_args, enum _upf_token_kind);
+        if (kind == _UPF_TOK_NONE) break;
+
+        const char *str = _upf_tok_to_str(kind);
+        size_t len = strlen(str);
+        if (ch - tokens + len > 100) {
+            ch -= 2;
+            memcpy(ch, "...", 3);
+            ch += 3;
+            break;
+        }
+
+        memcpy(ch, str, len);
+        ch += len;
+        *ch++ = ',';
+        *ch++ = ' ';
+    }
+    *(ch - 2) = '\0';
+    va_end(va_args);
+
+    ERROR("Expected one of the following: %s; but found %s in \"%s\" at %s:%d.", tokens, _upf_tok_to_str(token.kind),
+          t->args.data[t->arg_idx], t->file, t->line);
 }
 
 #define _upf_consume_any(t, ...) _upf_consume_any2(t, __VA_ARGS__, _UPF_TOK_NONE)
