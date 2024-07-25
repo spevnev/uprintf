@@ -344,6 +344,7 @@ typedef struct {
     const char *name;
     enum _upf_type_kind kind;
     int modifiers;
+    size_t size;
     union {
         struct {
             _upf_member_vec members;
@@ -887,6 +888,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
                 .name = NULL,
                 .kind = _UPF_TK_ARRAY,
                 .modifiers = 0,
+                .size = INVALID,
                 .as.array = {
                     .element_type = INVALID,
                     .lengths = VECTOR_NEW(&_upf_arena),
@@ -944,6 +946,10 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
                 if (generate_name) type.name = _upf_arena_concat(&_upf_arena, type.name, "[]");
             }
 
+            if (element_type->size != INVALID && type.as.array.lengths.length > 0) {
+                type.size = element_type->size * type.as.array.lengths.data[0];
+            }
+
             _upf_type_map_entry entry = {
                 .type_die = base,
                 .type = type,
@@ -957,6 +963,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
                 .name = "enum",
                 .kind = _UPF_TK_ENUM,
                 .modifiers = 0,
+                .size = INVALID,
                 .as.cenum = {
                     .underlying_type = INVALID,
                     .enums = VECTOR_NEW(&_upf_arena),
@@ -971,6 +978,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
                 } else if (attr.name == DW_AT_type) {
                     const uint8_t *new_info = cu->base + _upf_get_ref(info, attr.form);
                     type.as.cenum.underlying_type = _upf_parse_type(cu, new_info);
+                    type.size = _upf_get_type(type.as.cenum.underlying_type)->size;
                 }
 
                 info += _upf_get_attr_size(info, attr.form);
@@ -1024,6 +1032,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
                 .name = NULL,
                 .kind = _UPF_TK_POINTER,
                 .modifiers = 0,
+                .size = sizeof(void*),
                 .as.pointer = {
                     .type = INVALID,
                 },
@@ -1063,6 +1072,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
                 .name = is_struct ? "struct" : "union",
                 .kind = is_struct ? _UPF_TK_STRUCT : _UPF_TK_UNION,
                 .modifiers = 0,
+                .size = INVALID,
                 .as.cstruct = {
                     .members = VECTOR_NEW(&_upf_arena),
                 },
@@ -1071,7 +1081,15 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
             for (size_t i = 0; i < abbrev->attrs.length; i++) {
                 _upf_attr attr = abbrev->attrs.data[i];
 
-                if (attr.name == DW_AT_name) type.name = _upf_get_str(cu, info, attr.form);
+                if (attr.name == DW_AT_name) {
+                    type.name = _upf_get_str(cu, info, attr.form);
+                } else if (attr.name == DW_AT_byte_size) {
+                    if (_upf_is_data(attr.form)) {
+                        type.size = _upf_get_data(info, attr);
+                    } else {
+                        WARN("Non-constant struct/union sizes aren't supported. Marking it unknown.");
+                    }
+                }
 
                 info += _upf_get_attr_size(info, attr.form);
             }
@@ -1146,16 +1164,16 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
                 .name = NULL,
                 .kind = _UPF_TK_UNKNOWN,
                 .modifiers = 0,
+                .size = INVALID,
             };
 
-            uint64_t size = INVALID;
             uint64_t encoding = INVALID;
             for (size_t i = 0; i < abbrev->attrs.length; i++) {
                 _upf_attr attr = abbrev->attrs.data[i];
 
                 if (attr.name == DW_AT_byte_size) {
                     if (_upf_is_data(attr.form)) {
-                        size = _upf_get_data(info, attr);
+                        type.size = _upf_get_data(info, attr);
                     } else {
                         WARN("Non-constant base type sizes aren't supported. Ignoring this type.");
                         goto unknown_type;
@@ -1168,9 +1186,9 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
 
                 info += _upf_get_attr_size(info, attr.form);
             }
-            assert(size != INVALID && encoding != INVALID && type.name != NULL);
+            assert(type.size != INVALID && encoding != INVALID && type.name != NULL);
 
-            type.kind = _upf_get_type_kind(encoding, size);
+            type.kind = _upf_get_type_kind(encoding, type.size);
 
             _upf_type_map_entry entry = {
                 .type_die = base,
@@ -1200,6 +1218,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
                         .name = "void",
                         .kind = _UPF_TK_VOID,
                         .modifiers = _upf_get_type_modifier(abbrev->tag),
+                        .size = sizeof(void*),
                     },
                 };
                 VECTOR_PUSH(&_upf_type_map, entry);
@@ -1226,6 +1245,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
             .name = NULL,
             .kind = _UPF_TK_UNKNOWN,
             .modifiers = 0,
+            .size = INVALID,
         },
     };
 unknown_type:
@@ -1750,6 +1770,34 @@ static char *_upf_print_typename(char *p, const _upf_type *type) {
     return p;
 }
 
+static bool _upf_is_primitive(const _upf_type *type) {
+    switch (type->kind) {
+        case _UPF_TK_STRUCT:
+        case _UPF_TK_UNION:
+        case _UPF_TK_ARRAY:
+            return false;
+        case _UPF_TK_ENUM:
+        case _UPF_TK_POINTER:
+        case _UPF_TK_U1:
+        case _UPF_TK_U2:
+        case _UPF_TK_U4:
+        case _UPF_TK_U8:
+        case _UPF_TK_S1:
+        case _UPF_TK_S2:
+        case _UPF_TK_S4:
+        case _UPF_TK_S8:
+        case _UPF_TK_F4:
+        case _UPF_TK_F8:
+        case _UPF_TK_BOOL:
+        case _UPF_TK_SCHAR:
+        case _UPF_TK_UCHAR:
+        case _UPF_TK_VOID:
+        case _UPF_TK_UNKNOWN:
+            return true;
+    }
+    UNREACHABLE();
+}
+
 static char *_upf_print_type(char *p, const uint8_t *data, const _upf_type *type, int depth) {
     assert(type != NULL);
 
@@ -1822,10 +1870,66 @@ static char *_upf_print_type(char *p, const uint8_t *data, const _upf_type *type
             p = _upf_print_type(p, data, underlying_type, depth);
             *p++ = ')';
         } break;
-        case _UPF_TK_ARRAY:
-            WARN("Arrays are currently unsupported. Ignoring this type.");
-            p += sprintf(p, "(array)");
-            break;
+        case _UPF_TK_ARRAY: {
+            const uint8_t *array = data;
+            const _upf_type *element_type = _upf_get_type(type->as.array.element_type);
+
+            if (element_type->size == INVALID) {
+                p += sprintf(p, "(unknown)");
+                return p;
+            }
+
+            if (type->as.array.lengths.length > 1) {
+                _upf_type subarray = *type;
+                // Derive subarray type by popping one of the lengths
+                subarray.as.array.lengths.length--;
+                subarray.as.array.lengths.data++;
+
+                size_t subarray_size = _upf_get_type(subarray.as.array.element_type)->size;
+                assert(subarray_size != INVALID);
+                for (size_t j = 0; j < subarray.as.array.lengths.length; j++) {
+                    subarray_size *= subarray.as.array.lengths.data[j];
+                }
+
+                p += sprintf(p, "[\n");
+                for (size_t i = 0; i < type->as.array.lengths.data[0]; i++) {
+                    if (i > 0) p += sprintf(p, ",\n");
+                    p += sprintf(p, "%*s", UPRINTF_INDENTATION_WIDTH * (depth + 1), "");
+                    p = _upf_print_type(p, array + subarray_size * i, &subarray, depth + 1);
+                }
+                p += sprintf(p, "\n%*s]", UPRINTF_INDENTATION_WIDTH * depth, "");
+            } else {
+                if (_upf_is_primitive(element_type)) {
+                    *p++ = '[';
+                    for (size_t i = 0; i < type->as.array.lengths.data[0]; i++) {
+                        if (i > 0) p += sprintf(p, ", ");
+                        p = _upf_print_type(p, array + element_type->size * i, element_type, depth);
+                    }
+                    *p++ = ']';
+                } else {
+                    p += sprintf(p, "[\n");
+                    for (size_t i = 0; i < type->as.array.lengths.data[0]; i++) {
+                        if (i > 0) p += sprintf(p, ",\n");
+                        p += sprintf(p, "%*s", UPRINTF_INDENTATION_WIDTH * (depth + 1), "");
+                        p = _upf_print_type(p, array + element_type->size * i, element_type, depth + 1);
+                    }
+                    p += sprintf(p, "\n%*s]", UPRINTF_INDENTATION_WIDTH * depth, "");
+                }
+            }
+
+            if (type->as.array.lengths.length == 1 && _upf_is_primitive(element_type)) {
+                *p++ = '[';
+                for (size_t i = 0; i < type->as.array.lengths.data[0]; i++) {
+                    if (i > 0) {
+                        *p++ = ',';
+                        *p++ = ' ';
+                    }
+                    p = _upf_print_type(p, array + element_type->size * i, element_type, depth);
+                }
+                *p++ = ']';
+            } else {
+            }
+        } break;
         case _UPF_TK_POINTER: {
             const void *ptr = *((void **) data);
             if (ptr == NULL) {
@@ -2241,6 +2345,7 @@ static _upf_size_t_vec _upf_parse_args(_upf_tokenizer *t, uint64_t pc) {
                     .name = NULL,
                     .kind = _UPF_TK_POINTER,
                     .modifiers = 0,
+                    .size = sizeof(void*),
                     .as.pointer = {
                         .type = type_idx,
                     },
@@ -2254,17 +2359,38 @@ static _upf_size_t_vec _upf_parse_args(_upf_tokenizer *t, uint64_t pc) {
 
         while (dereference > 0) {
             const _upf_type *type = _upf_get_type(type_idx);
+
+            if (type->kind == _UPF_TK_POINTER) {
+                type_idx = type->as.pointer.type;
+                dereference--;
+            } else if (type->kind == _UPF_TK_ARRAY) {
+                assert(type_idx != INVALID && type_idx < _upf_type_map.length);
+                _upf_type_map_entry entry = _upf_type_map.data[type_idx];
+                entry.type.name = _upf_arena_string(&_upf_arena, entry.type.name, entry.type.name + strlen(entry.type.name) - 1);
+
+                if (dereference > (int) entry.type.as.array.lengths.length) goto arg_isn_t_pointer_error;
+                entry.type.as.array.lengths.length -= dereference;
+                entry.type.as.array.lengths.data += dereference;
+                dereference = 0;
+
+                if (entry.type.as.array.lengths.length == 0) {
+                    type_idx = type->as.array.element_type;
+                } else {
+                    VECTOR_PUSH(&_upf_type_map, entry);
+                    type_idx = _upf_type_map.length - 1;
+                }
+            } else {
+            arg_isn_t_pointer_error:
+                ERROR("Arguments must be pointers to data that should be printed. You must take pointer (&) of \"%s\" at %s:%d.",
                       t->args.data[t->arg_idx], t->file, t->line);
             }
 
-            type_idx = type->as.pointer.type;
             if (type_idx == INVALID) {
                 ERROR(
                     "Unable to print void* because it can point to arbitrary data of any length. To print the pointer itself, you must "
                     "take pointer (&) of \"%s\" at %s:%d.",
                     t->args.data[t->arg_idx], t->file, t->line);
             }
-            dereference--;
         }
 
         VECTOR_PUSH(&types, type_idx)
