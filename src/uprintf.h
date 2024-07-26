@@ -472,12 +472,22 @@ typedef struct {
 
 VECTOR_TYPEDEF(_upf_cu_vec, _upf_cu);
 
+typedef struct {
+    char *buffer;
+    size_t size;
+    char *ptr;
+    size_t free;
+} _upf_call_info;
+
 // ================= GLOBAL VARIABLES =====================
+
+#define INITIAL_BUFFER_SIZE 32
 
 static struct _upf_arena _upf_arena = {0};
 static struct _upf_dwarf _upf_dwarf = {0};
 static _upf_type_map_vec _upf_type_map = VECTOR_NEW(&_upf_arena);
 static _upf_cu_vec _upf_cus = VECTOR_NEW(&_upf_arena);
+static _upf_call_info _upf_call = {0};
 
 // ====================== HELPERS =========================
 
@@ -1661,6 +1671,27 @@ static void _upf_parse_dwarf(void) {
 
 // ===================== PRINTING =========================
 
+// All the printing is done to the global buffer stored in the _upf_call, which
+// is why calls don't accept or return string pointers.
+
+#define bprintf(...)                                                                         \
+    while (1) {                                                                              \
+        int bytes = snprintf(_upf_call.ptr, _upf_call.free, __VA_ARGS__);                    \
+        if (bytes < 0) ERROR("Unexpected error occurred in snprintf: %s.", strerror(errno)); \
+        if ((size_t) bytes >= _upf_call.free) {                                              \
+            size_t used = _upf_call.size - _upf_call.free;                                   \
+            _upf_call.size *= 2;                                                             \
+            _upf_call.buffer = realloc(_upf_call.buffer, _upf_call.size);                    \
+            if (_upf_call.buffer == NULL) OUT_OF_MEMORY();                                   \
+            _upf_call.ptr = _upf_call.buffer + used;                                         \
+            _upf_call.free = _upf_call.size - used;                                          \
+            continue;                                                                        \
+        }                                                                                    \
+        _upf_call.free -= bytes;                                                             \
+        _upf_call.ptr += bytes;                                                              \
+        break;                                                                               \
+    }
+
 static const char *_upf_escape_char(char ch) {
     // clang-format off
     switch (ch) {
@@ -1683,102 +1714,74 @@ static const char *_upf_escape_char(char ch) {
 
 static bool _upf_is_printable(char c) { return ' ' <= c && c <= '~'; }
 
-static char *_upf_print_modifiers(char *p, int modifiers) {
-    if (modifiers & MOD_CONST) p += sprintf(p, "const ");
-    if (modifiers & MOD_VOLATILE) p += sprintf(p, "volatile ");
-    if (modifiers & MOD_RESTRICT) p += sprintf(p, "restrict ");
-    if (modifiers & MOD_ATOMIC) p += sprintf(p, "atomic ");
-    return p;
+static void _upf_print_modifiers(int modifiers) {
+    if (modifiers & MOD_CONST) bprintf("const ");
+    if (modifiers & MOD_VOLATILE) bprintf("volatile ");
+    if (modifiers & MOD_RESTRICT) bprintf("restrict ");
+    if (modifiers & MOD_ATOMIC) bprintf("atomic ");
 }
 
-static char *_upf_print_typename(char *p, const _upf_type *type) {
+static void _upf_print_typename(const _upf_type *type) {
     if (type->kind == _UPF_TK_POINTER) {
         if (type->as.pointer.type == INVALID) {
-            p += sprintf(p, "void ");
+            bprintf("void ");
         } else {
-            p = _upf_print_typename(p, _upf_get_type(type->as.pointer.type));
+            _upf_print_typename(_upf_get_type(type->as.pointer.type));
         }
-        p += sprintf(p, "*");
-        p = _upf_print_modifiers(p, type->modifiers);
+        bprintf("*");
+        _upf_print_modifiers(type->modifiers);
     } else {
-        p = _upf_print_modifiers(p, type->modifiers);
-        p += sprintf(p, "%s ", type->name ? type->name : "(unnamed)");
+        _upf_print_modifiers(type->modifiers);
+        bprintf("%s ", type->name ? type->name : "(unnamed)");
     }
-
-    return p;
 }
 
-static bool _upf_is_primitive(const _upf_type *type) {
-    switch (type->kind) {
-        case _UPF_TK_STRUCT:
-        case _UPF_TK_UNION:
-        case _UPF_TK_ARRAY:
-            return false;
-        case _UPF_TK_ENUM:
-        case _UPF_TK_POINTER:
-        case _UPF_TK_U1:
-        case _UPF_TK_U2:
-        case _UPF_TK_U4:
-        case _UPF_TK_U8:
-        case _UPF_TK_S1:
-        case _UPF_TK_S2:
-        case _UPF_TK_S4:
-        case _UPF_TK_S8:
-        case _UPF_TK_F4:
-        case _UPF_TK_F8:
-        case _UPF_TK_BOOL:
-        case _UPF_TK_SCHAR:
-        case _UPF_TK_UCHAR:
-        case _UPF_TK_VOID:
-        case _UPF_TK_UNKNOWN:
-            return true;
-    }
-    UNREACHABLE();
-}
-
-static char *_upf_print_type(char *p, const uint8_t *data, const _upf_type *type, int depth) {
+// TODO: add option to align by equals
+// TODO: add pipes for indentation levels
+// TODO: snprintf
+static void _upf_print_type(const uint8_t *data, const _upf_type *type, int depth) {
     assert(type != NULL);
 
     if (UPRINTF_MAX_DEPTH != -1 && depth >= UPRINTF_MAX_DEPTH) {
         switch (type->kind) {
             case _UPF_TK_UNION:
             case _UPF_TK_STRUCT:
-                p += sprintf(p, "{...}");
-                return p;
+                bprintf("{...}");
+                return;
             default:
                 break;
         }
     }
 
     if (type->kind == _UPF_TK_UNKNOWN) {
-        p += sprintf(p, "(unknown)");
-        return p;
+        bprintf("(unknown)");
+        return;
     }
 
     if (data == NULL) {
-        p += sprintf(p, "NULL");
-        return p;
+        bprintf("NULL");
+        return;
     }
 
     switch (type->kind) {
         case _UPF_TK_UNION:
-            p += sprintf(p, "(union) ");
+            bprintf("(union) ");
             __attribute__((fallthrough));  // Handle union as struct
         case _UPF_TK_STRUCT: {
             _upf_member_vec members = type->as.cstruct.members;
 
-            p += sprintf(p, "{\n");
+            bprintf("{\n");
             for (size_t i = 0; i < members.length; i++) {
                 _upf_member *member = &members.data[i];
                 const _upf_type *member_type = _upf_get_type(member->type);
 
-                p += sprintf(p, "%*s", UPRINTF_INDENTATION_WIDTH * (depth + 1), "");
-                p = _upf_print_typename(p, member_type);
-                p += sprintf(p, "%s = ", member->name);
-                p = _upf_print_type(p, data + member->offset, member_type, depth + 1);
-                *p++ = '\n';
+                bprintf("%*s", UPRINTF_INDENTATION_WIDTH * (depth + 1), "");
+                _upf_print_typename(member_type);
+                bprintf("%s = ", member->name);
+                _upf_print_type(data + member->offset, member_type, depth + 1);
+                bprintf("\n");
             }
-            p += sprintf(p, "%*s}", UPRINTF_INDENTATION_WIDTH * depth, "");
+            bprintf("%*s}", UPRINTF_INDENTATION_WIDTH * depth, "");
         } break;
         case _UPF_TK_ENUM: {
             _upf_enum_vec enums = type->as.cenum.enums;
@@ -1793,7 +1796,7 @@ static char *_upf_print_type(char *p, const uint8_t *data, const _upf_type *type
                 memcpy(&enum_value, data, sizeof(enum_value));
             } else {
                 WARN("Expected enum to use int32_t or uint32_t. Ignoring this type.");
-                p += sprintf(p, "(enum)");
+                bprintf("(enum)");
                 break;
             }
 
@@ -1805,19 +1808,20 @@ static char *_upf_print_type(char *p, const uint8_t *data, const _upf_type *type
                 }
             }
 
-            p += sprintf(p, "%s (", name ? name : "(unknown)");
-            p = _upf_print_type(p, data, underlying_type, depth);
-            *p++ = ')';
+            bprintf("%s (", name ? name : "(unknown)");
+            _upf_print_type(data, underlying_type, depth);
+            bprintf(")");
         } break;
         case _UPF_TK_ARRAY: {
             const uint8_t *array = data;
             const _upf_type *element_type = _upf_get_type(type->as.array.element_type);
 
             if (element_type->size == INVALID) {
-                p += sprintf(p, "(unknown)");
-                return p;
+                bprintf("(unknown)");
+                return;
             }
 
+            // TODO: test empty
             if (type->as.array.lengths.length > 1) {
                 _upf_type subarray = _upf_get_subarray(type, 1);
 
@@ -1826,114 +1830,114 @@ static char *_upf_print_type(char *p, const uint8_t *data, const _upf_type *type
                     subarray_size *= subarray.as.array.lengths.data[j];
                 }
 
-                p += sprintf(p, "[\n");
+                bprintf("[\n");
                 for (size_t i = 0; i < type->as.array.lengths.data[0]; i++) {
-                    if (i > 0) p += sprintf(p, ",\n");
-                    p += sprintf(p, "%*s", UPRINTF_INDENTATION_WIDTH * (depth + 1), "");
-                    p = _upf_print_type(p, array + subarray_size * i, &subarray, depth + 1);
+                    if (i > 0) bprintf(",\n");
+                    bprintf("%*s", UPRINTF_INDENTATION_WIDTH * (depth + 1), "");
+                    _upf_print_type(array + subarray_size * i, &subarray, depth + 1);
                 }
-                p += sprintf(p, "\n%*s]", UPRINTF_INDENTATION_WIDTH * depth, "");
+                bprintf("\n%*s]", UPRINTF_INDENTATION_WIDTH * depth, "");
             } else {
                 if (_upf_is_primitive(element_type)) {
-                    *p++ = '[';
+                    bprintf("[");
                     for (size_t i = 0; i < type->as.array.lengths.data[0]; i++) {
-                        if (i > 0) p += sprintf(p, ", ");
-                        p = _upf_print_type(p, array + element_type->size * i, element_type, depth);
+                        if (i > 0) bprintf(", ");
+                        _upf_print_type(array + element_type->size * i, element_type, depth);
                     }
-                    *p++ = ']';
+                    bprintf("]");
                 } else {
-                    p += sprintf(p, "[\n");
+                    bprintf("[\n");
                     for (size_t i = 0; i < type->as.array.lengths.data[0]; i++) {
-                        if (i > 0) p += sprintf(p, ",\n");
-                        p += sprintf(p, "%*s", UPRINTF_INDENTATION_WIDTH * (depth + 1), "");
-                        p = _upf_print_type(p, array + element_type->size * i, element_type, depth + 1);
+                        if (i > 0) bprintf(",\n");
+                        bprintf("%*s", UPRINTF_INDENTATION_WIDTH * (depth + 1), "");
+                        _upf_print_type(array + element_type->size * i, element_type, depth + 1);
                     }
-                    p += sprintf(p, "\n%*s]", UPRINTF_INDENTATION_WIDTH * depth, "");
+                    bprintf("\n%*s]", UPRINTF_INDENTATION_WIDTH * depth, "");
                 }
             }
         } break;
         case _UPF_TK_POINTER: {
             const void *ptr = *((void **) data);
             if (ptr == NULL) {
-                p += sprintf(p, "NULL");
-                return p;
+                bprintf("NULL");
+                return;
             }
 
             if (type->as.pointer.type == INVALID) {
-                p += sprintf(p, "%p", ptr);
-                return p;
+                bprintf("%p", ptr);
+                return;
             }
 
             const _upf_type *pointed_type = _upf_get_type(type->as.pointer.type);
             if (pointed_type->kind == _UPF_TK_POINTER || pointed_type->kind == _UPF_TK_VOID) {
-                p += sprintf(p, "%p", ptr);
-                return p;
+                bprintf("%p", ptr);
+                return;
             }
 
             if (pointed_type->kind == _UPF_TK_SCHAR || pointed_type->kind == _UPF_TK_UCHAR) {
-                p += sprintf(p, "%p (\"", ptr);
+                bprintf("%p (\"", ptr);
                 const char *str = ptr;
-                while (*str != '\0') p += sprintf(p, "%s", _upf_escape_char(*str++));
-                p += sprintf(p, "\")");
-                return p;
+                while (*str != '\0') bprintf("%s", _upf_escape_char(*str++));
+                bprintf("\")");
+                return;
             }
 
-            p += sprintf(p, "%p (", ptr);
-            p = _upf_print_type(p, ptr, pointed_type, depth + 1);
-            p += sprintf(p, ")");
+            bprintf("%p (", ptr);
+            _upf_print_type(ptr, pointed_type, depth + 1);
+            bprintf(")");
         } break;
         case _UPF_TK_U1:
-            p += sprintf(p, "%hhu", *data);
+            bprintf("%hhu", *data);
             break;
         case _UPF_TK_U2:
-            p += sprintf(p, "%hu", *((uint16_t *) data));
+            bprintf("%hu", *((uint16_t *) data));
             break;
         case _UPF_TK_U4:
-            p += sprintf(p, "%u", *((uint32_t *) data));
+            bprintf("%u", *((uint32_t *) data));
             break;
         case _UPF_TK_U8:
-            p += sprintf(p, "%lu", *((uint64_t *) data));
+            bprintf("%lu", *((uint64_t *) data));
             break;
         case _UPF_TK_S1:
-            p += sprintf(p, "%hhd", *((int8_t *) data));
+            bprintf("%hhd", *((int8_t *) data));
             break;
         case _UPF_TK_S2:
-            p += sprintf(p, "%hd", *((int16_t *) data));
+            bprintf("%hd", *((int16_t *) data));
             break;
         case _UPF_TK_S4:
-            p += sprintf(p, "%d", *((int32_t *) data));
+            bprintf("%d", *((int32_t *) data));
             break;
         case _UPF_TK_S8:
-            p += sprintf(p, "%ld", *((int64_t *) data));
+            bprintf("%ld", *((int64_t *) data));
             break;
         case _UPF_TK_F4:
-            p += sprintf(p, "%f", *((float *) data));
+            bprintf("%f", *((float *) data));
             break;
         case _UPF_TK_F8:
-            p += sprintf(p, "%lf", *((double *) data));
+            bprintf("%lf", *((double *) data));
             break;
         case _UPF_TK_BOOL:
-            p += sprintf(p, "%s", *((int8_t *) data) ? "true" : "false");
+            bprintf("%s", *((int8_t *) data) ? "true" : "false");
             break;
         case _UPF_TK_SCHAR: {
             char ch = *((char *) data);
-            p += sprintf(p, "%hhd", ch);
-            if (_upf_is_printable(ch)) p += sprintf(p, " ('%s')", _upf_escape_char(ch));
+            bprintf("%hhd", ch);
+            if (_upf_is_printable(ch)) bprintf(" ('%s')", _upf_escape_char(ch));
         } break;
         case _UPF_TK_UCHAR: {
             char ch = *((char *) data);
-            p += sprintf(p, "%hhu", ch);
-            if (_upf_is_printable(ch)) p += sprintf(p, " ('%s')", _upf_escape_char(ch));
+            bprintf("%hhu", ch);
+            if (_upf_is_printable(ch)) bprintf(" ('%s')", _upf_escape_char(ch));
         } break;
         case _UPF_TK_VOID:
             WARN("void must be a pointer. Ignoring this type.");
             break;
         case _UPF_TK_UNKNOWN:
-            p += sprintf(p, "(unknown)");
+            bprintf("(unknown)");
             break;
     }
 
-    return p;
+    return;
 }
 
 // ====================== PARSER ==========================
@@ -2448,15 +2452,21 @@ __attribute__((destructor)) void _upf_fini(void) {
     // Must be unloaded at the end of the program because many variables point
     // into the _upf_dwarf.file to avoid unnecessarily copying date.
     munmap(_upf_dwarf.file, _upf_dwarf.file_size);
+
     _upf_arena_free(&_upf_arena);
+    if (_upf_call.buffer != NULL) free(_upf_call.buffer);
 }
 
 __attribute__((noinline)) void _upf_uprintf(const char *file, int line, const char *fmt, const char *args, ...) {
-    static char buffer[65536];  // TODO: dynamically resize and/or check size
-    char *p = buffer;
+    if (_upf_call.buffer == NULL) {
+        _upf_call.buffer = (char *) malloc(INITIAL_BUFFER_SIZE * sizeof(char));
+        if (_upf_call.buffer == NULL) OUT_OF_MEMORY();
+        _upf_call.size = INITIAL_BUFFER_SIZE;
+    }
+    _upf_call.ptr = _upf_call.buffer;
+    _upf_call.free = _upf_call.size;
 
     void *return_pc = __builtin_extract_return_addr(__builtin_return_address(0));
-
 #ifdef __clang__
     uint64_t pc = ((char *) return_pc) - ((char *) _upf_dwarf.this_file);
 #else
@@ -2469,42 +2479,48 @@ __attribute__((noinline)) void _upf_uprintf(const char *file, int line, const ch
 
     va_list va_args;
     va_start(va_args, args);
-    for (const char *ch = fmt; *ch != '\0'; ch++) {
-        if (*ch != '%') {
-            *p++ = *ch;
-            continue;
+    const char *ch = fmt;
+    while (1) {
+        const char *start = ch;
+        while (*ch != '%' && *ch != '\0') ch++;
+        bprintf("%.*s", (int) (ch - start), start);
+
+        if (*ch == '\0') break;
+        ch++;  // Skip percent sign
+
+        // TODO: create a variable for '%' and/or 'S'?
+        switch (*ch) {
+            case '%':
+                bprintf("%%");
+                break;
+            case 'S': {
+                if (arg_idx >= types.length) ERROR("There are more conversion specifiers than arguments provided at %s:%d.", file, line);
+
+                const void *ptr = va_arg(va_args, void *);
+                const _upf_type *type = _upf_get_type(types.data[arg_idx++]);
+                _upf_print_type(ptr, type, 0);
+            } break;
+            case '\0':
+            case '\n':
+                ERROR("Unfinished format specifier at the end of the line at %s:%d.", file, line);
+            default:
+                ERROR("Unknown format specifier \"%%%c\" at %s:%d.", *ch, file, line);
         }
-
-        char next = *(ch + 1);
-        if (next == '%') {
-            *p++ = '%';
-            ch++;
-        } else if (next == 'S') {
-            if (arg_idx >= types.length) ERROR("There are more conversion specifiers than arguments provided at %s:%d.", file, line);
-
-            const void *ptr = va_arg(va_args, void *);
-            const _upf_type *type = _upf_get_type(types.data[arg_idx++]);
-            p = _upf_print_type(p, ptr, type, 0);
-
-            ch++;
-        } else if (next == '\0' || next == '\n') {
-            ERROR("Unfinished format specifier at the end of the line at %s:%d.", file, line);
-        } else {
-            ERROR("Unknown format specifier \"%%%c\" at %s:%d.", next, file, line);
-        }
+        ch++;
     }
     va_end(va_args);
 
-    assert(arg_idx == types.length);  // TODO: warning/error not enough arguments
+    if (arg_idx < types.length) ERROR("There are more arguments provided than conversion specifiers at %s:%d.", file, line);
 
-    *p = '\0';
-    printf("%s", buffer);
+    printf("%s", _upf_call.buffer);
     // TODO: should this somehow be force-flushed?
 }
 
 // ====================== UNDEF ===========================
 
+#undef bprintf
 #undef _upf_consume_any
+#undef INITIAL_BUFFER_SIZE
 #undef MOD_CONST
 #undef MOD_VOLATILE
 #undef MOD_RESTRICT
