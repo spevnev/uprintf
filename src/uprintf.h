@@ -144,7 +144,7 @@ static void _upf_arena_init(struct _upf_arena *a) {
     _upf_arena_region *region = (_upf_arena_region *) malloc(sizeof(*region));
     if (region == NULL) OUT_OF_MEMORY();
     region->capacity = INITIAL_ARENA_SIZE;
-    region->data = (uint8_t *) malloc(region->capacity);
+    region->data = (uint8_t *) malloc(region->capacity * sizeof(uint8_t));
     if (region->data == NULL) OUT_OF_MEMORY();
     region->length = 0;
     region->next = NULL;
@@ -163,7 +163,7 @@ static void *_upf_arena_alloc(struct _upf_arena *a, size_t size) {
         _upf_arena_region *region = (_upf_arena_region *) malloc(sizeof(*region));
         if (region == NULL) OUT_OF_MEMORY();
         region->capacity = a->head->capacity * 2;
-        region->data = (uint8_t *) malloc(region->capacity);
+        region->data = (uint8_t *) malloc(region->capacity * sizeof(uint8_t));
         if (region->data == NULL) OUT_OF_MEMORY();
         region->length = 0;
         region->next = NULL;
@@ -389,6 +389,13 @@ typedef struct _upf_scope {
     _upf_scope_vec scopes;
 } _upf_scope;
 
+typedef struct {
+    int depth;
+    _upf_scope *scope;
+} _upf_scope_stack_entry;
+
+VECTOR_TYPEDEF(_upf_scope_stack, _upf_scope_stack_entry);
+
 enum _upf_token_kind {
     _UPF_TOK_NONE,
     _UPF_TOK_OPEN_PAREN,
@@ -532,6 +539,34 @@ static bool _upf_is_in_range(uint64_t pc, _upf_range_vec ranges) {
         }
     }
     return false;
+}
+
+static bool _upf_is_primitive(const _upf_type *type) {
+    switch (type->kind) {
+        case _UPF_TK_STRUCT:
+        case _UPF_TK_UNION:
+        case _UPF_TK_ARRAY:
+            return false;
+        case _UPF_TK_ENUM:
+        case _UPF_TK_POINTER:
+        case _UPF_TK_U1:
+        case _UPF_TK_U2:
+        case _UPF_TK_U4:
+        case _UPF_TK_U8:
+        case _UPF_TK_S1:
+        case _UPF_TK_S2:
+        case _UPF_TK_S4:
+        case _UPF_TK_S8:
+        case _UPF_TK_F4:
+        case _UPF_TK_F8:
+        case _UPF_TK_BOOL:
+        case _UPF_TK_SCHAR:
+        case _UPF_TK_UCHAR:
+        case _UPF_TK_VOID:
+        case _UPF_TK_UNKNOWN:
+            return true;
+    }
+    UNREACHABLE();
 }
 
 // ================== DWARF PARSING =======================
@@ -1178,7 +1213,6 @@ static const char *_upf_get_type_name(const _upf_cu *cu, const uint8_t *info) {
     for (size_t i = 0; i < abbrev->attrs.length; i++) {
         _upf_attr attr = abbrev->attrs.data[i];
 
-        // TODO: test all! esp array_type
         switch (abbrev->tag) {
             case DW_TAG_array_type:
             case DW_TAG_enumeration_type:
@@ -1363,13 +1397,6 @@ static _upf_range_vec _upf_get_cu_ranges(const _upf_cu *cu, const uint8_t *low_p
     return ranges;
 }
 
-typedef struct {
-    int depth;
-    _upf_scope *scope;
-} _upf_scope_stack_entry;
-
-VECTOR_TYPEDEF(_upf_scope_stack, _upf_scope_stack_entry);
-
 static void _upf_parse_cu_scope(const _upf_cu *cu, _upf_scope_stack *scope_stack, int depth, const uint8_t *info,
                                 const _upf_abbrev *abbrev) {
     if (!abbrev->has_children) return;
@@ -1400,12 +1427,13 @@ static void _upf_parse_cu_scope(const _upf_cu *cu, _upf_scope_stack *scope_stack
     }
 
     if (low_pc != INVALID) {
+        if (high_pc_info == NULL) ERROR("Expected CU to have both low and high PC.");
+
         _upf_range range = {
             .from = low_pc,
             .to = INVALID,
         };
 
-        if (high_pc_info == NULL) ERROR("Expected CU to have both low and high PC.");
         if (_upf_is_addr(high_pc_attr.form)) {
             range.to = _upf_get_addr(cu, high_pc_info, high_pc_attr.form);
         } else {
@@ -1563,7 +1591,6 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *info, const uin
         info = _upf_skip_die(info, abbrev);
     }
 
-    // TODO: assumed that scopes and their ranges are in sorted order. Check that or sort them!
     assert(cu.scope.scopes.length > 0);
     if (cu.scope.ranges.length == 1) {
         _upf_range *range = &cu.scope.ranges.data[0];
