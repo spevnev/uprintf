@@ -431,8 +431,6 @@ typedef struct {
 } _upf_tokenizer;
 
 struct _upf_dwarf {
-    void *this_file;
-
     uint8_t *file;
     off_t file_size;
 
@@ -1205,49 +1203,15 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
             break;
     }
 
-    _upf_type unknown_type = {
+    _upf_type type;
+unknown_type:
+    type = (_upf_type){
         .name = name,
         .kind = _UPF_TK_UNKNOWN,
         .modifiers = 0,
         .size = size,
     };
-unknown_type:
-    return _upf_add_type(base, unknown_type);
-}
-
-static const char *_upf_get_type_name(const _upf_cu *cu, const uint8_t *info) {
-    uint64_t code;
-    info += _upf_uLEB_to_uint64(info, &code);
-
-    const _upf_abbrev *abbrev = _upf_get_abbrev(cu, code);
-    for (size_t i = 0; i < abbrev->attrs.length; i++) {
-        _upf_attr attr = abbrev->attrs.data[i];
-
-        switch (abbrev->tag) {
-            case DW_TAG_array_type:
-            case DW_TAG_enumeration_type:
-            case DW_TAG_structure_type:
-            case DW_TAG_typedef:
-            case DW_TAG_union_type:
-            case DW_TAG_base_type:
-                if (attr.name == DW_AT_name) return _upf_get_str(cu, info, attr.form);
-                break;
-            case DW_TAG_pointer_type:
-            case DW_TAG_const_type:
-            case DW_TAG_volatile_type:
-            case DW_TAG_restrict_type:
-            case DW_TAG_atomic_type:
-                if (attr.name == DW_AT_type) return _upf_get_type_name(cu, cu->base + _upf_get_ref(info, attr.form));
-                break;
-            default:
-                return NULL;
-        }
-
-        info += _upf_get_attr_size(info, attr.form);
-    }
-    if (abbrev->tag == DW_TAG_pointer_type) return "void";
-
-    return NULL;
+    return _upf_add_type(base, type);
 }
 
 static _upf_range_vec _upf_get_ranges(const _upf_cu *cu, const uint8_t *info, uint64_t form) {
@@ -1486,7 +1450,23 @@ static void _upf_parse_cu_var(const _upf_cu *cu, _upf_scope_stack *scope_stack, 
 }
 
 static void _upf_parse_cu_type(_upf_cu *cu, const uint8_t *die) {
-    const char *name = _upf_get_type_name(cu, die);
+    const uint8_t *info = die;
+    uint64_t code;
+    info += _upf_uLEB_to_uint64(info, &code);
+    const _upf_abbrev *abbrev = _upf_get_abbrev(cu, code);
+
+    const char *name = NULL;
+    for (size_t i = 0; i < abbrev->attrs.length; i++) {
+        _upf_attr attr = abbrev->attrs.data[i];
+
+        if (attr.name == DW_AT_name) name = _upf_get_str(cu, info, attr.form);
+
+        info += _upf_get_attr_size(info, attr.form);
+    }
+    if (abbrev->tag == DW_TAG_pointer_type) {
+        if (name) return;
+        name = "void";
+    }
     if (name == NULL) return;
 
     _upf_named_type type = {
@@ -1590,10 +1570,6 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *info, const uin
             case DW_TAG_typedef:
             case DW_TAG_union_type:
             case DW_TAG_base_type:
-            case DW_TAG_const_type:
-            case DW_TAG_volatile_type:
-            case DW_TAG_restrict_type:
-            case DW_TAG_atomic_type:
                 _upf_parse_cu_type(&cu, die_base);
                 break;
         }
@@ -1736,9 +1712,6 @@ static void _upf_print_typename(const _upf_type *type) {
     }
 }
 
-// TODO: add option to align by equals
-// TODO: add pipes for indentation levels
-// TODO: snprintf
 static void _upf_print_type(const uint8_t *data, const _upf_type *type, int depth) {
     assert(type != NULL);
 
@@ -1816,12 +1789,11 @@ static void _upf_print_type(const uint8_t *data, const _upf_type *type, int dept
             const uint8_t *array = data;
             const _upf_type *element_type = _upf_get_type(type->as.array.element_type);
 
-            if (element_type->size == INVALID) {
+            if (element_type->size == INVALID || type->as.array.lengths.length == 0) {
                 bprintf("(unknown)");
                 return;
             }
 
-            // TODO: test empty
             if (type->as.array.lengths.length > 1) {
                 _upf_type subarray = _upf_get_subarray(type, 1);
 
@@ -2088,7 +2060,7 @@ static void _upf_skip(_upf_tokenizer *t) {
     t->idx++;
 }
 
-static _upf_token _upf_consume(_upf_tokenizer *t, enum _upf_token_kind kind) {
+static const char *_upf_consume(_upf_tokenizer *t, enum _upf_token_kind kind) {
     if (!_upf_can_consume(t)) {
         ERROR("Expected a token but reached the end of the input(\"%s\") at %s:%d.", t->args.data[t->arg_idx], t->file, t->line);
     }
@@ -2099,7 +2071,7 @@ static _upf_token _upf_consume(_upf_tokenizer *t, enum _upf_token_kind kind) {
               t->args.data[t->arg_idx], t->file, t->line);
     }
 
-    return token;
+    return token.string;
 }
 
 static bool _upf_try_consume(_upf_tokenizer *t, enum _upf_token_kind kind) {
@@ -2210,7 +2182,7 @@ static _upf_size_t_vec _upf_parse_args(_upf_tokenizer *t, uint64_t pc) {
     _upf_size_t_vec types = VECTOR_NEW(&_upf_arena);
     _upf_cstr_vec vars = VECTOR_NEW(&_upf_arena);
     while (_upf_can_consume(t)) {
-        const char *casted_type_name = NULL;
+        const char *casted_typename = NULL;
         int dereference = 0;
         vars.length = 0;
 
@@ -2223,10 +2195,10 @@ static _upf_size_t_vec _upf_parse_args(_upf_tokenizer *t, uint64_t pc) {
         }
 
         _upf_try_consume(t, _UPF_TOK_KEYWORD);
-        const char *type_or_var = _upf_consume(t, _UPF_TOK_ID).string;
+        const char *type_or_var = _upf_consume(t, _UPF_TOK_ID);
 
         if (paren && _upf_try_consume(t, _UPF_TOK_STAR)) {
-            casted_type_name = type_or_var;
+            casted_typename = type_or_var;
             dereference--;
 
             while (_upf_try_consume(t, _UPF_TOK_STAR)) dereference--;
@@ -2252,18 +2224,18 @@ static _upf_size_t_vec _upf_parse_args(_upf_tokenizer *t, uint64_t pc) {
                 }
 
                 _upf_consume_any(t, _UPF_TOK_DOT, _UPF_TOK_ARROW);
-                VECTOR_PUSH(&vars, _upf_consume(t, _UPF_TOK_ID).string);
+                VECTOR_PUSH(&vars, _upf_consume(t, _UPF_TOK_ID));
             }
         }
 
         size_t type_idx = INVALID;
-        if (casted_type_name != NULL) {
+        if (casted_typename != NULL) {
             for (size_t i = 0; i < _upf_cus.length && type_idx == INVALID; i++) {
                 const _upf_cu *cu = &_upf_cus.data[i];
                 if (!_upf_is_in_range(pc, cu->scope.ranges)) continue;
 
                 for (size_t j = 0; j < cu->types.length && type_idx == INVALID; j++) {
-                    if (strcmp(cu->types.data[j].name, casted_type_name) == 0) {
+                    if (strcmp(cu->types.data[j].name, casted_typename) == 0) {
                         type_idx = _upf_parse_type(cu, cu->types.data[j].die);
                     }
                 }
@@ -2442,8 +2414,6 @@ __attribute__((constructor)) void _upf_init(void) {
 
     _upf_arena_init(&_upf_arena);
 
-    _upf_dwarf.this_file = _upf_get_this_file_address();
-
     _upf_parse_elf();
     _upf_parse_dwarf();
 }
@@ -2468,8 +2438,11 @@ __attribute__((noinline)) void _upf_uprintf(const char *file, int line, const ch
 
     void *return_pc = __builtin_extract_return_addr(__builtin_return_address(0));
 #ifdef __clang__
-    uint64_t pc = ((char *) return_pc) - ((char *) _upf_dwarf.this_file);
+    static char *this_file = NULL;
+    if (this_file == NULL) this_file = _upf_get_this_file_address();
+    uint64_t pc = ((char *) return_pc) - this_file;
 #else
+    (void) _upf_get_this_file_address;
     uint64_t pc = (uint64_t) return_pc;
 #endif
 
@@ -2513,7 +2486,7 @@ __attribute__((noinline)) void _upf_uprintf(const char *file, int line, const ch
     if (arg_idx < types.length) ERROR("There are more arguments provided than conversion specifiers at %s:%d.", file, line);
 
     printf("%s", _upf_call.buffer);
-    // TODO: should this somehow be force-flushed?
+    fflush(stdout);
 }
 
 // ====================== UNDEF ===========================
