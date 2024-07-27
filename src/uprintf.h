@@ -1236,10 +1236,36 @@ static _upf_range_vec _upf_get_ranges(const _upf_cu *cu, const uint8_t *info, ui
     _upf_range_vec ranges = VECTOR_NEW(&_upf_arena);
     while (*rnglist != DW_RLE_end_of_list) {
         switch (*rnglist++) {
-            case DW_RLE_base_address:
-                base = _upf_address_cast(rnglist);
-                rnglist += _upf_dwarf.address_size;
+            case DW_RLE_base_addressx:
+                base = _upf_get_addr(cu, rnglist, DW_FORM_addrx);
+                rnglist += _upf_get_attr_size(rnglist, DW_FORM_addrx);
                 break;
+            case DW_RLE_startx_endx: {
+                uint64_t from = _upf_get_addr(cu, rnglist, DW_FORM_addrx);
+                rnglist += _upf_get_attr_size(rnglist, DW_FORM_addrx);
+                uint64_t to = _upf_get_addr(cu, rnglist, DW_FORM_addrx);
+                rnglist += _upf_get_attr_size(rnglist, DW_FORM_addrx);
+
+                _upf_range range = {
+                    .from = from,
+                    .to = to,
+                };
+
+                VECTOR_PUSH(&ranges, range);
+            } break;
+            case DW_RLE_startx_length: {
+                uint64_t address = _upf_get_addr(cu, rnglist, DW_FORM_addrx);
+                rnglist += _upf_get_attr_size(rnglist, DW_FORM_addrx);
+                uint64_t length = _upf_get_addr(cu, rnglist, DW_FORM_addrx);
+                rnglist += _upf_get_attr_size(rnglist, DW_FORM_addrx);
+
+                _upf_range range = {
+                    .from = address,
+                    .to = address + length,
+                };
+
+                VECTOR_PUSH(&ranges, range);
+            } break;
             case DW_RLE_offset_pair: {
                 uint64_t from, to;
                 rnglist += _upf_uLEB_to_uint64(rnglist, &from);
@@ -1252,22 +1278,39 @@ static _upf_range_vec _upf_get_ranges(const _upf_cu *cu, const uint8_t *info, ui
 
                 VECTOR_PUSH(&ranges, range);
             } break;
-            case DW_RLE_start_length: {
+            case DW_RLE_base_address:
+                base = _upf_address_cast(rnglist);
+                rnglist += _upf_dwarf.address_size;
+                break;
+            case DW_RLE_start_end: {
                 uint64_t from = _upf_address_cast(rnglist);
                 rnglist += _upf_dwarf.address_size;
+                uint64_t to = _upf_address_cast(rnglist);
+                rnglist += _upf_dwarf.address_size;
 
+                _upf_range range = {
+                    .from = from,
+                    .to = to,
+                };
+
+                VECTOR_PUSH(&ranges, range);
+            } break;
+            case DW_RLE_start_length: {
+                uint64_t address = _upf_address_cast(rnglist);
+                rnglist += _upf_dwarf.address_size;
                 uint64_t length;
                 rnglist += _upf_uLEB_to_uint64(rnglist, &length);
 
                 _upf_range range = {
-                    .from = from,
-                    .to = from + length,
+                    .from = address,
+                    .to = address + length,
                 };
 
                 VECTOR_PUSH(&ranges, range);
             } break;
             default:
-                assert(0 && "TODO: handle other rnglist types");  // TODO:
+                WARN("Found unsupported range list entry kind (0x%x). Skipping it.", *(rnglist - 1));
+                return ranges;
         }
     }
 
