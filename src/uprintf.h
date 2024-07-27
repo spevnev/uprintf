@@ -409,7 +409,6 @@ enum _upf_token_kind {
     _UPF_TOK_ARROW,
     _UPF_TOK_NUMBER,
     _UPF_TOK_ID,
-    _UPF_TOK_STRING,
     _UPF_TOK_KEYWORD
 };
 
@@ -1929,7 +1928,6 @@ static const char *_upf_tok_to_str(enum _upf_token_kind kind) {
         case _UPF_TOK_ARROW:         return "arrow";
         case _UPF_TOK_NUMBER:        return "number";
         case _UPF_TOK_ID:            return "identifier";
-        case _UPF_TOK_STRING:        return "string";
         case _UPF_TOK_KEYWORD:       return "keyword";
     }
     // clang-format on
@@ -2006,23 +2004,6 @@ static _upf_tokenizer _upf_tokenize(const char *file, int line, const char *stri
             VECTOR_PUSH(&tokenizer.tokens, token);
 
             ch = end;
-            continue;
-        }
-
-        if (*ch == '"') {
-            ch++;
-
-            const char *end = ch;
-            while (*end != '"' && *end != '\0') end++;
-            assert(*end != '\0');  // C compiler won't allow this, so it must be a bug within the code
-
-            _upf_token token = {
-                .kind = _UPF_TOK_STRING,
-                .string = _upf_arena_string(&_upf_arena, ch, end),
-            };
-            VECTOR_PUSH(&tokenizer.tokens, token);
-
-            ch = end + 1;
             continue;
         }
 
@@ -2461,7 +2442,6 @@ __attribute__((noinline)) void _upf_uprintf(const char *file, int line, const ch
         if (*ch == '\0') break;
         ch++;  // Skip percent sign
 
-        // TODO: create a variable for '%' and/or 'S'?
         switch (*ch) {
             case '%':
                 bprintf("%%");
