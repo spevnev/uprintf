@@ -1,4 +1,5 @@
 // Usage and other information can be found in README at https://github.com/spevnev/uprintf
+// Bugs and suggestions can be submitted at https://github.com/spevnev/uprintf/issues
 
 // MIT License
 //
@@ -38,8 +39,6 @@
 
 #ifndef UPRINTF_H
 #define UPRINTF_H
-
-#include <stdint.h>
 
 void _upf_uprintf(const char *file, int line, const char *fmt, const char *args, ...);
 
@@ -260,8 +259,8 @@ typedef struct {
 } _upf_type;
 
 typedef struct {
-    uint64_t from;
-    uint64_t to;
+    uint64_t start;
+    uint64_t end;
 } _upf_range;
 
 VECTOR_TYPEDEF(_upf_range_vec, _upf_range);
@@ -330,8 +329,8 @@ struct _upf_dwarf {
     uint8_t offset_size;
     uint8_t address_size;
 
-    const uint8_t *info;
-    size_t info_size;
+    const uint8_t *die;
+    size_t die_size;
     const uint8_t *abbrev;
     const char *str;
     const char *line_str;
@@ -365,6 +364,7 @@ VECTOR_TYPEDEF(_upf_cu_vec, _upf_cu);
 typedef struct {
     char *buffer;
     size_t size;
+
     char *ptr;
     size_t free;
 } _upf_call_info;
@@ -397,34 +397,33 @@ struct _upf_arena {
     _upf_arena_region *head;
 };
 
-static void _upf_arena_init(struct _upf_arena *a) {
+static _upf_arena_region *_upf_arena_alloc_region(size_t capacity) {
     _upf_arena_region *region = (_upf_arena_region *) malloc(sizeof(*region));
     if (region == NULL) OUT_OF_MEMORY();
-    region->capacity = INITIAL_ARENA_SIZE;
-    region->data = (uint8_t *) malloc(region->capacity * sizeof(uint8_t));
+    region->capacity = capacity;
+    region->data = (uint8_t *) malloc(region->capacity * sizeof(*region->data));
     if (region->data == NULL) OUT_OF_MEMORY();
     region->length = 0;
     region->next = NULL;
+    return region;
+}
 
+static void _upf_arena_init(struct _upf_arena *a) {
+    ASSERT(a != NULL);
+
+    _upf_arena_region *region = _upf_arena_alloc_region(INITIAL_ARENA_SIZE);
     a->head = region;
     a->tail = region;
 }
 
 static void *_upf_arena_alloc(struct _upf_arena *a, size_t size) {
-    ASSERT(a->head != NULL && a->tail != NULL);
+    ASSERT(a != NULL && a->head != NULL && a->tail != NULL);
 
     size_t alignment = (a->head->length % sizeof(void *));
     if (alignment > 0) alignment = sizeof(void *) - alignment;
 
     if (alignment + size > a->head->capacity - a->head->length) {
-        _upf_arena_region *region = (_upf_arena_region *) malloc(sizeof(*region));
-        if (region == NULL) OUT_OF_MEMORY();
-        region->capacity = a->head->capacity * 2;
-        region->data = (uint8_t *) malloc(region->capacity * sizeof(uint8_t));
-        if (region->data == NULL) OUT_OF_MEMORY();
-        region->length = 0;
-        region->next = NULL;
-
+        _upf_arena_region *region = _upf_arena_alloc_region(a->head->capacity * 2);
         a->head->next = region;
         a->head = region;
         alignment = 0;
@@ -436,7 +435,7 @@ static void *_upf_arena_alloc(struct _upf_arena *a, size_t size) {
 }
 
 static void _upf_arena_free(struct _upf_arena *a) {
-    ASSERT(a->head != NULL && a->tail != NULL);
+    ASSERT(a != NULL && a->head != NULL && a->tail != NULL);
 
     _upf_arena_region *region = a->tail;
     while (region != NULL) {
@@ -454,6 +453,8 @@ static void _upf_arena_free(struct _upf_arena *a) {
 
 // Copies [begin, end) to arena-allocated string
 static char *_upf_arena_string(struct _upf_arena *a, const char *begin, const char *end) {
+    ASSERT(a != NULL && begin != NULL && end != NULL);
+
     size_t len = end - begin;
 
     char *string = (char *) _upf_arena_alloc(a, len + 2);
@@ -464,6 +465,8 @@ static char *_upf_arena_string(struct _upf_arena *a, const char *begin, const ch
 }
 
 static char *_upf_arena_concat2(struct _upf_arena *a, ...) {
+    ASSERT(a != NULL);
+
     va_list va_args;
 
     size_t size = 0;
@@ -499,6 +502,8 @@ static char *_upf_arena_concat2(struct _upf_arena *a, ...) {
 
 // Converts unsigned LEB128 to uint64_t and returns the size of LEB in bytes
 static size_t _upf_uLEB_to_uint64(const uint8_t *leb, uint64_t *result) {
+    ASSERT(leb != NULL && result != NULL);
+
     static const uint8_t BITS_MASK = 0x7f;      // 01111111
     static const uint8_t CONTINUE_MASK = 0x80;  // 10000000
 
@@ -518,6 +523,8 @@ static size_t _upf_uLEB_to_uint64(const uint8_t *leb, uint64_t *result) {
 
 // Converts signed LEB128 to int64_t and returns the size of LEB in bytes
 static size_t _upf_LEB_to_int64(const uint8_t *leb, int64_t *result) {
+    ASSERT(leb != NULL && result != NULL);
+
     static const uint8_t BITS_MASK = 0x7f;      // 01111111
     static const uint8_t CONTINUE_MASK = 0x80;  // 10000000
     static const uint8_t SIGN_MASK = 0x40;      // 01000000
@@ -539,7 +546,7 @@ static size_t _upf_LEB_to_int64(const uint8_t *leb, int64_t *result) {
 }
 
 static const _upf_abbrev *_upf_get_abbrev(const _upf_cu *cu, size_t code) {
-    ASSERT(code > 0 && code - 1 < cu->abbrevs.length);
+    ASSERT(cu != NULL && code > 0 && code - 1 < cu->abbrevs.length);
     return &cu->abbrevs.data[code - 1];
 }
 
@@ -550,14 +557,14 @@ static const _upf_type *_upf_get_type(size_t type_idx) {
 
 static bool _upf_is_in_range(uint64_t pc, _upf_range_vec ranges) {
     for (size_t i = 0; i < ranges.length; i++) {
-        if (ranges.data[i].from <= pc && pc < ranges.data[i].to) {
-            return true;
-        }
+        if (ranges.data[i].start <= pc && pc < ranges.data[i].end) return true;
     }
     return false;
 }
 
 static bool _upf_is_primitive(const _upf_type *type) {
+    ASSERT(type != NULL);
+
     switch (type->kind) {
         case _UPF_TK_STRUCT:
         case _UPF_TK_UNION:
@@ -587,19 +594,25 @@ static bool _upf_is_primitive(const _upf_type *type) {
 
 // ================== DWARF PARSING =======================
 
-static uint64_t _upf_offset_cast(const uint8_t *info) {
+static uint64_t _upf_offset_cast(const uint8_t *die) {
+    ASSERT(die != NULL);
+
     uint64_t offset = 0;
-    memcpy(&offset, info, _upf_dwarf.offset_size);
+    memcpy(&offset, die, _upf_dwarf.offset_size);
     return offset;
 }
 
-static uint64_t _upf_address_cast(const uint8_t *info) {
+static uint64_t _upf_address_cast(const uint8_t *die) {
+    ASSERT(die != NULL);
+
     uint64_t address = 0;
-    memcpy(&address, info, _upf_dwarf.address_size);
+    memcpy(&address, die, _upf_dwarf.address_size);
     return address;
 }
 
-static size_t _upf_get_attr_size(const uint8_t *info, uint64_t form) {
+static size_t _upf_get_attr_size(const uint8_t *die, uint64_t form) {
+    ASSERT(die != NULL);
+
     switch (form) {
         case DW_FORM_addr:
             return _upf_dwarf.address_size;
@@ -634,7 +647,7 @@ static size_t _upf_get_attr_size(const uint8_t *info, uint64_t form) {
             return 16;
         case DW_FORM_sdata: {
             int64_t result;
-            return _upf_LEB_to_int64(info, &result);
+            return _upf_LEB_to_int64(die, &result);
         } break;
         case DW_FORM_loclistx:
         case DW_FORM_rnglistx:
@@ -643,14 +656,14 @@ static size_t _upf_get_attr_size(const uint8_t *info, uint64_t form) {
         case DW_FORM_ref_udata:
         case DW_FORM_udata: {
             uint64_t result;
-            return _upf_uLEB_to_uint64(info, &result);
+            return _upf_uLEB_to_uint64(die, &result);
         } break;
         case DW_FORM_string:
-            return strlen((const char *) info) + 1;
+            return strlen((const char *) die) + 1;
         case DW_FORM_exprloc:
         case DW_FORM_block: {
             uint64_t length;
-            size_t leb_size = _upf_uLEB_to_uint64(info, &length);
+            size_t leb_size = _upf_uLEB_to_uint64(die, &length);
             return leb_size + length;
         } break;
         case DW_FORM_line_strp:
@@ -661,8 +674,8 @@ static size_t _upf_get_attr_size(const uint8_t *info, uint64_t form) {
             return _upf_dwarf.offset_size;
         case DW_FORM_indirect: {
             uint64_t form;
-            size_t offset = _upf_uLEB_to_uint64(info, &form);
-            return _upf_get_attr_size(info + offset, form);
+            size_t offset = _upf_uLEB_to_uint64(die, &form);
+            return _upf_get_attr_size(die + offset, form);
         } break;
         case DW_FORM_flag_present:
         case DW_FORM_implicit_const:
@@ -671,66 +684,72 @@ static size_t _upf_get_attr_size(const uint8_t *info, uint64_t form) {
     UNREACHABLE();
 }
 
-static uint64_t _upf_get_x_offset(const uint8_t *info, uint64_t form) {
+static uint64_t _upf_get_x_offset(const uint8_t *die, uint64_t form) {
+    ASSERT(die != NULL);
+
     uint64_t offset = 0;
     switch (form) {
         case DW_FORM_strx1:
         case DW_FORM_addrx1:
-            memcpy(&offset, info, 1);
+            memcpy(&offset, die, 1);
             return offset;
         case DW_FORM_strx2:
         case DW_FORM_addrx2:
-            memcpy(&offset, info, 2);
+            memcpy(&offset, die, 2);
             return offset;
         case DW_FORM_strx3:
         case DW_FORM_addrx3:
-            memcpy(&offset, info, 3);
+            memcpy(&offset, die, 3);
             return offset;
         case DW_FORM_strx4:
         case DW_FORM_addrx4:
-            memcpy(&offset, info, 4);
+            memcpy(&offset, die, 4);
             return offset;
         case DW_FORM_addrx:
         case DW_FORM_strx:
-            _upf_uLEB_to_uint64(info, &offset);
+            _upf_uLEB_to_uint64(die, &offset);
             return offset;
     }
     UNREACHABLE();
 }
 
-static const char *_upf_get_str(const _upf_cu *cu, const uint8_t *info, uint64_t form) {
+static const char *_upf_get_str(const _upf_cu *cu, const uint8_t *die, uint64_t form) {
+    ASSERT(cu != NULL && die != NULL);
+
     switch (form) {
         case DW_FORM_strp:
-            return _upf_dwarf.str + _upf_offset_cast(info);
+            return _upf_dwarf.str + _upf_offset_cast(die);
         case DW_FORM_line_strp:
-            assert(_upf_dwarf.line_str != NULL);
-            return _upf_dwarf.line_str + _upf_offset_cast(info);
+            ASSERT(_upf_dwarf.line_str != NULL);
+            return _upf_dwarf.line_str + _upf_offset_cast(die);
         case DW_FORM_string:
-            return (const char *) info;
+            return (const char *) die;
         case DW_FORM_strx:
         case DW_FORM_strx1:
         case DW_FORM_strx2:
         case DW_FORM_strx3:
         case DW_FORM_strx4: {
-            assert(_upf_dwarf.str_offsets != NULL && cu->str_offsets_base != INVALID);
-            uint64_t offset = _upf_get_x_offset(info, form) * _upf_dwarf.offset_size;
+            ASSERT(_upf_dwarf.str_offsets != NULL && cu->str_offsets_base != INVALID);
+            uint64_t offset = _upf_get_x_offset(die, form) * _upf_dwarf.offset_size;
             return _upf_dwarf.str + _upf_offset_cast(_upf_dwarf.str_offsets + cu->str_offsets_base + offset);
         }
     }
     UNREACHABLE();
 }
 
-static uint64_t _upf_get_ref(const uint8_t *info, uint64_t form) {
+static uint64_t _upf_get_ref(const uint8_t *die, uint64_t form) {
+    ASSERT(die != NULL);
+
     uint64_t ref = 0;
     switch (form) {
         case DW_FORM_ref1:
         case DW_FORM_ref2:
         case DW_FORM_ref4:
         case DW_FORM_ref8:
-            memcpy(&ref, info, _upf_get_attr_size(info, form));
+            memcpy(&ref, die, _upf_get_attr_size(die, form));
             return ref;
         case DW_FORM_ref_udata:
-            _upf_uLEB_to_uint64(info, &ref);
+            _upf_uLEB_to_uint64(die, &ref);
             return ref;
     }
     ERROR("Only references within single compilation unit are supported.");
@@ -752,14 +771,16 @@ static bool _upf_is_data(uint64_t form) {
     }
 }
 
-static int64_t _upf_get_data(const uint8_t *info, _upf_attr attr) {
+static int64_t _upf_get_data(const uint8_t *die, _upf_attr attr) {
+    ASSERT(die != NULL);
+
     switch (attr.form) {
         case DW_FORM_data1:
         case DW_FORM_data2:
         case DW_FORM_data4:
         case DW_FORM_data8: {
             int64_t data = 0;
-            memcpy(&data, info, _upf_get_attr_size(info, attr.form));
+            memcpy(&data, die, _upf_get_attr_size(die, attr.form));
             return data;
         } break;
         case DW_FORM_data16:
@@ -768,12 +789,12 @@ static int64_t _upf_get_data(const uint8_t *info, _upf_attr attr) {
             return attr.implicit_const;
         case DW_FORM_sdata: {
             int64_t data = 0;
-            _upf_LEB_to_int64(info, &data);
+            _upf_LEB_to_int64(die, &data);
             return data;
         } break;
         case DW_FORM_udata: {
             uint64_t data = 0;
-            _upf_uLEB_to_uint64(info, &data);
+            _upf_uLEB_to_uint64(die, &data);
             return data;
         } break;
     }
@@ -794,29 +815,33 @@ static bool _upf_is_addr(uint64_t form) {
     }
 }
 
-static uint64_t _upf_get_addr(const _upf_cu *cu, const uint8_t *info, uint64_t form) {
+static uint64_t _upf_get_addr(const _upf_cu *cu, const uint8_t *die, uint64_t form) {
+    ASSERT(cu != NULL && die != NULL);
+
     switch (form) {
         case DW_FORM_addr:
-            return _upf_address_cast(info);
+            return _upf_address_cast(die);
         case DW_FORM_addrx1:
         case DW_FORM_addrx2:
         case DW_FORM_addrx3:
         case DW_FORM_addrx4:
         case DW_FORM_addrx: {
-            assert(_upf_dwarf.addr != NULL);
-            uint64_t offset = cu->addr_base + _upf_get_x_offset(info, form) * _upf_dwarf.address_size;
+            ASSERT(_upf_dwarf.addr != NULL);
+            uint64_t offset = cu->addr_base + _upf_get_x_offset(die, form) * _upf_dwarf.address_size;
             return _upf_address_cast(_upf_dwarf.addr + offset);
         }
     }
     UNREACHABLE();
 }
 
-static const uint8_t *_upf_skip_die(const uint8_t *info, const _upf_abbrev *abbrev) {
+static const uint8_t *_upf_skip_die(const uint8_t *die, const _upf_abbrev *abbrev) {
+    ASSERT(die != NULL && abbrev != NULL);
+
     for (size_t i = 0; i < abbrev->attrs.length; i++) {
-        info += _upf_get_attr_size(info, abbrev->attrs.data[i].form);
+        die += _upf_get_attr_size(die, abbrev->attrs.data[i].form);
     }
 
-    return info;
+    return die;
 }
 
 static enum _upf_type_kind _upf_get_type_kind(int64_t encoding, int64_t size) {
@@ -909,26 +934,27 @@ static enum _upf_type_kind _upf_get_type_kind(int64_t encoding, int64_t size) {
 }
 
 static int _upf_get_type_modifier(uint64_t tag) {
+    // clang-format off
     switch (tag) {
-        case DW_TAG_const_type:
-            return MOD_CONST;
-        case DW_TAG_volatile_type:
-            return MOD_VOLATILE;
-        case DW_TAG_restrict_type:
-            return MOD_RESTRICT;
-        case DW_TAG_atomic_type:
-            return MOD_ATOMIC;
+        case DW_TAG_const_type:    return MOD_CONST;
+        case DW_TAG_volatile_type: return MOD_VOLATILE;
+        case DW_TAG_restrict_type: return MOD_RESTRICT;
+        case DW_TAG_atomic_type:   return MOD_ATOMIC;
     }
+    // clang-format on
     UNREACHABLE();
 }
 
 static _upf_type _upf_get_subarray(const _upf_type *array, int count) {
+    ASSERT(array != NULL);
+
     _upf_type subarray = *array;
     if (array->name != NULL) {
         subarray.name = _upf_arena_string(&_upf_arena, array->name, array->name + strlen(array->name) - 2 * count);
     }
     subarray.as.array.lengths.length -= count;
     subarray.as.array.lengths.data += count;
+
     return subarray;
 }
 
@@ -942,17 +968,17 @@ static size_t _upf_add_type(const uint8_t *type_die, _upf_type type) {
     return _upf_type_map.length - 1;
 }
 
-static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
+static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
+    ASSERT(cu != NULL && die != NULL);
+
     for (size_t i = 0; i < _upf_type_map.length; i++) {
-        if (_upf_type_map.data[i].die == info) {
-            return i;
-        }
+        if (_upf_type_map.data[i].die == die) return i;
     }
 
-    const uint8_t *base = info;
+    const uint8_t *base = die;
 
     uint64_t code;
-    info += _upf_uLEB_to_uint64(info, &code);
+    die += _upf_uLEB_to_uint64(die, &code);
     const _upf_abbrev *abbrev = _upf_get_abbrev(cu, code);
 
     const char *name = NULL;
@@ -963,19 +989,19 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
         _upf_attr attr = abbrev->attrs.data[i];
 
         if (attr.name == DW_AT_name) {
-            name = _upf_get_str(cu, info, attr.form);
+            name = _upf_get_str(cu, die, attr.form);
         } else if (attr.name == DW_AT_type) {
-            subtype_offset = _upf_get_ref(info, attr.form);
+            subtype_offset = _upf_get_ref(die, attr.form);
         } else if (attr.name == DW_AT_byte_size) {
             if (_upf_is_data(attr.form)) {
-                size = _upf_get_data(info, attr);
+                size = _upf_get_data(die, attr);
             } else {
                 WARN("Non-constant type sizes aren't supported. Marking size as unknown.");
             }
         } else if (attr.name == DW_AT_encoding) {
-            encoding = _upf_get_data(info, attr);
+            encoding = _upf_get_data(die, attr);
         }
-        info += _upf_get_attr_size(info, attr.form);
+        die += _upf_get_attr_size(die, attr.form);
     }
 
     switch (abbrev->tag) {
@@ -1000,7 +1026,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
 
             size_t array_size = element_type->size;
             while (1) {
-                info += _upf_uLEB_to_uint64(info, &code);
+                die += _upf_uLEB_to_uint64(die, &code);
                 if (code == 0) break;
 
                 abbrev = _upf_get_abbrev(cu, code);
@@ -1016,14 +1042,14 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
 
                     if (attr.name == DW_AT_count || attr.name == DW_AT_upper_bound) {
                         if (_upf_is_data(attr.form)) {
-                            length = _upf_get_data(info, attr);
+                            length = _upf_get_data(die, attr);
                             if (attr.name == DW_AT_upper_bound) length++;
                         } else {
                             WARN("Non-constant array lengths aren't supported. Marking it unknown.");
                         }
                     }
 
-                    info += _upf_get_attr_size(info, attr.form);
+                    die += _upf_get_attr_size(die, attr.form);
                 }
                 ASSERT(length != INVALID);
 
@@ -1053,12 +1079,10 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
                 },
             };
 
-            if (type.size == INVALID) {
-                type.size = _upf_get_type(type.as.cenum.underlying_type)->size;
-            }
+            if (type.size == INVALID) type.size = _upf_get_type(type.as.cenum.underlying_type)->size;
 
             while (1) {
-                info += _upf_uLEB_to_uint64(info, &code);
+                die += _upf_uLEB_to_uint64(die, &code);
                 if (code == 0) break;
 
                 abbrev = _upf_get_abbrev(cu, code);
@@ -1073,18 +1097,18 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
                     _upf_attr attr = abbrev->attrs.data[i];
 
                     if (attr.name == DW_AT_name) {
-                        cenum.name = _upf_get_str(cu, info, attr.form);
+                        cenum.name = _upf_get_str(cu, die, attr.form);
                     } else if (attr.name == DW_AT_const_value) {
                         if (!_upf_is_data(attr.form)) {
                             WARN("Expected enum value to be of data class. Ignoring this type.");
                             goto unknown_type;
                         }
 
-                        cenum.value = _upf_get_data(info, attr);
+                        cenum.value = _upf_get_data(die, attr);
                         found_value = true;
                     }
 
-                    info += _upf_get_attr_size(info, attr.form);
+                    die += _upf_get_attr_size(die, attr.form);
                 }
                 ASSERT(cenum.name != NULL && found_value);
 
@@ -1129,12 +1153,12 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
             };
 
             while (1) {
-                info += _upf_uLEB_to_uint64(info, &code);
+                die += _upf_uLEB_to_uint64(die, &code);
                 if (code == 0) break;
 
                 abbrev = _upf_get_abbrev(cu, code);
                 if (abbrev->tag != DW_TAG_member) {
-                    info = _upf_skip_die(info, abbrev);
+                    die = _upf_skip_die(die, abbrev);
                     continue;
                 }
 
@@ -1147,15 +1171,15 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
                     _upf_attr attr = abbrev->attrs.data[i];
 
                     if (attr.name == DW_AT_name) {
-                        member.name = _upf_get_str(cu, info, attr.form);
+                        member.name = _upf_get_str(cu, die, attr.form);
                     } else if (attr.name == DW_AT_type) {
-                        const uint8_t *type_die = cu->base + _upf_get_ref(info, attr.form);
+                        const uint8_t *type_die = cu->base + _upf_get_ref(die, attr.form);
                         member.type = _upf_parse_type(cu, type_die);
                     } else if (attr.name == DW_AT_data_member_location) {
-                        member.offset = _upf_get_data(info, attr);
+                        member.offset = _upf_get_data(die, attr);
                     }
 
-                    info += _upf_get_attr_size(info, attr.form);
+                    die += _upf_get_attr_size(die, attr.form);
                 }
                 ASSERT(member.name != NULL && member.type != INVALID && member.offset != INVALID);
 
@@ -1222,16 +1246,16 @@ unknown_type:
     return _upf_add_type(base, type);
 }
 
-static _upf_range_vec _upf_get_ranges(const _upf_cu *cu, const uint8_t *info, uint64_t form) {
-    assert(_upf_dwarf.rnglists != NULL);
+static _upf_range_vec _upf_get_ranges(const _upf_cu *cu, const uint8_t *die, uint64_t form) {
+    ASSERT(cu != NULL && die != NULL && _upf_dwarf.rnglists != NULL);
 
     const uint8_t *rnglist = NULL;
     if (form == DW_FORM_sec_offset) {
-        rnglist = _upf_dwarf.rnglists + _upf_offset_cast(info);
+        rnglist = _upf_dwarf.rnglists + _upf_offset_cast(die);
     } else {
-        assert(cu->rnglists_base != INVALID);
+        ASSERT(cu->rnglists_base != INVALID);
         uint64_t index;
-        _upf_uLEB_to_uint64(info, &index);
+        _upf_uLEB_to_uint64(die, &index);
         uint64_t rnglist_offset = _upf_offset_cast(_upf_dwarf.rnglists + cu->rnglists_base + index * _upf_dwarf.offset_size);
         rnglist = _upf_dwarf.rnglists + cu->rnglists_base + rnglist_offset;
     }
@@ -1239,7 +1263,7 @@ static _upf_range_vec _upf_get_ranges(const _upf_cu *cu, const uint8_t *info, ui
 
     uint64_t base = 0;
     if (cu->scope.ranges.length == 1) {
-        base = cu->scope.ranges.data[0].from;
+        base = cu->scope.ranges.data[0].start;
     }
 
     _upf_range_vec ranges = VECTOR_NEW(&_upf_arena);
@@ -1250,14 +1274,14 @@ static _upf_range_vec _upf_get_ranges(const _upf_cu *cu, const uint8_t *info, ui
                 rnglist += _upf_get_attr_size(rnglist, DW_FORM_addrx);
                 break;
             case DW_RLE_startx_endx: {
-                uint64_t from = _upf_get_addr(cu, rnglist, DW_FORM_addrx);
+                uint64_t start = _upf_get_addr(cu, rnglist, DW_FORM_addrx);
                 rnglist += _upf_get_attr_size(rnglist, DW_FORM_addrx);
-                uint64_t to = _upf_get_addr(cu, rnglist, DW_FORM_addrx);
+                uint64_t end = _upf_get_addr(cu, rnglist, DW_FORM_addrx);
                 rnglist += _upf_get_attr_size(rnglist, DW_FORM_addrx);
 
                 _upf_range range = {
-                    .from = from,
-                    .to = to,
+                    .start = start,
+                    .end = end,
                 };
 
                 VECTOR_PUSH(&ranges, range);
@@ -1269,20 +1293,20 @@ static _upf_range_vec _upf_get_ranges(const _upf_cu *cu, const uint8_t *info, ui
                 rnglist += _upf_get_attr_size(rnglist, DW_FORM_addrx);
 
                 _upf_range range = {
-                    .from = address,
-                    .to = address + length,
+                    .start = address,
+                    .end = address + length,
                 };
 
                 VECTOR_PUSH(&ranges, range);
             } break;
             case DW_RLE_offset_pair: {
-                uint64_t from, to;
-                rnglist += _upf_uLEB_to_uint64(rnglist, &from);
-                rnglist += _upf_uLEB_to_uint64(rnglist, &to);
+                uint64_t start, end;
+                rnglist += _upf_uLEB_to_uint64(rnglist, &start);
+                rnglist += _upf_uLEB_to_uint64(rnglist, &end);
 
                 _upf_range range = {
-                    .from = base + from,
-                    .to = base + to,
+                    .start = base + start,
+                    .end = base + end,
                 };
 
                 VECTOR_PUSH(&ranges, range);
@@ -1292,14 +1316,14 @@ static _upf_range_vec _upf_get_ranges(const _upf_cu *cu, const uint8_t *info, ui
                 rnglist += _upf_dwarf.address_size;
                 break;
             case DW_RLE_start_end: {
-                uint64_t from = _upf_address_cast(rnglist);
+                uint64_t start = _upf_address_cast(rnglist);
                 rnglist += _upf_dwarf.address_size;
-                uint64_t to = _upf_address_cast(rnglist);
+                uint64_t end = _upf_address_cast(rnglist);
                 rnglist += _upf_dwarf.address_size;
 
                 _upf_range range = {
-                    .from = from,
-                    .to = to,
+                    .start = start,
+                    .end = end,
                 };
 
                 VECTOR_PUSH(&ranges, range);
@@ -1311,8 +1335,8 @@ static _upf_range_vec _upf_get_ranges(const _upf_cu *cu, const uint8_t *info, ui
                 rnglist += _upf_uLEB_to_uint64(rnglist, &length);
 
                 _upf_range range = {
-                    .from = address,
-                    .to = address + length,
+                    .start = address,
+                    .end = address + length,
                 };
 
                 VECTOR_PUSH(&ranges, range);
@@ -1326,9 +1350,11 @@ static _upf_range_vec _upf_get_ranges(const _upf_cu *cu, const uint8_t *info, ui
     return ranges;
 }
 
-static _upf_named_type _upf_get_var(const _upf_cu *cu, const uint8_t *info) {
+static _upf_named_type _upf_get_var(const _upf_cu *cu, const uint8_t *die) {
+    ASSERT(cu != NULL && die != NULL);
+
     uint64_t code;
-    info += _upf_uLEB_to_uint64(info, &code);
+    die += _upf_uLEB_to_uint64(die, &code);
     const _upf_abbrev *abbrev = _upf_get_abbrev(cu, code);
 
     _upf_named_type var = {
@@ -1339,23 +1365,23 @@ static _upf_named_type _upf_get_var(const _upf_cu *cu, const uint8_t *info) {
         _upf_attr attr = abbrev->attrs.data[i];
 
         if (attr.name == DW_AT_name) {
-            var.name = _upf_get_str(cu, info, attr.form);
+            var.name = _upf_get_str(cu, die, attr.form);
         } else if (attr.name == DW_AT_type) {
-            var.die = cu->base + _upf_get_ref(info, attr.form);
+            var.die = cu->base + _upf_get_ref(die, attr.form);
         } else if (attr.name == DW_AT_abstract_origin) {
-            const uint8_t *new_info = cu->base + _upf_get_ref(info, attr.form);
-            return _upf_get_var(cu, new_info);
+            return _upf_get_var(cu, cu->base + _upf_get_ref(die, attr.form));
         }
 
-        info += _upf_get_attr_size(info, attr.form);
+        die += _upf_get_attr_size(die, attr.form);
     }
 
     return var;
 }
 
 static _upf_abbrev_vec _upf_parse_abbrevs(const uint8_t *abbrev_table) {
-    _upf_abbrev_vec abbrevs = VECTOR_NEW(&_upf_arena);
+    ASSERT(abbrev_table != NULL);
 
+    _upf_abbrev_vec abbrevs = VECTOR_NEW(&_upf_arena);
     while (1) {
         _upf_abbrev abbrev = {
             .attrs = VECTOR_NEW(&_upf_arena),
@@ -1365,7 +1391,7 @@ static _upf_abbrev_vec _upf_parse_abbrevs(const uint8_t *abbrev_table) {
         abbrev_table += _upf_uLEB_to_uint64(abbrev_table, &abbrev.tag);
 
         abbrev.has_children = *abbrev_table;
-        abbrev_table += sizeof(uint8_t);
+        abbrev_table += sizeof(abbrev.has_children);
 
         while (1) {
             _upf_attr attr = {0};
@@ -1394,27 +1420,29 @@ static bool _upf_is_language_c(int64_t language) {
     }
 }
 
-static _upf_range_vec _upf_get_cu_ranges(const _upf_cu *cu, const uint8_t *low_pc_info, _upf_attr low_pc_attr, const uint8_t *high_pc_info,
-                                         _upf_attr high_pc_attr, const uint8_t *ranges_info, _upf_attr ranges_attr) {
-    if (ranges_info != NULL) return _upf_get_ranges(cu, ranges_info, ranges_attr.form);
+static _upf_range_vec _upf_get_cu_ranges(const _upf_cu *cu, const uint8_t *low_pc_die, _upf_attr low_pc_attr, const uint8_t *high_pc_die,
+                                         _upf_attr high_pc_attr, const uint8_t *ranges_die, _upf_attr ranges_attr) {
+    ASSERT(cu != NULL);
+
+    if (ranges_die != NULL) return _upf_get_ranges(cu, ranges_die, ranges_attr.form);
 
     _upf_range_vec ranges = VECTOR_NEW(&_upf_arena);
     _upf_range range = {
-        .from = INVALID,
-        .to = INVALID,
+        .start = INVALID,
+        .end = INVALID,
     };
 
-    if (low_pc_info == NULL) {
+    if (low_pc_die == NULL) {
         VECTOR_PUSH(&ranges, range);
         return ranges;
     }
 
-    range.from = _upf_get_addr(cu, low_pc_info, low_pc_attr.form);
-    if (high_pc_info != NULL) {
+    range.start = _upf_get_addr(cu, low_pc_die, low_pc_attr.form);
+    if (high_pc_die != NULL) {
         if (_upf_is_addr(high_pc_attr.form)) {
-            range.to = _upf_get_addr(cu, high_pc_info, high_pc_attr.form);
+            range.end = _upf_get_addr(cu, high_pc_die, high_pc_attr.form);
         } else {
-            range.to = range.from + _upf_get_data(high_pc_info, high_pc_attr);
+            range.end = range.start + _upf_get_data(high_pc_die, high_pc_attr);
         }
     }
 
@@ -1422,8 +1450,10 @@ static _upf_range_vec _upf_get_cu_ranges(const _upf_cu *cu, const uint8_t *low_p
     return ranges;
 }
 
-static void _upf_parse_cu_scope(const _upf_cu *cu, _upf_scope_stack *scope_stack, int depth, const uint8_t *info,
+static void _upf_parse_cu_scope(const _upf_cu *cu, _upf_scope_stack *scope_stack, int depth, const uint8_t *die,
                                 const _upf_abbrev *abbrev) {
+    ASSERT(cu != NULL && scope_stack != NULL && die != NULL && abbrev != NULL);
+
     if (!abbrev->has_children) return;
     ASSERT(scope_stack->length > 0);
 
@@ -1434,35 +1464,35 @@ static void _upf_parse_cu_scope(const _upf_cu *cu, _upf_scope_stack *scope_stack
     };
 
     uint64_t low_pc = INVALID;
-    const uint8_t *high_pc_info = NULL;
+    const uint8_t *high_pc_die = NULL;
     _upf_attr high_pc_attr = {0};
     for (size_t i = 0; i < abbrev->attrs.length; i++) {
         _upf_attr attr = abbrev->attrs.data[i];
 
         if (attr.name == DW_AT_low_pc) {
-            low_pc = _upf_get_addr(cu, info, attr.form);
+            low_pc = _upf_get_addr(cu, die, attr.form);
         } else if (attr.name == DW_AT_high_pc) {
-            high_pc_info = info;
+            high_pc_die = die;
             high_pc_attr = attr;
         } else if (attr.name == DW_AT_ranges) {
-            new_scope.ranges = _upf_get_ranges(cu, info, attr.form);
+            new_scope.ranges = _upf_get_ranges(cu, die, attr.form);
         }
 
-        info += _upf_get_attr_size(info, attr.form);
+        die += _upf_get_attr_size(die, attr.form);
     }
 
     if (low_pc != INVALID) {
-        if (high_pc_info == NULL) ERROR("Expected CU to have both low and high PC.");
+        if (high_pc_die == NULL) ERROR("Expected CU to have both low and high PC.");
 
         _upf_range range = {
-            .from = low_pc,
-            .to = INVALID,
+            .start = low_pc,
+            .end = INVALID,
         };
 
         if (_upf_is_addr(high_pc_attr.form)) {
-            range.to = _upf_get_addr(cu, high_pc_info, high_pc_attr.form);
+            range.end = _upf_get_addr(cu, high_pc_die, high_pc_attr.form);
         } else {
-            range.to = low_pc + _upf_get_data(high_pc_info, high_pc_attr);
+            range.end = low_pc + _upf_get_data(high_pc_die, high_pc_attr);
         }
 
         VECTOR_PUSH(&new_scope.ranges, range);
@@ -1489,30 +1519,36 @@ static void _upf_parse_cu_scope(const _upf_cu *cu, _upf_scope_stack *scope_stack
     VECTOR_PUSH(scope_stack, stack_entry);
 }
 
-static void _upf_parse_cu_var(const _upf_cu *cu, _upf_scope_stack *scope_stack, const uint8_t *die_base) {
-    ASSERT(scope_stack->length > 0);
+static void _upf_parse_cu_var(const _upf_cu *cu, _upf_scope_stack *scope_stack, const uint8_t *die) {
+    ASSERT(cu != NULL && scope_stack != NULL && die != NULL && scope_stack->length > 0);
+
     if (VECTOR_TOP(scope_stack).scope == NULL) return;
 
-    _upf_named_type var = _upf_get_var(cu, die_base);
+    _upf_named_type var = _upf_get_var(cu, die);
     if (var.name == NULL) return;
+    if (var.die == NULL) {
+        ERROR("Unable to find variable DIE. Ensure that the executable contains debugging information of at least 2nd level (-g2 or -g3).");
+    }
 
-    ASSERT(var.die != NULL);
     VECTOR_PUSH(&VECTOR_TOP(scope_stack).scope->vars, var);
 }
 
 static void _upf_parse_cu_type(_upf_cu *cu, const uint8_t *die) {
-    const uint8_t *info = die;
+    ASSERT(cu != NULL && die != NULL);
+
+    const uint8_t *die_base = die;
+
     uint64_t code;
-    info += _upf_uLEB_to_uint64(info, &code);
+    die += _upf_uLEB_to_uint64(die, &code);
     const _upf_abbrev *abbrev = _upf_get_abbrev(cu, code);
 
     const char *name = NULL;
     for (size_t i = 0; i < abbrev->attrs.length; i++) {
         _upf_attr attr = abbrev->attrs.data[i];
 
-        if (attr.name == DW_AT_name) name = _upf_get_str(cu, info, attr.form);
+        if (attr.name == DW_AT_name) name = _upf_get_str(cu, die, attr.form);
 
-        info += _upf_get_attr_size(info, attr.form);
+        die += _upf_get_attr_size(die, attr.form);
     }
     if (abbrev->tag == DW_TAG_pointer_type) {
         if (name) return;
@@ -1521,13 +1557,15 @@ static void _upf_parse_cu_type(_upf_cu *cu, const uint8_t *die) {
     if (name == NULL) return;
 
     _upf_named_type type = {
-        .die = die,
+        .die = die_base,
         .name = name,
     };
     VECTOR_PUSH(&cu->types, type);
 }
 
-static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *info, const uint8_t *info_end, const uint8_t *abbrev_table) {
+static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *die, const uint8_t *die_end, const uint8_t *abbrev_table) {
+    ASSERT(cu_base != NULL && die != NULL && die_end != NULL && abbrev_table != NULL);
+
     _upf_cu cu = {
         .base = cu_base,
         .abbrevs = _upf_parse_abbrevs(abbrev_table),
@@ -1543,44 +1581,44 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *info, const uin
     };
 
     uint64_t code;
-    info += _upf_uLEB_to_uint64(info, &code);
+    die += _upf_uLEB_to_uint64(die, &code);
     const _upf_abbrev *abbrev = _upf_get_abbrev(&cu, code);
     ASSERT(abbrev->tag == DW_TAG_compile_unit);
 
     // Save to parse after the initializing addr_base, str_offsets, and rnglists_base
-    const uint8_t *low_pc_info = NULL;
+    const uint8_t *low_pc_die = NULL;
     _upf_attr low_pc_attr = {0};
-    const uint8_t *high_pc_info = NULL;
+    const uint8_t *high_pc_die = NULL;
     _upf_attr high_pc_attr = {0};
-    const uint8_t *ranges_info = NULL;
+    const uint8_t *ranges_die = NULL;
     _upf_attr ranges_attr = {0};
     for (size_t i = 0; i < abbrev->attrs.length; i++) {
         _upf_attr attr = abbrev->attrs.data[i];
 
         if (attr.name == DW_AT_low_pc) {
             low_pc_attr = attr;
-            low_pc_info = info;
+            low_pc_die = die;
         } else if (attr.name == DW_AT_high_pc) {
             high_pc_attr = attr;
-            high_pc_info = info;
+            high_pc_die = die;
         } else if (attr.name == DW_AT_ranges) {
             ranges_attr = attr;
-            ranges_info = info;
+            ranges_die = die;
         } else if (attr.name == DW_AT_addr_base) {
-            cu.addr_base = _upf_offset_cast(info);
+            cu.addr_base = _upf_offset_cast(die);
         } else if (attr.name == DW_AT_str_offsets_base) {
-            cu.str_offsets_base = _upf_offset_cast(info);
+            cu.str_offsets_base = _upf_offset_cast(die);
         } else if (attr.name == DW_AT_rnglists_base) {
-            cu.rnglists_base = _upf_offset_cast(info);
+            cu.rnglists_base = _upf_offset_cast(die);
         } else if (attr.name == DW_AT_language) {
-            int64_t language = _upf_get_data(info, attr);
+            int64_t language = _upf_get_data(die, attr);
             if (!_upf_is_language_c(language)) return;
         }
 
-        info += _upf_get_attr_size(info, attr.form);
+        die += _upf_get_attr_size(die, attr.form);
     }
 
-    cu.scope.ranges = _upf_get_cu_ranges(&cu, low_pc_info, low_pc_attr, high_pc_info, high_pc_attr, ranges_info, ranges_attr);
+    cu.scope.ranges = _upf_get_cu_ranges(&cu, low_pc_die, low_pc_attr, high_pc_die, high_pc_attr, ranges_die, ranges_attr);
 
     int depth = 0;
     _upf_scope_stack scope_stack = VECTOR_NEW(&_upf_arena);
@@ -1590,10 +1628,10 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *info, const uin
     stack_entry.scope = &cu.scope;
     VECTOR_PUSH(&scope_stack, stack_entry);
 
-    while (info < info_end) {
-        const uint8_t *die_base = info;
+    while (die < die_end) {
+        const uint8_t *die_base = die;
 
-        info += _upf_uLEB_to_uint64(info, &code);
+        die += _upf_uLEB_to_uint64(die, &code);
         if (code == 0) {
             ASSERT(scope_stack.length > 0);
             if (depth == VECTOR_TOP(&scope_stack).depth) VECTOR_POP(&scope_stack);
@@ -1608,7 +1646,7 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *info, const uin
             case DW_TAG_lexical_block:
             case DW_TAG_subprogram:
             case DW_TAG_inlined_subroutine:
-                _upf_parse_cu_scope(&cu, &scope_stack, depth, info, abbrev);
+                _upf_parse_cu_scope(&cu, &scope_stack, depth, die, abbrev);
                 break;
             case DW_TAG_variable:
             case DW_TAG_formal_parameter:
@@ -1625,26 +1663,26 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *info, const uin
                 break;
         }
 
-        info = _upf_skip_die(info, abbrev);
+        die = _upf_skip_die(die, abbrev);
     }
 
     ASSERT(cu.scope.scopes.length > 0);
     if (cu.scope.ranges.length == 1) {
         _upf_range *range = &cu.scope.ranges.data[0];
 
-        if (range->from == INVALID) {
+        if (range->start == INVALID) {
             if (cu.scope.scopes.data[0].ranges.length == 0) {
-                range->from = 0;
+                range->start = 0;
             } else {
-                range->from = cu.scope.scopes.data[0].ranges.data[0].from;
+                range->start = cu.scope.scopes.data[0].ranges.data[0].start;
             }
         }
 
-        if (range->to == INVALID) {
+        if (range->end == INVALID) {
             if (VECTOR_TOP(&cu.scope.scopes).ranges.length == 0) {
-                range->to = UINT64_MAX;
+                range->end = UINT64_MAX;
             } else {
-                range->to = VECTOR_TOP(&VECTOR_TOP(&cu.scope.scopes).ranges).to;
+                range->end = VECTOR_TOP(&VECTOR_TOP(&cu.scope.scopes).ranges).end;
             }
         }
     }
@@ -1653,46 +1691,46 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *info, const uin
 }
 
 static void _upf_parse_dwarf(void) {
-    const uint8_t *info = _upf_dwarf.info;
-    const uint8_t *info_end = info + _upf_dwarf.info_size;
-    while (info < info_end) {
-        const uint8_t *cu_base = info;
+    const uint8_t *die = _upf_dwarf.die;
+    const uint8_t *die_end = die + _upf_dwarf.die_size;
+    while (die < die_end) {
+        const uint8_t *cu_base = die;
 
         uint64_t length = 0;
-        memcpy(&length, info, sizeof(uint32_t));
-        info += sizeof(uint32_t);
+        memcpy(&length, die, sizeof(uint32_t));
+        die += sizeof(uint32_t);
 
         _upf_dwarf.is64bit = false;
         if (length == 0xffffffffU) {
-            memcpy(&length, info, sizeof(uint64_t));
-            info += sizeof(uint64_t);
+            memcpy(&length, die, sizeof(uint64_t));
+            die += sizeof(uint64_t);
             _upf_dwarf.is64bit = true;
         }
 
         _upf_dwarf.offset_size = _upf_dwarf.is64bit ? 8 : 4;
 
-        const uint8_t *next = info + length;
+        const uint8_t *next = die + length;
 
         uint16_t version = 0;
-        memcpy(&version, info, sizeof(version));
-        info += sizeof(version);
+        memcpy(&version, die, sizeof(version));
+        die += sizeof(version);
         if (version != 5) ERROR("uprintf only supports DWARF version 5.");
 
-        uint8_t type = *info;
-        info += sizeof(type);
+        uint8_t type = *die;
+        die += sizeof(type);
         ASSERT(type == DW_UT_compile);
 
-        uint8_t address_size = *info;
+        uint8_t address_size = *die;
         ASSERT(_upf_dwarf.address_size == 0 || _upf_dwarf.address_size == address_size);
         _upf_dwarf.address_size = address_size;
-        info += sizeof(address_size);
+        die += sizeof(address_size);
 
-        uint64_t abbrev_offset = _upf_offset_cast(info);
-        info += _upf_dwarf.offset_size;
+        uint64_t abbrev_offset = _upf_offset_cast(die);
+        die += _upf_dwarf.offset_size;
 
-        _upf_parse_cu(cu_base, info, next, _upf_dwarf.abbrev + abbrev_offset);
+        _upf_parse_cu(cu_base, die, next, _upf_dwarf.abbrev + abbrev_offset);
 
-        info = next;
+        die = next;
     }
 }
 
@@ -1749,6 +1787,8 @@ static void _upf_print_modifiers(int modifiers) {
 }
 
 static void _upf_print_typename(const _upf_type *type) {
+    ASSERT(type != NULL);
+
     if (type->kind == _UPF_TK_POINTER) {
         if (type->as.pointer.type == INVALID) {
             bprintf("void ");
@@ -1796,7 +1836,7 @@ static void _upf_print_type(const uint8_t *data, const _upf_type *type, int dept
 
             bprintf("{\n");
             for (size_t i = 0; i < members.length; i++) {
-                _upf_member *member = &members.data[i];
+                const _upf_member *member = &members.data[i];
                 const _upf_type *member_type = _upf_get_type(member->type);
 
                 bprintf("%*s", UPRINTF_INDENTATION_WIDTH * (depth + 1), "");
@@ -1987,6 +2027,8 @@ static const char *_upf_tok_to_str(enum _upf_token_kind kind) {
 }
 
 static _upf_tokenizer _upf_tokenize(const char *file, int line, const char *string) {
+    ASSERT(file != NULL && string != NULL);
+
     static const _upf_token signs[] = {{_UPF_TOK_OPEN_PAREN, "("},    {_UPF_TOK_CLOSE_PAREN, ")"}, {_UPF_TOK_OPEN_BRACKET, "["},
                                        {_UPF_TOK_CLOSE_BRACKET, "]"}, {_UPF_TOK_STAR, "*"},        {_UPF_TOK_AMPERSAND, "&"},
                                        {_UPF_TOK_COMMA, ","},         {_UPF_TOK_DOT, "."},         {_UPF_TOK_ARROW, "->"}};
@@ -2075,9 +2117,13 @@ static _upf_tokenizer _upf_tokenize(const char *file, int line, const char *stri
     return tokenizer;
 }
 
-static bool _upf_can_consume(const _upf_tokenizer *t) { return t->idx < t->tokens.length; }
+static bool _upf_can_consume(const _upf_tokenizer *t) {
+    ASSERT(t != NULL);
+    return t->idx < t->tokens.length;
+}
 
 static _upf_token _upf_get_next(const _upf_tokenizer *t) {
+    ASSERT(t != NULL);
     if (!_upf_can_consume(t)) {
         ERROR("Expected a token but reached the end of the input(\"%s\") at %s:%d.", t->args.data[t->arg_idx], t->file, t->line);
     }
@@ -2086,6 +2132,7 @@ static _upf_token _upf_get_next(const _upf_tokenizer *t) {
 }
 
 static void _upf_skip(_upf_tokenizer *t) {
+    ASSERT(t != NULL);
     if (!_upf_can_consume(t)) {
         ERROR("Expected a token but reached the end of the input(\"%s\") at %s:%d.", t->args.data[t->arg_idx], t->file, t->line);
     }
@@ -2094,6 +2141,7 @@ static void _upf_skip(_upf_tokenizer *t) {
 }
 
 static const char *_upf_consume(_upf_tokenizer *t, enum _upf_token_kind kind) {
+    ASSERT(t != NULL);
     if (!_upf_can_consume(t)) {
         ERROR("Expected a token but reached the end of the input(\"%s\") at %s:%d.", t->args.data[t->arg_idx], t->file, t->line);
     }
@@ -2108,6 +2156,7 @@ static const char *_upf_consume(_upf_tokenizer *t, enum _upf_token_kind kind) {
 }
 
 static bool _upf_try_consume(_upf_tokenizer *t, enum _upf_token_kind kind) {
+    ASSERT(t != NULL);
     if (!_upf_can_consume(t)) return false;
 
     _upf_token token = t->tokens.data[t->idx];
@@ -2118,6 +2167,7 @@ static bool _upf_try_consume(_upf_tokenizer *t, enum _upf_token_kind kind) {
 }
 
 static _upf_token _upf_consume_any2(_upf_tokenizer *t, ...) {
+    ASSERT(t != NULL);
     if (!_upf_can_consume(t)) {
         ERROR("Expected a token but reached the end of the input(\"%s\") at %s:%d.", t->args.data[t->arg_idx], t->file, t->line);
     }
@@ -2168,6 +2218,8 @@ static _upf_token _upf_consume_any2(_upf_tokenizer *t, ...) {
 #define _upf_consume_any(t, ...) _upf_consume_any2(t, __VA_ARGS__, _UPF_TOK_NONE)
 
 static const uint8_t *_upf_find_var_type(uint64_t pc, const char *var, const _upf_scope *scope) {
+    ASSERT(var != NULL && scope != NULL);
+
     if (!_upf_is_in_range(pc, scope->ranges)) return NULL;
 
     for (size_t i = 0; i < scope->scopes.length; i++) {
@@ -2207,11 +2259,14 @@ static size_t _upf_get_member_type(_upf_cstr_vec member_names, size_t idx, size_
 }
 
 static size_t _upf_get_expression_type(const _upf_cu *cu, const uint8_t *type_die, _upf_cstr_vec vars) {
+    ASSERT(cu != NULL && type_die != NULL);
     size_t base_type = _upf_parse_type(cu, type_die);
     return _upf_get_member_type(vars, 1, base_type);
 }
 
 static _upf_size_t_vec _upf_parse_args(_upf_tokenizer *t, uint64_t pc) {
+    ASSERT(t != NULL);
+
     _upf_size_t_vec types = VECTOR_NEW(&_upf_arena);
     _upf_cstr_vec vars = VECTOR_NEW(&_upf_arena);
     while (_upf_can_consume(t)) {
@@ -2273,6 +2328,12 @@ static _upf_size_t_vec _upf_parse_args(_upf_tokenizer *t, uint64_t pc) {
                     }
                 }
             }
+            if (type_idx == INVALID) {
+                ERROR(
+                    "Unable to find type \"%s\" in \"%s\" at %s:%d. Ensure that the executable contains debugging information of at "
+                    "least 2nd level (-g2 or -g3).",
+                    casted_typename, t->args.data[t->arg_idx], t->file, t->line);
+            }
         } else {
             if (vars.length == 0)
                 ERROR("Unable to find variable name while parsing \"%s\" at %s:%d.", t->args.data[t->arg_idx], t->file, t->line);
@@ -2286,9 +2347,12 @@ static _upf_size_t_vec _upf_parse_args(_upf_tokenizer *t, uint64_t pc) {
                 type_idx = _upf_get_expression_type(cu, type_die, vars);
                 break;
             }
-        }
-        if (type_idx == INVALID) {
-            ERROR("Unable to find type of \"%s\" in \"%s\" at %s:%d.", vars.data[0], t->args.data[t->arg_idx], t->file, t->line);
+            if (type_idx == INVALID) {
+                ERROR(
+                    "Unable to find type of \"%s\" in \"%s\" at %s:%d. Ensure that the executable contains debugging information of at "
+                    "least 2nd level (-g2 or -g3).",
+                    vars.data[0], t->args.data[t->arg_idx], t->file, t->line);
+            }
         }
 
         // Arguments are pointers to data that should be printed, so they get dereferenced
@@ -2382,8 +2446,8 @@ static void _upf_parse_elf(void) {
         const char *name = string_table + section->sh_name;
 
         if (strcmp(name, ".debug_info") == 0) {
-            _upf_dwarf.info = file + section->sh_offset;
-            _upf_dwarf.info_size = section->sh_size;
+            _upf_dwarf.die = file + section->sh_offset;
+            _upf_dwarf.die_size = section->sh_size;
         } else if (strcmp(name, ".debug_abbrev") == 0) {
             _upf_dwarf.abbrev = file + section->sh_offset;
         } else if (strcmp(name, ".debug_str") == 0) {
@@ -2400,7 +2464,10 @@ static void _upf_parse_elf(void) {
 
         section++;
     }
-    ASSERT(_upf_dwarf.die != NULL && _upf_dwarf.abbrev != NULL && _upf_dwarf.str != NULL);
+
+    if (_upf_dwarf.die == NULL || _upf_dwarf.abbrev == NULL || _upf_dwarf.str == NULL) {
+        ERROR("Unable to find debugging information. Ensure that the executable contains it by using -g2 or -g3.");
+    }
 }
 
 // Function returns the address to which this executable is mapped to.
@@ -2444,8 +2511,8 @@ static void *_upf_get_this_file_address(void) {
 __attribute__((constructor)) void _upf_init(void) {
     if (setjmp(_upf_jmp_buf) != 0) return;
 
-    if (access("/proc/self/exe", R_OK) != 0) ERROR("uprintf only supports Linux: expected \"/proc/self/exe\" to be a valid path.");
-    if (access("/proc/self/maps", R_OK) != 0) ERROR("uprintf only supports Linux: expected \"/proc/self/maps\" to be a valid path.");
+    if (access("/proc/self/exe", R_OK) != 0) ERROR("Expected \"/proc/self/exe\" to be a valid path.");
+    if (access("/proc/self/maps", R_OK) != 0) ERROR("Expected \"/proc/self/maps\" to be a valid path.");
 
     _upf_arena_init(&_upf_arena);
 
@@ -2467,11 +2534,13 @@ __attribute__((destructor)) void _upf_fini(void) {
 }
 
 __attribute__((noinline)) void _upf_uprintf(const char *file, int line, const char *fmt, const char *args, ...) {
+    ASSERT(file != NULL && line > 0 && fmt != NULL && args != NULL);
+
     if (!_upf_is_init) return;
     if (setjmp(_upf_jmp_buf) != 0) return;
 
     if (_upf_call.buffer == NULL) {
-        _upf_call.buffer = (char *) malloc(INITIAL_BUFFER_SIZE * sizeof(char));
+        _upf_call.buffer = (char *) malloc(INITIAL_BUFFER_SIZE * sizeof(*_upf_call.buffer));
         if (_upf_call.buffer == NULL) OUT_OF_MEMORY();
         _upf_call.size = INITIAL_BUFFER_SIZE;
     }
@@ -2479,6 +2548,7 @@ __attribute__((noinline)) void _upf_uprintf(const char *file, int line, const ch
     _upf_call.free = _upf_call.size;
 
     void *return_pc = __builtin_extract_return_addr(__builtin_return_address(0));
+    ASSERT(return_pc != NULL);
 #ifdef __clang__
     static char *this_file = NULL;
     if (this_file == NULL) this_file = _upf_get_this_file_address();
@@ -2508,7 +2578,7 @@ __attribute__((noinline)) void _upf_uprintf(const char *file, int line, const ch
                 bprintf("%%");
                 break;
             case 'S': {
-                if (arg_idx >= types.length) ERROR("There are more conversion specifiers than arguments provided at %s:%d.", file, line);
+                if (arg_idx >= types.length) ERROR("There are more format specifiers than arguments provided at %s:%d.", file, line);
 
                 const void *ptr = va_arg(va_args, void *);
                 const _upf_type *type = _upf_get_type(types.data[arg_idx++]);
@@ -2524,7 +2594,7 @@ __attribute__((noinline)) void _upf_uprintf(const char *file, int line, const ch
     }
     va_end(va_args);
 
-    if (arg_idx < types.length) ERROR("There are more arguments provided than conversion specifiers at %s:%d.", file, line);
+    if (arg_idx < types.length) ERROR("There are more arguments provided than format specifiers at %s:%d.", file, line);
 
     printf("%s", _upf_call.buffer);
     fflush(stdout);
@@ -2532,27 +2602,27 @@ __attribute__((noinline)) void _upf_uprintf(const char *file, int line, const ch
 
 // ====================== UNDEF ===========================
 
-#undef bprintf
-#undef _upf_consume_any
-#undef INITIAL_BUFFER_SIZE
+#undef INVALID
+#undef LOG
+#undef ERROR
+#undef WARN
 #undef ASSERT
+#undef OUT_OF_MEMORY
+#undef UNREACHABLE
+#undef INITIAL_VECTOR_CAPACITY
+#undef VECTOR_NEW
+#undef VECTOR_TYPEDEF
+#undef VECTOR_PUSH
+#undef VECTOR_TOP
+#undef VECTOR_POP
 #undef MOD_CONST
 #undef MOD_VOLATILE
 #undef MOD_RESTRICT
 #undef MOD_ATOMIC
-#undef VECTOR_POP
-#undef VECTOR_TOP
-#undef VECTOR_PUSH
-#undef VECTOR_TYPEDEF
-#undef VECTOR_NEW
-#undef INITIAL_VECTOR_CAPACITY
-#undef _upf_arena_concat
+#undef INITIAL_BUFFER_SIZE
 #undef INITIAL_ARENA_SIZE
-#undef UNREACHABLE
-#undef OUT_OF_MEMORY
-#undef WARN
-#undef ERROR
-#undef LOG
-#undef INVALID
+#undef _upf_arena_concat
+#undef bprintf
+#undef _upf_consume_any
 
 #endif  // UPRINTF_IMPLEMENTATION
