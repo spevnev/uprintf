@@ -1519,20 +1519,6 @@ static void _upf_parse_cu_scope(const _upf_cu *cu, _upf_scope_stack *scope_stack
     VECTOR_PUSH(scope_stack, stack_entry);
 }
 
-static void _upf_parse_cu_var(const _upf_cu *cu, _upf_scope_stack *scope_stack, const uint8_t *die) {
-    ASSERT(cu != NULL && scope_stack != NULL && die != NULL && scope_stack->length > 0);
-
-    if (VECTOR_TOP(scope_stack).scope == NULL) return;
-
-    _upf_named_type var = _upf_get_var(cu, die);
-    if (var.name == NULL) return;
-    if (var.die == NULL) {
-        ERROR("Unable to find variable DIE. Ensure that the executable contains debugging information of at least 2nd level (-g2 or -g3).");
-    }
-
-    VECTOR_PUSH(&VECTOR_TOP(scope_stack).scope->vars, var);
-}
-
 static void _upf_parse_cu_type(_upf_cu *cu, const uint8_t *die) {
     ASSERT(cu != NULL && die != NULL);
 
@@ -1623,9 +1609,10 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *die, const uint
     int depth = 0;
     _upf_scope_stack scope_stack = VECTOR_NEW(&_upf_arena);
 
-    _upf_scope_stack_entry stack_entry = {0};
-    stack_entry.depth = depth;
-    stack_entry.scope = &cu.scope;
+    _upf_scope_stack_entry stack_entry = {
+        .depth = depth,
+        .scope = &cu.scope,
+    };
     VECTOR_PUSH(&scope_stack, stack_entry);
 
     while (die < die_end) {
@@ -1648,10 +1635,6 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *die, const uint
             case DW_TAG_inlined_subroutine:
                 _upf_parse_cu_scope(&cu, &scope_stack, depth, die, abbrev);
                 break;
-            case DW_TAG_variable:
-            case DW_TAG_formal_parameter:
-                _upf_parse_cu_var(&cu, &scope_stack, die_base);
-                break;
             case DW_TAG_array_type:
             case DW_TAG_enumeration_type:
             case DW_TAG_pointer_type:
@@ -1661,6 +1644,21 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *die, const uint
             case DW_TAG_base_type:
                 _upf_parse_cu_type(&cu, die_base);
                 break;
+            case DW_TAG_variable:
+            case DW_TAG_formal_parameter: {
+                _upf_scope *scope = VECTOR_TOP(&scope_stack).scope;
+                if (scope == NULL) break;
+
+                _upf_named_type var = _upf_get_var(&cu, die_base);
+                if (var.name == NULL) break;
+                if (var.die == NULL) {
+                    ERROR(
+                        "Unable to find variable DIE. "
+                        "Ensure that the executable contains debugging information of at least 2nd level (-g2 or -g3).");
+                }
+
+                VECTOR_PUSH(&scope->vars, var);
+            } break;
         }
 
         die = _upf_skip_die(die, abbrev);
@@ -2330,8 +2328,8 @@ static _upf_size_t_vec _upf_parse_args(_upf_tokenizer *t, uint64_t pc) {
             }
             if (type_idx == INVALID) {
                 ERROR(
-                    "Unable to find type \"%s\" in \"%s\" at %s:%d. Ensure that the executable contains debugging information of at "
-                    "least 2nd level (-g2 or -g3).",
+                    "Unable to find type \"%s\" in \"%s\" at %s:%d. "
+                    "Ensure that the executable contains debugging information of at least 2nd level (-g2 or -g3).",
                     casted_typename, t->args.data[t->arg_idx], t->file, t->line);
             }
         } else {
@@ -2349,8 +2347,8 @@ static _upf_size_t_vec _upf_parse_args(_upf_tokenizer *t, uint64_t pc) {
             }
             if (type_idx == INVALID) {
                 ERROR(
-                    "Unable to find type of \"%s\" in \"%s\" at %s:%d. Ensure that the executable contains debugging information of at "
-                    "least 2nd level (-g2 or -g3).",
+                    "Unable to find type of \"%s\" in \"%s\" at %s:%d. "
+                    "Ensure that the executable contains debugging information of at least 2nd level (-g2 or -g3).",
                     vars.data[0], t->args.data[t->arg_idx], t->file, t->line);
             }
         }
@@ -2399,8 +2397,8 @@ static _upf_size_t_vec _upf_parse_args(_upf_tokenizer *t, uint64_t pc) {
 
             if (type_idx == INVALID) {
                 ERROR(
-                    "Unable to print void* because it can point to arbitrary data of any length. To print the pointer itself, you must "
-                    "take pointer (&) of \"%s\" at %s:%d.",
+                    "Unable to print void* because it can point to arbitrary data of any length. "
+                    "To print the pointer itself, you must take pointer (&) of \"%s\" at %s:%d.",
                     t->args.data[t->arg_idx], t->file, t->line);
             }
         }
