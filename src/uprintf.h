@@ -435,7 +435,7 @@ static void *_upf_arena_alloc(struct _upf_arena *a, size_t size) {
 }
 
 static void _upf_arena_free(struct _upf_arena *a) {
-    ASSERT(a != NULL && a->head != NULL && a->tail != NULL);
+    if (a == NULL || a->head == NULL || a->tail == NULL) return;
 
     _upf_arena_region *region = a->tail;
     while (region != NULL) {
@@ -2523,14 +2523,11 @@ __attribute__((constructor)) void _upf_init(void) {
 }
 
 __attribute__((destructor)) void _upf_fini(void) {
-    if (!_upf_is_init) return;
-
     // Must be unloaded at the end of the program because many variables point
     // into the _upf_dwarf.file to avoid unnecessarily copying date.
-    munmap(_upf_dwarf.file, _upf_dwarf.file_size);
-
-    _upf_arena_free(&_upf_arena);
+    if (_upf_dwarf.file != NULL) munmap(_upf_dwarf.file, _upf_dwarf.file_size);
     if (_upf_call.buffer != NULL) free(_upf_call.buffer);
+    _upf_arena_free(&_upf_arena);
 }
 
 __attribute__((noinline)) void _upf_uprintf(const char *file, int line, const char *fmt, const char *args, ...) {
