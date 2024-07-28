@@ -78,11 +78,11 @@ void _upf_uprintf(const char *file, int line, const char *fmt, const char *args,
 // ===================== INCLUDES =========================
 
 #define __USE_XOPEN_EXTENDED
-#include <assert.h>
 #include <dwarf.h>
 #include <elf.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <setjmp.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -106,137 +106,28 @@ ssize_t getline(char **lineptr, size_t *n, FILE *stream);
 
 #define INVALID -1UL
 
-#define ERROR(...)                             \
-    do {                                       \
-        fprintf(stderr, "[ERROR] (uprintf) "); \
-        fprintf(stderr, __VA_ARGS__);          \
-        fprintf(stderr, "\n");                 \
-        exit(1);                               \
+#define LOG(type, ...)                            \
+    do {                                          \
+        fprintf(stderr, "(uprintf) [%s] ", type); \
+        fprintf(stderr, __VA_ARGS__);             \
+        fprintf(stderr, "\n");                    \
     } while (0)
+
+#define ERROR(...)                           \
+    do {                                     \
+        LOG("ERROR", __VA_ARGS__);           \
+        longjmp(_upf_jmp_buf, EXIT_FAILURE); \
+    } while (0)
+
+#define WARN(...) LOG("WARN", __VA_ARGS__)
+
+#define ASSERT(condition)                                                                        \
+    do {                                                                                         \
+        if (!(condition)) ERROR("Assert (%s) failed at %s:%d.", #condition, __FILE__, __LINE__); \
+    } while (0);
 
 #define OUT_OF_MEMORY() ERROR("Process ran out of memory.")
 #define UNREACHABLE() ERROR("Unreachable.");
-
-#define WARN(...)                             \
-    do {                                      \
-        fprintf(stderr, "[WARN] (uprintf) "); \
-        fprintf(stderr, __VA_ARGS__);         \
-        fprintf(stderr, "\n");                \
-    } while (0)
-
-// ====================== ARENA ===========================
-
-#define INITIAL_ARENA_SIZE 4096
-
-typedef struct _upf_arena_region {
-    uint8_t *data;
-    size_t capacity;
-    size_t length;
-    struct _upf_arena_region *next;
-} _upf_arena_region;
-
-struct _upf_arena {
-    _upf_arena_region *tail;
-    _upf_arena_region *head;
-};
-
-static void _upf_arena_init(struct _upf_arena *a) {
-    _upf_arena_region *region = (_upf_arena_region *) malloc(sizeof(*region));
-    if (region == NULL) OUT_OF_MEMORY();
-    region->capacity = INITIAL_ARENA_SIZE;
-    region->data = (uint8_t *) malloc(region->capacity * sizeof(uint8_t));
-    if (region->data == NULL) OUT_OF_MEMORY();
-    region->length = 0;
-    region->next = NULL;
-
-    a->head = region;
-    a->tail = region;
-}
-
-static void *_upf_arena_alloc(struct _upf_arena *a, size_t size) {
-    assert(a->head != NULL && a->tail != NULL);
-
-    size_t alignment = (a->head->length % sizeof(void *));
-    if (alignment > 0) alignment = sizeof(void *) - alignment;
-
-    if (alignment + size > a->head->capacity - a->head->length) {
-        _upf_arena_region *region = (_upf_arena_region *) malloc(sizeof(*region));
-        if (region == NULL) OUT_OF_MEMORY();
-        region->capacity = a->head->capacity * 2;
-        region->data = (uint8_t *) malloc(region->capacity * sizeof(uint8_t));
-        if (region->data == NULL) OUT_OF_MEMORY();
-        region->length = 0;
-        region->next = NULL;
-
-        a->head->next = region;
-        a->head = region;
-        alignment = 0;
-    }
-
-    void *memory = a->head->data + a->head->length + alignment;
-    a->head->length += alignment + size;
-    return memory;
-}
-
-static void _upf_arena_free(struct _upf_arena *a) {
-    assert(a->head != NULL && a->tail != NULL);
-
-    _upf_arena_region *region = a->tail;
-    while (region != NULL) {
-        _upf_arena_region *next = region->next;
-
-        free(region->data);
-        free(region);
-
-        region = next;
-    }
-
-    a->head = NULL;
-    a->tail = NULL;
-}
-
-// Copies [begin, end) to arena-allocated string
-static char *_upf_arena_string(struct _upf_arena *a, const char *begin, const char *end) {
-    size_t len = end - begin;
-
-    char *string = (char *) _upf_arena_alloc(a, len + 2);
-    memcpy(string, begin, len);
-    string[len] = '\0';
-
-    return string;
-}
-
-static char *_upf_arena_concat2(struct _upf_arena *a, ...) {
-    va_list va_args;
-
-    size_t size = 0;
-    va_start(va_args, a);
-    while (1) {
-        const char *str = va_arg(va_args, const char *);
-        if (str == NULL) break;
-        size += strlen(str);
-    }
-    va_end(va_args);
-
-    char *result = _upf_arena_alloc(a, size + 1);
-    result[size] = '\0';
-
-    char *p = result;
-    va_start(va_args, a);
-    while (1) {
-        const char *str = va_arg(va_args, const char *);
-        if (str == NULL) break;
-
-        size_t len = strlen(str);
-        memcpy(p, str, len);
-        p += len;
-    }
-    va_end(va_args);
-
-    return result;
-}
-
-#define _upf_arena_concat(a, ...) _upf_arena_concat2(a, __VA_ARGS__, NULL)
 
 // ====================== VECTOR ==========================
 
@@ -279,6 +170,8 @@ static char *_upf_arena_concat2(struct _upf_arena *a, ...) {
 #define VECTOR_POP(vec) (vec)->length--
 
 // ====================== TYPES ===========================
+
+struct _upf_arena;
 
 VECTOR_TYPEDEF(_upf_size_t_vec, size_t);
 VECTOR_TYPEDEF(_upf_cstr_vec, const char *);
@@ -480,11 +373,127 @@ typedef struct {
 
 #define INITIAL_BUFFER_SIZE 32
 
-static struct _upf_arena _upf_arena = {0};
+static jmp_buf _upf_jmp_buf;
+static bool _upf_is_init = false;
+static struct _upf_arena _upf_arena;
 static struct _upf_dwarf _upf_dwarf = {0};
 static _upf_type_map_vec _upf_type_map = VECTOR_NEW(&_upf_arena);
 static _upf_cu_vec _upf_cus = VECTOR_NEW(&_upf_arena);
 static _upf_call_info _upf_call = {0};
+
+// ====================== ARENA ===========================
+
+#define INITIAL_ARENA_SIZE 4096
+
+typedef struct _upf_arena_region {
+    uint8_t *data;
+    size_t capacity;
+    size_t length;
+    struct _upf_arena_region *next;
+} _upf_arena_region;
+
+struct _upf_arena {
+    _upf_arena_region *tail;
+    _upf_arena_region *head;
+};
+
+static void _upf_arena_init(struct _upf_arena *a) {
+    _upf_arena_region *region = (_upf_arena_region *) malloc(sizeof(*region));
+    if (region == NULL) OUT_OF_MEMORY();
+    region->capacity = INITIAL_ARENA_SIZE;
+    region->data = (uint8_t *) malloc(region->capacity * sizeof(uint8_t));
+    if (region->data == NULL) OUT_OF_MEMORY();
+    region->length = 0;
+    region->next = NULL;
+
+    a->head = region;
+    a->tail = region;
+}
+
+static void *_upf_arena_alloc(struct _upf_arena *a, size_t size) {
+    ASSERT(a->head != NULL && a->tail != NULL);
+
+    size_t alignment = (a->head->length % sizeof(void *));
+    if (alignment > 0) alignment = sizeof(void *) - alignment;
+
+    if (alignment + size > a->head->capacity - a->head->length) {
+        _upf_arena_region *region = (_upf_arena_region *) malloc(sizeof(*region));
+        if (region == NULL) OUT_OF_MEMORY();
+        region->capacity = a->head->capacity * 2;
+        region->data = (uint8_t *) malloc(region->capacity * sizeof(uint8_t));
+        if (region->data == NULL) OUT_OF_MEMORY();
+        region->length = 0;
+        region->next = NULL;
+
+        a->head->next = region;
+        a->head = region;
+        alignment = 0;
+    }
+
+    void *memory = a->head->data + a->head->length + alignment;
+    a->head->length += alignment + size;
+    return memory;
+}
+
+static void _upf_arena_free(struct _upf_arena *a) {
+    ASSERT(a->head != NULL && a->tail != NULL);
+
+    _upf_arena_region *region = a->tail;
+    while (region != NULL) {
+        _upf_arena_region *next = region->next;
+
+        free(region->data);
+        free(region);
+
+        region = next;
+    }
+
+    a->head = NULL;
+    a->tail = NULL;
+}
+
+// Copies [begin, end) to arena-allocated string
+static char *_upf_arena_string(struct _upf_arena *a, const char *begin, const char *end) {
+    size_t len = end - begin;
+
+    char *string = (char *) _upf_arena_alloc(a, len + 2);
+    memcpy(string, begin, len);
+    string[len] = '\0';
+
+    return string;
+}
+
+static char *_upf_arena_concat2(struct _upf_arena *a, ...) {
+    va_list va_args;
+
+    size_t size = 0;
+    va_start(va_args, a);
+    while (1) {
+        const char *str = va_arg(va_args, const char *);
+        if (str == NULL) break;
+        size += strlen(str);
+    }
+    va_end(va_args);
+
+    char *result = _upf_arena_alloc(a, size + 1);
+    result[size] = '\0';
+
+    char *p = result;
+    va_start(va_args, a);
+    while (1) {
+        const char *str = va_arg(va_args, const char *);
+        if (str == NULL) break;
+
+        size_t len = strlen(str);
+        memcpy(p, str, len);
+        p += len;
+    }
+    va_end(va_args);
+
+    return result;
+}
+
+#define _upf_arena_concat(a, ...) _upf_arena_concat2(a, __VA_ARGS__, NULL)
 
 // ====================== HELPERS =========================
 
@@ -530,12 +539,12 @@ static size_t _upf_LEB_to_int64(const uint8_t *leb, int64_t *result) {
 }
 
 static const _upf_abbrev *_upf_get_abbrev(const _upf_cu *cu, size_t code) {
-    assert(code > 0 && code - 1 < cu->abbrevs.length);
+    ASSERT(code > 0 && code - 1 < cu->abbrevs.length);
     return &cu->abbrevs.data[code - 1];
 }
 
 static const _upf_type *_upf_get_type(size_t type_idx) {
-    assert(type_idx != INVALID && type_idx < _upf_type_map.length);
+    ASSERT(type_idx != INVALID && type_idx < _upf_type_map.length);
     return &_upf_type_map.data[type_idx].type;
 }
 
@@ -828,7 +837,7 @@ static enum _upf_type_kind _upf_get_type_kind(int64_t encoding, int64_t size) {
             if (size == 8) return _UPF_TK_S8;
             if (size == 16) {
                 uint32_t x = 1;
-                assert(*((uint8_t *) (&x)) == 1 && "uprintf only support x86_64/amd64 which is little-endian");
+                ASSERT(*((uint8_t *) (&x)) == 1 && "uprintf only support x86_64/amd64 which is little-endian");
 
                 WARN("16 byte integers aren't supported. Truncating to 8 bytes.");
                 return _UPF_TK_S8;
@@ -846,7 +855,7 @@ static enum _upf_type_kind _upf_get_type_kind(int64_t encoding, int64_t size) {
             if (size == 8) return _UPF_TK_U8;
             if (size == 16) {
                 uint32_t x = 1;
-                assert(*((uint8_t *) (&x)) == 1 && "uprintf only support x86_64/amd64 which is little-endian");
+                ASSERT(*((uint8_t *) (&x)) == 1 && "uprintf only support x86_64/amd64 which is little-endian");
 
                 WARN("16 byte unsigned integers aren't supported. Truncating to 8 bytes.");
                 return _UPF_TK_U8;
@@ -971,7 +980,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
 
     switch (abbrev->tag) {
         case DW_TAG_array_type: {
-            assert(subtype_offset != INVALID);
+            ASSERT(subtype_offset != INVALID);
 
             _upf_type type = {
                 .name = name,
@@ -999,7 +1008,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
                     WARN("Enumerator array subranges aren't unsupported. Ignoring this type.");
                     goto unknown_type;
                 }
-                assert(abbrev->tag == DW_TAG_subrange_type);
+                ASSERT(abbrev->tag == DW_TAG_subrange_type);
 
                 size_t length = INVALID;
                 for (size_t i = 0; i < abbrev->attrs.length; i++) {
@@ -1016,7 +1025,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
 
                     info += _upf_get_attr_size(info, attr.form);
                 }
-                assert(length != INVALID);
+                ASSERT(length != INVALID);
 
                 array_size *= length;
                 VECTOR_PUSH(&type.as.array.lengths, length);
@@ -1031,7 +1040,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
             return _upf_add_type(base, type);
         }
         case DW_TAG_enumeration_type: {
-            assert(subtype_offset != INVALID);
+            ASSERT(subtype_offset != INVALID);
 
             _upf_type type = {
                 .name = name ? name : "enum",
@@ -1053,7 +1062,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
                 if (code == 0) break;
 
                 abbrev = _upf_get_abbrev(cu, code);
-                assert(abbrev->tag == DW_TAG_enumerator);
+                ASSERT(abbrev->tag == DW_TAG_enumerator);
 
                 bool found_value = false;
                 _upf_enum cenum = {
@@ -1077,7 +1086,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
 
                     info += _upf_get_attr_size(info, attr.form);
                 }
-                assert(cenum.name != NULL && found_value);
+                ASSERT(cenum.name != NULL && found_value);
 
                 VECTOR_PUSH(&type.as.cenum.enums, cenum);
             }
@@ -1085,7 +1094,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
             return _upf_add_type(base, type);
         }
         case DW_TAG_pointer_type: {
-            assert(size == INVALID || size == sizeof(void *));
+            ASSERT(size == INVALID || size == sizeof(void *));
 
             _upf_type type = {
                 .name = name,
@@ -1148,7 +1157,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
 
                     info += _upf_get_attr_size(info, attr.form);
                 }
-                assert(member.name != NULL && member.type != INVALID && member.offset != INVALID);
+                ASSERT(member.name != NULL && member.type != INVALID && member.offset != INVALID);
 
                 VECTOR_PUSH(&type.as.cstruct.members, member);
             }
@@ -1156,7 +1165,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
             return _upf_add_type(base, type);
         }
         case DW_TAG_typedef: {
-            assert(name != NULL && subtype_offset != INVALID);
+            ASSERT(name != NULL && subtype_offset != INVALID);
 
             size_t type_idx = _upf_parse_type(cu, cu->base + subtype_offset);
             _upf_type type = *_upf_get_type(type_idx);
@@ -1165,7 +1174,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *info) {
             return _upf_add_type(base, type);
         }
         case DW_TAG_base_type: {
-            assert(name != NULL && size != INVALID && encoding != 0);
+            ASSERT(name != NULL && size != INVALID && encoding != 0);
 
             _upf_type type = {
                 .name = name,
@@ -1226,7 +1235,7 @@ static _upf_range_vec _upf_get_ranges(const _upf_cu *cu, const uint8_t *info, ui
         uint64_t rnglist_offset = _upf_offset_cast(_upf_dwarf.rnglists + cu->rnglists_base + index * _upf_dwarf.offset_size);
         rnglist = _upf_dwarf.rnglists + cu->rnglists_base + rnglist_offset;
     }
-    assert(rnglist != NULL);
+    ASSERT(rnglist != NULL);
 
     uint64_t base = 0;
     if (cu->scope.ranges.length == 1) {
@@ -1416,7 +1425,7 @@ static _upf_range_vec _upf_get_cu_ranges(const _upf_cu *cu, const uint8_t *low_p
 static void _upf_parse_cu_scope(const _upf_cu *cu, _upf_scope_stack *scope_stack, int depth, const uint8_t *info,
                                 const _upf_abbrev *abbrev) {
     if (!abbrev->has_children) return;
-    assert(scope_stack->length > 0);
+    ASSERT(scope_stack->length > 0);
 
     _upf_scope new_scope = {
         .ranges = VECTOR_NEW(&_upf_arena),
@@ -1469,7 +1478,7 @@ static void _upf_parse_cu_scope(const _upf_cu *cu, _upf_scope_stack *scope_stack
         for (size_t i = 0; i < scope_stack->length && scope == NULL; i++) {
             scope = scope_stack->data[scope_stack->length - 1 - i].scope;
         }
-        assert(scope != NULL);
+        ASSERT(scope != NULL);
 
         VECTOR_PUSH(&scope->scopes, new_scope);
         stack_entry.scope = &VECTOR_TOP(&scope->scopes);
@@ -1481,13 +1490,13 @@ static void _upf_parse_cu_scope(const _upf_cu *cu, _upf_scope_stack *scope_stack
 }
 
 static void _upf_parse_cu_var(const _upf_cu *cu, _upf_scope_stack *scope_stack, const uint8_t *die_base) {
-    assert(scope_stack->length > 0);
+    ASSERT(scope_stack->length > 0);
     if (VECTOR_TOP(scope_stack).scope == NULL) return;
 
     _upf_named_type var = _upf_get_var(cu, die_base);
     if (var.name == NULL) return;
 
-    assert(var.die != NULL);
+    ASSERT(var.die != NULL);
     VECTOR_PUSH(&VECTOR_TOP(scope_stack).scope->vars, var);
 }
 
@@ -1536,7 +1545,7 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *info, const uin
     uint64_t code;
     info += _upf_uLEB_to_uint64(info, &code);
     const _upf_abbrev *abbrev = _upf_get_abbrev(&cu, code);
-    assert(abbrev->tag == DW_TAG_compile_unit);
+    ASSERT(abbrev->tag == DW_TAG_compile_unit);
 
     // Save to parse after the initializing addr_base, str_offsets, and rnglists_base
     const uint8_t *low_pc_info = NULL;
@@ -1586,7 +1595,7 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *info, const uin
 
         info += _upf_uLEB_to_uint64(info, &code);
         if (code == 0) {
-            assert(scope_stack.length > 0);
+            ASSERT(scope_stack.length > 0);
             if (depth == VECTOR_TOP(&scope_stack).depth) VECTOR_POP(&scope_stack);
             depth--;
             continue;
@@ -1619,7 +1628,7 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *info, const uin
         info = _upf_skip_die(info, abbrev);
     }
 
-    assert(cu.scope.scopes.length > 0);
+    ASSERT(cu.scope.scopes.length > 0);
     if (cu.scope.ranges.length == 1) {
         _upf_range *range = &cu.scope.ranges.data[0];
 
@@ -1671,10 +1680,10 @@ static void _upf_parse_dwarf(void) {
 
         uint8_t type = *info;
         info += sizeof(type);
-        assert(type == DW_UT_compile);
+        ASSERT(type == DW_UT_compile);
 
         uint8_t address_size = *info;
-        assert(_upf_dwarf.address_size == 0 || _upf_dwarf.address_size == address_size);
+        ASSERT(_upf_dwarf.address_size == 0 || _upf_dwarf.address_size == address_size);
         _upf_dwarf.address_size = address_size;
         info += sizeof(address_size);
 
@@ -1755,7 +1764,7 @@ static void _upf_print_typename(const _upf_type *type) {
 }
 
 static void _upf_print_type(const uint8_t *data, const _upf_type *type, int depth) {
-    assert(type != NULL);
+    ASSERT(type != NULL);
 
     if (UPRINTF_MAX_DEPTH != -1 && depth >= UPRINTF_MAX_DEPTH) {
         switch (type->kind) {
@@ -2014,7 +2023,7 @@ static _upf_tokenizer _upf_tokenize(const char *file, int line, const char *stri
             errno = 0;
             char *end = NULL;
             strtol(ch, &end, 0);
-            assert(errno == 0 && end != NULL);
+            ASSERT(errno == 0 && end != NULL);
 
             _upf_token token = {
                 .kind = _UPF_TOK_NUMBER,
@@ -2348,22 +2357,22 @@ static void _upf_parse_elf(void) {
     _upf_dwarf.file_size = size;
 
     int fd = open("/proc/self/exe", O_RDONLY);
-    assert(fd != -1);
+    ASSERT(fd != -1);
 
     uint8_t *file = (uint8_t *) mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
-    assert(file != MAP_FAILED);
+    ASSERT(file != MAP_FAILED);
     _upf_dwarf.file = file;
 
     close(fd);
 
     const Elf64_Ehdr *header = (Elf64_Ehdr *) file;
 
-    assert(memcmp(header->e_ident, ELFMAG, SELFMAG) == 0);
-    assert(header->e_ident[EI_CLASS] == ELFCLASS64);
-    assert(header->e_ident[EI_VERSION] == 1);
-    assert(header->e_machine == EM_X86_64);
-    assert(header->e_version == 1);
-    assert(header->e_shentsize == sizeof(Elf64_Shdr));
+    ASSERT(memcmp(header->e_ident, ELFMAG, SELFMAG) == 0);
+    ASSERT(header->e_ident[EI_CLASS] == ELFCLASS64);
+    ASSERT(header->e_ident[EI_VERSION] == 1);
+    ASSERT(header->e_machine == EM_X86_64);
+    ASSERT(header->e_version == 1);
+    ASSERT(header->e_shentsize == sizeof(Elf64_Shdr));
 
     const Elf64_Shdr *string_section = (Elf64_Shdr *) (file + header->e_shoff + header->e_shstrndx * header->e_shentsize);
     const char *string_table = (char *) (file + string_section->sh_offset);
@@ -2391,7 +2400,7 @@ static void _upf_parse_elf(void) {
 
         section++;
     }
-    assert(_upf_dwarf.info != NULL && _upf_dwarf.abbrev != NULL && _upf_dwarf.str != NULL);
+    ASSERT(_upf_dwarf.die != NULL && _upf_dwarf.abbrev != NULL && _upf_dwarf.str != NULL);
 }
 
 // Function returns the address to which this executable is mapped to.
@@ -2426,13 +2435,15 @@ static void *_upf_get_this_file_address(void) {
     if (line) free(line);
     fclose(file);
 
-    assert(address != INVALID);
+    ASSERT(address != INVALID);
     return (void *) address;
 }
 
 // =================== ENTRY POINTS =======================
 
 __attribute__((constructor)) void _upf_init(void) {
+    if (setjmp(_upf_jmp_buf) != 0) return;
+
     if (access("/proc/self/exe", R_OK) != 0) ERROR("uprintf only supports Linux: expected \"/proc/self/exe\" to be a valid path.");
     if (access("/proc/self/maps", R_OK) != 0) ERROR("uprintf only supports Linux: expected \"/proc/self/maps\" to be a valid path.");
 
@@ -2440,9 +2451,13 @@ __attribute__((constructor)) void _upf_init(void) {
 
     _upf_parse_elf();
     _upf_parse_dwarf();
+
+    _upf_is_init = true;
 }
 
 __attribute__((destructor)) void _upf_fini(void) {
+    if (!_upf_is_init) return;
+
     // Must be unloaded at the end of the program because many variables point
     // into the _upf_dwarf.file to avoid unnecessarily copying date.
     munmap(_upf_dwarf.file, _upf_dwarf.file_size);
@@ -2452,6 +2467,9 @@ __attribute__((destructor)) void _upf_fini(void) {
 }
 
 __attribute__((noinline)) void _upf_uprintf(const char *file, int line, const char *fmt, const char *args, ...) {
+    if (!_upf_is_init) return;
+    if (setjmp(_upf_jmp_buf) != 0) return;
+
     if (_upf_call.buffer == NULL) {
         _upf_call.buffer = (char *) malloc(INITIAL_BUFFER_SIZE * sizeof(char));
         if (_upf_call.buffer == NULL) OUT_OF_MEMORY();
@@ -2517,6 +2535,7 @@ __attribute__((noinline)) void _upf_uprintf(const char *file, int line, const ch
 #undef bprintf
 #undef _upf_consume_any
 #undef INITIAL_BUFFER_SIZE
+#undef ASSERT
 #undef MOD_CONST
 #undef MOD_VOLATILE
 #undef MOD_RESTRICT
@@ -2529,10 +2548,11 @@ __attribute__((noinline)) void _upf_uprintf(const char *file, int line, const ch
 #undef INITIAL_VECTOR_CAPACITY
 #undef _upf_arena_concat
 #undef INITIAL_ARENA_SIZE
-#undef WARN
 #undef UNREACHABLE
 #undef OUT_OF_MEMORY
+#undef WARN
 #undef ERROR
+#undef LOG
 #undef INVALID
 
 #endif  // UPRINTF_IMPLEMENTATION
