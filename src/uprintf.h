@@ -1124,14 +1124,20 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                 },
             };
 
+            // Pointers have to be added before their data gets filled in so that
+            // structs that pointer to themselves, such as linked lists, don't get
+            // stuck in an infinite loop.
+            size_t type_idx = _upf_add_type(base, type);
+
             if (subtype_offset != INVALID) {
                 // `void*`s have invalid offset (since they don't point to any type), thus
                 // pointer with INVALID type represents `void*`
-                type.as.pointer.type = _upf_parse_type(cu, cu->base + subtype_offset);
-                type.name = _upf_get_type(type.as.pointer.type)->name;
+                _upf_type *type = &_upf_type_map.data[type_idx].type;
+                type->as.pointer.type = _upf_parse_type(cu, cu->base + subtype_offset);
+                type->name = _upf_get_type(type->as.pointer.type)->name;
             }
 
-            return _upf_add_type(base, type);
+            return type_idx;
         }
         case DW_TAG_structure_type:
         case DW_TAG_union_type: {
@@ -1943,7 +1949,7 @@ static void _upf_print_type(const uint8_t *data, const _upf_type *type, int dept
             }
 
             bprintf("%p (", ptr);
-            _upf_print_type(ptr, pointed_type, depth + 1);
+            _upf_print_type(ptr, pointed_type, depth);
             bprintf(")");
         } break;
         case _UPF_TK_U1:
