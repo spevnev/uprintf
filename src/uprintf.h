@@ -861,11 +861,8 @@ static enum _upf_type_kind _upf_get_type_kind(int64_t encoding, int64_t size) {
             if (size == 4) return _UPF_TK_S4;
             if (size == 8) return _UPF_TK_S8;
             if (size == 16) {
-                uint32_t x = 1;
-                ASSERT(*((uint8_t *) (&x)) == 1 && "uprintf only support x86_64/amd64 which is little-endian");
-
-                WARN("16 byte integers aren't supported. Truncating to 8 bytes.");
-                return _UPF_TK_S8;
+                WARN("16 byte integers aren't supported. Ignoring this type.");
+                return _UPF_TK_UNKNOWN;
             }
             WARN("Expected signed integer to be 1, 2, 4, 8 or 16 bytes long. Ignoring this type.");
             return _UPF_TK_UNKNOWN;
@@ -879,11 +876,8 @@ static enum _upf_type_kind _upf_get_type_kind(int64_t encoding, int64_t size) {
             if (size == 4) return _UPF_TK_U4;
             if (size == 8) return _UPF_TK_U8;
             if (size == 16) {
-                uint32_t x = 1;
-                ASSERT(*((uint8_t *) (&x)) == 1 && "uprintf only support x86_64/amd64 which is little-endian");
-
-                WARN("16 byte unsigned integers aren't supported. Truncating to 8 bytes.");
-                return _UPF_TK_U8;
+                WARN("16 byte unsigned integers aren't supported. Ignoring this type.");
+                return _UPF_TK_UNKNOWN;
             }
             WARN("Expected unsigned integer to be 1, 2, 4, 8 or 16 bytes long. Ignoring this type.");
             return _UPF_TK_UNKNOWN;
@@ -1099,13 +1093,13 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                     if (attr.name == DW_AT_name) {
                         cenum.name = _upf_get_str(cu, die, attr.form);
                     } else if (attr.name == DW_AT_const_value) {
-                        if (!_upf_is_data(attr.form)) {
-                            WARN("Expected enum value to be of data class. Ignoring this type.");
+                        if (_upf_is_data(attr.form)) {
+                            cenum.value = _upf_get_data(die, attr);
+                            found_value = true;
+                        } else {
+                            WARN("Non-constant enum values aren't supported. Ignoring this type.");
                             goto unknown_type;
                         }
-
-                        cenum.value = _upf_get_data(die, attr);
-                        found_value = true;
                     }
 
                     die += _upf_get_attr_size(die, attr.form);
@@ -1176,7 +1170,12 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                         const uint8_t *type_die = cu->base + _upf_get_ref(die, attr.form);
                         member.type = _upf_parse_type(cu, type_die);
                     } else if (attr.name == DW_AT_data_member_location) {
-                        member.offset = _upf_get_data(die, attr);
+                        if (_upf_is_data(attr.form)) {
+                            member.offset = _upf_get_data(die, attr);
+                        } else {
+                            WARN("Non-constant member offsets aren't supported. Ignoring this type.");
+                            goto unknown_type;
+                        }
                     }
 
                     die += _upf_get_attr_size(die, attr.form);
