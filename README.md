@@ -29,15 +29,7 @@ This will copy library implementation to be built as a part of this file.
 
 There are also options which can be set by defining other macros before *implementation*:
 
-macro |  description   
--|-
-IGNORE_NO_DEBUG |  When unset and there is no debug information, calls to `uprintf()` will `abort()`. <br> If set, it will silently ignore them instead. 
-
-### Examples
-
-There are many examples included in the folder to see the capabilities of this library.
-
-```console
-$ make examples
-$ ./build/examples/EXAMPLE
-```
+macro |  description | default
+-|--|
+UPRINTF_INDENTATION_WIDTH | The number of spaces to use for indentation | 4
+UPRINTF_MAX_DEPTH | How deep can nested structures be | 10
