@@ -173,7 +173,17 @@ ssize_t getline(char **lineptr, size_t *n, FILE *stream);
 
 // ====================== TYPES ===========================
 
-struct _upf_arena;
+typedef struct _upf_arena_region {
+    uint8_t *data;
+    size_t capacity;
+    size_t length;
+    struct _upf_arena_region *next;
+} _upf_arena_region;
+
+struct _upf_arena {
+    _upf_arena_region *tail;
+    _upf_arena_region *head;
+};
 
 _UPF_VECTOR_TYPEDEF(_upf_size_t_vec, size_t);
 _UPF_VECTOR_TYPEDEF(_upf_cstr_vec, const char *);
@@ -387,18 +397,6 @@ static _upf_call_info _upf_call = {0};
 // ====================== ARENA ===========================
 
 #define _UPF_INITIAL_ARENA_SIZE 4096
-
-typedef struct _upf_arena_region {
-    uint8_t *data;
-    size_t capacity;
-    size_t length;
-    struct _upf_arena_region *next;
-} _upf_arena_region;
-
-struct _upf_arena {
-    _upf_arena_region *tail;
-    _upf_arena_region *head;
-};
 
 static _upf_arena_region *_upf_arena_alloc_region(size_t capacity) {
     _upf_arena_region *region = (_upf_arena_region *) malloc(sizeof(*region));
