@@ -12,24 +12,45 @@ However, by defining a macro the header start to act as a .c file, i.e. contains
 
 ## Usage
 
-In order to use it, you need to pick one file (preferably rarely modified to avoid rebuilding the library) and define `UPRINTF_IMPLEMENTATION` before the include:
+
+Adding uprintf to your project:
+
+1. Pick a single file and define `UPRINTF_IMPLEMENTATION` before the include:
+    ```c
+    #define UPRINTF_IMPLEMENTATION
+    #include "uprintf.h"
+    ```
+    This will copy library's implementation to be built as a part of this file, so you should choose rarely modified file in order to avoid unnecessary rebuilding.
+
+2. Add include in other files where you intend to use it:
+    ```c
+    #include "uprintf.h"
+    ```
+
+3. Call function.
+    ```c
+    uprintf(fmt, ...);
+    ```
+    *fmt* - format string with `%S` format specifier (**NOTE: printf specifiers are NOT supported**). \
+    For each format specifier there must be a pointer to whatever should be printed in its place.
+
+### Options
+
+Behavior of the library can be changed by setting options before **implementation**:
 
 ```c
+#define OPTION_NAME VALUE
 #define UPRINTF_IMPLEMENTATION
 #include "uprintf.h"
 ```
 
-This will copy library implementation to be built as a part of this file.
-
-**NOTE: regular printf types are not supported**
-
-`uprintf(fmt, ...)`: fmt is a string to be printed where `%S` will be replaced with a struct. Structures must be passed as non-`void*` pointers.
-
-### Options
-
-There are also options which can be set by defining other macros before *implementation*:
+The list of options:
 
 macro |  description | default
--|--|
-UPRINTF_INDENTATION_WIDTH | The number of spaces to use for indentation | 4
-UPRINTF_MAX_DEPTH | How deep can nested structures be | 10
+-|-|-
+`UPRINTF_INDENTATION_WIDTH` | The number of spaces to use for indentation | 4
+`UPRINTF_MAX_DEPTH` | How deep can nested structures be | 10
+
+
+
+
