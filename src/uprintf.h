@@ -101,6 +101,16 @@ void _upf_uprintf(const char *file, int line, const char *fmt, const char *args,
 ssize_t readlink(const char *path, char *buf, size_t bufsiz);
 ssize_t getline(char **lineptr, size_t *n, FILE *stream);
 
+// ===================== TESTING ==========================
+
+#ifdef UPRINTF_TEST
+static int _upf_test_status = EXIT_SUCCESS;
+
+#define _UPF_SET_TEST_STATUS(status) _upf_test_status = status
+#else
+#define _UPF_SET_TEST_STATUS(status) (void) status
+#endif
+
 // ====================== ERRORS ==========================
 
 #define _UPF_INVALID -1UL
@@ -112,15 +122,17 @@ ssize_t getline(char **lineptr, size_t *n, FILE *stream);
         fprintf(stderr, "\n");                    \
     } while (0)
 
-#define _UPF_ERROR(...)                        \
-    do {                                       \
-        _UPF_LOG("ERROR", __VA_ARGS__);        \
-        longjmp(_upf_jmp_buf, EXIT_FAILURE);   \
+#define _UPF_ERROR(...)                      \
+    do {                                     \
+        _UPF_LOG("ERROR", __VA_ARGS__);      \
+        _UPF_SET_TEST_STATUS(EXIT_FAILURE);  \
+        longjmp(_upf_jmp_buf, EXIT_FAILURE); \
     } while (0)
 
-#define _UPF_WARN(...)                        \
-    do {                                      \
-        _UPF_LOG("WARN", __VA_ARGS__);        \
+#define _UPF_WARN(...)                      \
+    do {                                    \
+        _UPF_LOG("WARN", __VA_ARGS__);      \
+        _UPF_SET_TEST_STATUS(EXIT_FAILURE); \
     } while (0)
 
 #define _UPF_ASSERT(condition)                                                                        \
@@ -2603,6 +2615,7 @@ __attribute__((noinline)) void _upf_uprintf(const char *file, int line, const ch
 
 // ====================== UNDEF ===========================
 
+#undef _UPF_SET_TEST_STATUS
 #undef _UPF_INVALID
 #undef _UPF_LOG
 #undef _UPF_ERROR

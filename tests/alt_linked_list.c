@@ -51,4 +51,6 @@ int main(void) {
         free(_cur);
         _cur = next;
     }
+
+    return _upf_test_status;
 }

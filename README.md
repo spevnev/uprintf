@@ -51,6 +51,13 @@ macro |  description | default
 `UPRINTF_INDENTATION_WIDTH` | The number of spaces to use for indentation | 4
 `UPRINTF_MAX_DEPTH` | How deep can nested structures be | 10
 
+## Tests
 
 
+Requirements: sed, awk, wdiff
 
+```console
+$ make all_tests
+```
+
+Tests take long to complete, so it is highly recommended to set `-j NUMBER_OF_CORES` to parallelize.

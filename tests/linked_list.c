@@ -32,4 +32,6 @@ int main(void) {
         free(cur);
         cur = next;
     }
+
+    return _upf_test_status;
 }
