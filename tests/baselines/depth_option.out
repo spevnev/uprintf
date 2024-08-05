@@ -1,0 +1,10 @@
+Linked list: {
+    int value = 0
+    Node *next = POINTER ({
+        int value = 2
+        Node *next = POINTER ({
+            int value = 4
+            Node *next = POINTER ({...})
+        })
+    })
+}
