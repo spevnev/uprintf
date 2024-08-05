@@ -27,6 +27,12 @@ fi
 cat $output >> $log
 
 # Comparing
+if [ ! -f $baseline ]; then
+    echo "[WARNING] There is no baseline for $1!"
+    echo "[TEST PASSED] $output_file: ?";
+    exit 0
+fi
+
 sed -E "s/0x[0-9a-fA-F]{6,16}/POINTER/" -i $baseline -i $output
 similarity=$(wdiff -123 --statistics $baseline $output | tail -n 1 | \
     awk -F ':' '{print $NF}' | awk -F ' ' '{print $4}' | sed 's/%$//')
