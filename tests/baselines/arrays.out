@@ -1,0 +1,54 @@
+1D array: [5, 3, 1]
+2x2x3 array [
+    [
+        [0, 1, 0],
+        [2, 3, 2]
+    ],
+    [
+        [4, 5, 4],
+        [6, 7, 6]
+    ]
+]
+2x2x1 subarray [
+    [4, 5, 4],
+    [6, 7, 6]
+]
+2x1x1 subarray [6, 7, 6]
+Array of tokenizer signs: [
+    {
+        _upf_token_kind kind = _UPF_TOK_OPEN_PAREN (1)
+        const char *string = POINTER ("(")
+    },
+    {
+        _upf_token_kind kind = _UPF_TOK_CLOSE_PAREN (2)
+        const char *string = POINTER (")")
+    },
+    {
+        _upf_token_kind kind = _UPF_TOK_OPEN_BRACKET (3)
+        const char *string = POINTER ("[")
+    },
+    {
+        _upf_token_kind kind = _UPF_TOK_CLOSE_BRACKET (4)
+        const char *string = POINTER ("]")
+    },
+    {
+        _upf_token_kind kind = _UPF_TOK_STAR (5)
+        const char *string = POINTER ("*")
+    },
+    {
+        _upf_token_kind kind = _UPF_TOK_AMPERSAND (6)
+        const char *string = POINTER ("&")
+    },
+    {
+        _upf_token_kind kind = _UPF_TOK_COMMA (7)
+        const char *string = POINTER (",")
+    },
+    {
+        _upf_token_kind kind = _UPF_TOK_DOT (8)
+        const char *string = POINTER (".")
+    },
+    {
+        _upf_token_kind kind = _UPF_TOK_ARROW (9)
+        const char *string = POINTER ("->")
+    }
+]
