@@ -37,8 +37,12 @@ Adding uprintf to your project:
     ```c
     uprintf(fmt, ...);
     ```
-    *fmt* - format string with `%S` format specifier (**NOTE: printf specifiers are NOT supported**). \
+    *fmt* - format string with `%S` format specifier (**NOTE: printf specifiers are NOT supported**). Use `%%` to print `%`. \
     For each format specifier there must be a pointer to whatever should be printed in its place.
+
+4. Compile with debug information, i.e. `-g2` or `-g3`.
+
+Examples can be found in `tests/`.
 
 ### Options
 
@@ -59,11 +63,15 @@ macro |  description | default
 
 ## Tests
 
-
 Requirements: sed, awk, wdiff
+
+Tests take long to complete, so it is highly recommended to set `-j NUMBER_OF_CORES`.
 
 ```console
 $ make all_tests
 ```
 
-Tests take long to complete, so it is highly recommended to set `-j NUMBER_OF_CORES` to parallelize.
+Tests work by:
+1. Checking errors during compilation.
+2. Checking errors and warnings during execution.
+3. Comparing output to baseline (which is manually updated/created, when needed).
