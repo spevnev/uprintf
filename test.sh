@@ -36,7 +36,7 @@ fi
 sed -E "s/0x[0-9a-fA-F]{6,16}/POINTER/" -i $baseline -i $output
 similarity=$(wdiff -123 --statistics $baseline $output | tail -n 1 | \
     awk -F ':' '{print $NF}' | awk -F ' ' '{print $4}' | sed 's/%$//')
-echo "Similiarity is $similarity%" >> $log
+echo "Similarity is $similarity%" >> $log
 if [ $similarity -lt 95 ]; then
     wdiff $baseline $output > $diff
     echo "[DIFF FAILED] Similarity is $similarity%. Diff: $diff. Log: $log. Rerun test: make $bin"
