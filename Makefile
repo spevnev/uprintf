@@ -44,7 +44,7 @@ all_tests: $(foreach C,$(COMPILERS),$(foreach O,$(O_LEVELS),$(foreach G,$(G_LEVE
 export
 
 define TEST_TEMPLATE
-$(BUILD_DIR)/all/$1/$1-$2-$3-$4-$5: $(TEST_DIR)/$1.c src/uprintf.h Makefile
+$(BUILD_DIR)/all/$1/$1-$2-$3-$4-$5: $(TEST_DIR)/$1.c src/uprintf.h Makefile test.sh
 	@./test.sh $1 $2 $3 $4 $5
 endef
 
