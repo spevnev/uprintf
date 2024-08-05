@@ -2,6 +2,8 @@
 #define UPRINTF_IMPLEMENTATION
 #include "uprintf.h"
 
+#define NODES 5
+
 typedef struct Node {
     int value;
     struct Node *next;
@@ -14,7 +16,7 @@ int main(void) {
     };
 
     Node *cur = &head;
-    for (int i = 1; i <= 5; i++) {
+    for (int i = 1; i < NODES; i++) {
         Node *node = (Node *) malloc(sizeof(*node));
         if (node == NULL) return 1;
         node->value = i * 2;

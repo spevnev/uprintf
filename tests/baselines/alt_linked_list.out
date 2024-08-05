@@ -8,10 +8,7 @@ Alternating linked list: {
                 float value = -3.690000
                 NodeA *next = POINTER ({
                     int value = 8
-                    NodeB *next = POINTER ({
-                        float value = -6.150000
-                        NodeA *next = NULL
-                    })
+                    NodeB *next = NULL
                 })
             })
         })

@@ -2,6 +2,8 @@
 #define UPRINTF_IMPLEMENTATION
 #include "uprintf.h"
 
+#define NODES 5
+
 struct NodeB;
 
 typedef struct NodeA {
@@ -21,7 +23,7 @@ int main(void) {
     };
 
     void *_cur = &head;
-    for (int i = 1; i <= 5; i++) {
+    for (int i = 1; i < NODES; i++) {
         if (i % 2 == 0) {
             NodeB *cur = (NodeB *) _cur;
             NodeA *node = (NodeA *) malloc(sizeof(*node));

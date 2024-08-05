@@ -8,10 +8,7 @@ Linked list: {
                 int value = 6
                 Node *next = POINTER ({
                     int value = 8
-                    Node *next = POINTER ({
-                        int value = 10
-                        Node *next = NULL
-                    })
+                    Node *next = NULL
                 })
             })
         })
