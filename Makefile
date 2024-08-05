@@ -1,6 +1,6 @@
 CC     := gcc
 FLAGS  := -g3 -O2 -std=c17
-CFLAGS := -Wall -Wextra -pedantic -Isrc -fsanitize=undefined,address,leak -DUPRINTF_TEST
+CFLAGS := -Wall -Wextra -pedantic -I src -fsanitize=undefined,address,leak -DUPRINTF_TEST
 
 BUILD_DIR    := build
 TEST_DIR     := tests
@@ -20,6 +20,15 @@ all: tests
 .PHONY: clean
 clean:
 	rm -rf $(BUILD_DIR)
+
+.PHONY: install
+install:
+	cp src/uprintf.h /usr/local/include/uprintf.h
+	chmod 644 /usr/local/include/uprintf.h
+
+.PHONY: uninstall
+uninstall:
+	rm /usr/local/include/uprintf.h
 
 .PHONY: tests
 tests: $(patsubst %, $(BUILD_DIR)/tests/%, $(TESTS))

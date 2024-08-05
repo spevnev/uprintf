@@ -10,8 +10,14 @@ The idea behind single-header libraries is that they're easy to distribute since
 By default the header file acts as any header would, i.e. contain declarations without definitions. \
 However, by defining a macro the header start to act as a .c file, i.e. contains definitions.
 
-## Usage
+## Installation
 
+Installing a single header library is as simple as downloading `src/uprintf.h`.
+
+If you cloned the repository, it can be installed to `/usr/local/include` by running `make install`. \
+This way you should be able to include it without copying the header to every project (since it is a default include path).
+
+## Usage
 
 Adding uprintf to your project:
 
