@@ -1,0 +1,29 @@
+Binary tree: {
+    _Node *left = POINTER ({
+        _Node *left = POINTER ({
+            _Node *left = NULL
+            _Node *right = NULL
+            int value = 5
+        })
+        _Node *right = POINTER ({
+            _Node *left = NULL
+            _Node *right = NULL
+            int value = 8
+        })
+        int value = 4
+    })
+    _Node *right = POINTER ({
+        _Node *left = POINTER ({
+            _Node *left = NULL
+            _Node *right = NULL
+            int value = 7
+        })
+        _Node *right = POINTER ({
+            _Node *left = NULL
+            _Node *right = NULL
+            int value = 12
+        })
+        int value = 6
+    })
+    int value = 3
+}
