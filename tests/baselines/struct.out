@@ -1,0 +1,21 @@
+Struct containing all types: {
+    uint8_t u8 = 255
+    short unsigned int u16 = 65535
+    unsigned int u32 = 4294967295
+    long long unsigned int u64 = 18446744073709551615
+    i8_t i8 = -128
+    short int i16 = -32768
+    int32_t i32 = -2147483648
+    long int i64 = -9223372036854775807
+    signed char sch = -99
+    unsigned char uch = 99 ('c')
+    float f32 = 0.123000
+    long_float f64 = -0.321000
+    void *void_ptr = POINTER
+    int *int_ptr = POINTER (5)
+    float *null_ptr = NULL
+    char *ch_ptr = NULL
+    const char *str = POINTER ("str string")
+    char *const const_str = POINTER ("const_str string")
+    _Bool b = true
+}
