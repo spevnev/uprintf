@@ -1,0 +1,5 @@
+Default enums: ZERO (0), THREE (3)
+Positive enums: FIVE (5), SEVEN (7)
+Negative enums: MINUS_TWO (-2), MINUS_ZERO (0)
+Different zero enums: ZERO (0), MINUS_ZERO (0)
+Invalid enums: (unknown) (4294967286), (unknown) (10)
