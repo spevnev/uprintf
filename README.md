@@ -19,6 +19,8 @@ This way you should be able to include it without copying the header to every pr
 
 ## Usage
 
+Requirements: elf.h, dwarf.h
+
 Adding uprintf to your project:
 
 1. Pick a single file and define `UPRINTF_IMPLEMENTATION` before the include:

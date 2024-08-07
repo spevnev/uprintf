@@ -2483,12 +2483,10 @@ static void _upf_parse_elf(void) {
 
     const Elf64_Ehdr *header = (Elf64_Ehdr *) file;
 
-    _UPF_ASSERT(memcmp(header->e_ident, ELFMAG, SELFMAG) == 0);
-    _UPF_ASSERT(header->e_ident[EI_CLASS] == ELFCLASS64);
-    _UPF_ASSERT(header->e_ident[EI_VERSION] == 1);
-    _UPF_ASSERT(header->e_machine == EM_X86_64);
-    _UPF_ASSERT(header->e_version == 1);
-    _UPF_ASSERT(header->e_shentsize == sizeof(Elf64_Shdr));
+    if (memcmp(header->e_ident, ELFMAG, SELFMAG) != 0 || header->e_ident[EI_CLASS] != ELFCLASS64 || header->e_ident[EI_VERSION] != 1
+        || header->e_machine != EM_X86_64 || header->e_version != 1 || header->e_shentsize != sizeof(Elf64_Shdr)) {
+        _UPF_ERROR("Unsupported or invalid ELF file.");
+    }
 
     const Elf64_Shdr *string_section = (Elf64_Shdr *) (file + header->e_shoff + header->e_shstrndx * header->e_shentsize);
     const char *string_table = (char *) (file + string_section->sh_offset);
