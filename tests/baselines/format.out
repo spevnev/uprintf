@@ -1,0 +1,4 @@
+Escaped format specifier: 100 %
+(uprintf) [ERROR] Unfinished format specifier at the end of the line at tests/format.c:11.
+(uprintf) [ERROR] Unfinished format specifier at the end of the line at tests/format.c:15.
+(uprintf) [ERROR] Unknown format specifier "%d" at tests/format.c:19.
