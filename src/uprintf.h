@@ -1,5 +1,5 @@
 // Usage and other information can be found in README at https://github.com/spevnev/uprintf
-// Bugs and suggestions can be submitted at https://github.com/spevnev/uprintf/issues
+// Bugs and suggestions can be submitted to https://github.com/spevnev/uprintf/issues
 
 // MIT License
 //

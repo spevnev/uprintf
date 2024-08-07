@@ -1,20 +1,20 @@
-# Ultimate printf
+# Universal printf
 
-uprintf is a single-header [stb-style](https://github.com/nothings/stb?tab=readme-ov-file#faq) library for printing any array or structure in C. \
-It only works on Linux when the program is built with debug information.
+uprintf is a single-header library for printing structures in C. \
+It only works on Linux when the executable is built with debug information.
 
 ### What is a single header library?
 
 The idea behind single-header libraries is that they're easy to distribute since it's trivial to add them to any project.
 
-By default the header file acts as any header would, i.e. contain declarations without definitions. \
+By default the header file acts as any header would, i.e. contains declarations without definitions. \
 However, by defining a macro the header start to act as a .c file, i.e. contains definitions.
 
 ## Installation
 
 Installing a single header library is as simple as downloading `src/uprintf.h`.
 
-If you cloned the repository, it can be installed to `/usr/local/include` by running `make install`. \
+If you have cloned the repository, it can be installed to `/usr/local/include` by running `make install`. \
 This way you should be able to include it without copying the header to every project (since it is a default include path).
 
 ## Usage
