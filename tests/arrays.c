@@ -12,10 +12,9 @@ int main(void) {
     uprintf("2x2x1 subarray %S\n", &arr3d[1]);
     uprintf("2x1x1 subarray %S\n", &arr3d[1][1]);
 
-    const _upf_token signs[] = {{_UPF_TOK_OPEN_PAREN, "("},    {_UPF_TOK_CLOSE_PAREN, ")"}, {_UPF_TOK_OPEN_BRACKET, "["},
-                                {_UPF_TOK_CLOSE_BRACKET, "]"}, {_UPF_TOK_STAR, "*"},        {_UPF_TOK_AMPERSAND, "&"},
-                                {_UPF_TOK_COMMA, ","},         {_UPF_TOK_DOT, "."},         {_UPF_TOK_ARROW, "->"}};
-    uprintf("Array of tokenizer signs: %S\n", &signs);
+    uprintf("2x2x1 array %S\n", arr3d);
+    uprintf("2x1x1 array %S\n", arr3d[1]);
+    uprintf("int %S\n", arr3d[1][1]);
 
     return _upf_test_status;
 }
