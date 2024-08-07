@@ -63,6 +63,19 @@ macro |  description | default
 `UPRINTF_INDENTATION_WIDTH` | The number of spaces to use for indentation | 4
 `UPRINTF_MAX_DEPTH` | How deep can nested structures be | 10
 
+## How does it work?
+
+TL;DR It works by inspecting debugging information of the executable in a way similar to `print` in `gdb`.
+
+Longer explanation:
+1. Parse ELF and DWARF.
+2. Get all scopes and types.
+3. Associate current call with one of scopes based on its PC.
+4. Parse provided arguments.
+5. If the argument is casted, get typename, otherwise get variable name.
+6. If the argument is casted, find type by its name, otherwise find variable in the scope and get its type.
+7. Print data using type definition to know location and format of the fields.
+
 ## Tests
 
 Requirements: sed, awk, wdiff
@@ -76,4 +89,4 @@ $ make all_tests
 Tests work by:
 1. Checking errors during compilation.
 2. Checking errors and warnings during execution.
-3. Comparing output to baseline (which is manually updated/created, when needed).
+3. Comparing output to baseline, which is manually created/updated.
