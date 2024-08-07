@@ -1956,7 +1956,10 @@ static void _upf_print_type(const uint8_t *data, const _upf_type *type, int dept
             if (pointed_type->kind == _UPF_TK_SCHAR || pointed_type->kind == _UPF_TK_UCHAR) {
                 _upf_bprintf("%p (\"", ptr);
                 const char *str = ptr;
-                while (*str != '\0') _upf_bprintf("%s", _upf_escape_char(*str++));
+                while (*str != '\0') {
+                    _upf_bprintf("%s", _upf_escape_char(*str));
+                    str++;  // Increment inside of macro (_upf_bprintf) may be triggered twice
+                }
                 _upf_bprintf("\")");
                 return;
             }

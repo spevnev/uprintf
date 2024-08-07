@@ -5,6 +5,7 @@ output_file="$1-$2-$3-$4-$5"
 baseline="$BASELINE_DIR/$1.out"
 dir="$BUILD_DIR/all/$1"
 bin="$dir/$output_file"
+failed="$bin.failed"
 log="$bin.log"
 output="$bin.out"
 diff="$bin.diff"
@@ -20,8 +21,8 @@ fi
 # Running
 ./$bin > $output 2>&1
 if [ $? -ne 0 ]; then
-    rm $bin
-    echo "[TEST FAILED] Log: $log. Rerun test: make $bin"
+    mv $bin $failed
+    echo "[TEST FAILED] Log: $log. Failed test binary: $failed. Rerun test: make $bin"
     exit 1
 fi
 cat $output >> $log
