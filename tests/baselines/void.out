@@ -1,0 +1,5 @@
+(uprintf) [ERROR] Unable to print void* because it can point to arbitrary data of any length. To print the pointer itself, you must take pointer (&) of "v" at tests/void.c:8.
+void* POINTER
+void** POINTER, void* POINTER
+void*** POINTER, void** POINTER
+void*[] [POINTER, POINTER, POINTER]
