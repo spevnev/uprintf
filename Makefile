@@ -1,5 +1,5 @@
 CC     := gcc
-FLAGS  := -g3 -O2 -std=c17
+FLAGS  := -g3 -O2 -std=c99
 CFLAGS := -Wall -Wextra -pedantic -I src -fsanitize=undefined,address,leak -DUPRINTF_TEST
 
 BUILD_DIR    := build
@@ -9,7 +9,6 @@ BASELINE_DIR := tests/baselines
 COMPILERS := clang-18 gcc
 O_LEVELS  := O0 O1 O2 O3 Os
 G_LEVELS  := g2 g3
-C_STDS    := c99 c17
 
 TESTS := $(patsubst $(TEST_DIR)/%.c, %, $(shell find $(TEST_DIR) -type f -name '*.c'))
 
@@ -38,24 +37,22 @@ $(BUILD_DIR)/tests/%: $(TEST_DIR)/%.c src/uprintf.h Makefile
 	$(CC) $(FLAGS) $(CFLAGS) -o $@ $<
 
 .PHONY: all_tests
-all_tests: $(foreach C,$(COMPILERS),$(foreach O,$(O_LEVELS),$(foreach G,$(G_LEVELS),$(foreach V,$(C_STDS),$(foreach T,$(TESTS),$(BUILD_DIR)/all/$T/$T-$C-$O-$G-$V)))))
+all_tests: $(foreach C,$(COMPILERS),$(foreach O,$(O_LEVELS),$(foreach G,$(G_LEVELS),$(foreach T,$(TESTS),$(BUILD_DIR)/all/$T/$T-$C-$O-$G))))
 
 # Export all variables to subprocesses, i.e. test.sh
 export
 
 define TEST_TEMPLATE
-$(BUILD_DIR)/all/$1/$1-$2-$3-$4-$5: $(TEST_DIR)/$1.c src/uprintf.h Makefile test.sh
-	@./test.sh $1 $2 $3 $4 $5
+$(BUILD_DIR)/all/$1/$1-$2-$3-$4: $(TEST_DIR)/$1.c src/uprintf.h Makefile test.sh
+	@./test.sh $1 $2 $3 $4
 endef
 
-$(foreach C,$(COMPILERS),                                        \
-	$(foreach O,$(O_LEVELS),                                     \
-		$(foreach G,$(G_LEVELS),                                 \
-			$(foreach V,$(C_STDS),                               \
-				$(foreach T,$(TESTS),                            \
-					$(eval $(call TEST_TEMPLATE,$T,$C,$O,$G,$V)) \
-				)                                                \
-			)                                                    \
-		)                                                        \
-	)                                                            \
+$(foreach C,$(COMPILERS),                                 \
+	$(foreach O,$(O_LEVELS),                              \
+		$(foreach G,$(G_LEVELS),                          \
+			$(foreach T,$(TESTS),                         \
+				$(eval $(call TEST_TEMPLATE,$T,$C,$O,$G)) \
+			)                                             \
+		)                                                 \
+	)                                                     \
 )

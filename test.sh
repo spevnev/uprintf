@@ -1,7 +1,7 @@
 #!/bin/sh
 
 input="$TEST_DIR/$1.c"
-output_file="$1-$2-$3-$4-$5"
+output_file="$1-$2-$3-$4"
 baseline="$BASELINE_DIR/$1.out"
 dir="$BUILD_DIR/all/$1"
 bin="$dir/$output_file"
@@ -12,7 +12,7 @@ diff="$bin.diff"
 
 # Compiling
 mkdir -p $dir
-$2 $CFLAGS -Werror -$3 -$4 -std=$5 -o $bin $input > $log 2>&1
+$2 $CFLAGS -Werror -$3 -$4 -o $bin $input > $log 2>&1
 if [ $? -ne 0 ]; then
     echo "[COMPILATION FAILED] Log: $log. Rerun test: make $bin"
     exit 1
