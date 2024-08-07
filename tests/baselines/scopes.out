@@ -1,0 +1,7 @@
+int = 1
+double = 1.234000
+string = POINTER ("string variable")
+int8_t = -5
+int8_t = -5
+size_t = 3
+size_t = 4
