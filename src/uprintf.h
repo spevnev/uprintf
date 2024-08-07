@@ -1031,6 +1031,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
             bool generate_name = element_type->name != NULL && type.name == NULL;
             if (generate_name) type.name = element_type->name;
 
+            bool is_static = true;
             size_t array_size = element_type->size;
             while (1) {
                 die += _upf_uLEB_to_uint64(die, &code);
@@ -1058,10 +1059,17 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
 
                     die += _upf_get_attr_size(die, attr.form);
                 }
-                _UPF_ASSERT(length != _UPF_INVALID);
 
-                array_size *= length;
-                _UPF_VECTOR_PUSH(&type.as.array.lengths, length);
+                if (length == _UPF_INVALID) {
+                    is_static = false;
+                    array_size = _UPF_INVALID;
+                    type.as.array.lengths.length = 0;
+                }
+
+                if (is_static) {
+                    array_size *= length;
+                    _UPF_VECTOR_PUSH(&type.as.array.lengths, length);
+                }
 
                 if (generate_name) type.name = _upf_arena_concat(&_upf_arena, type.name, "[]");
             }
@@ -1896,8 +1904,13 @@ static void _upf_print_type(const uint8_t *data, const _upf_type *type, int dept
             const uint8_t *array = data;
             const _upf_type *element_type = _upf_get_type(type->as.array.element_type);
 
-            if (element_type->size == _UPF_INVALID || type->as.array.lengths.length == 0) {
+            if (element_type->size == _UPF_INVALID) {
                 _upf_bprintf("(unknown)");
+                return;
+            }
+
+            if (type->as.array.lengths.length == 0) {
+                _upf_bprintf("(non-static array)");
                 return;
             }
 

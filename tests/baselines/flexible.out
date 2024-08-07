@@ -1,0 +1,4 @@
+Struct with a flexible array member: {
+    int count = 5
+    int[] flexible = (non-static array)
+}
