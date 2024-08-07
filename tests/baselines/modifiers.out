@@ -1,0 +1,14 @@
+Modifiers: {
+    int i = 1
+    const int ci = 2
+    volatile int vi = 3
+    int *p = POINTER (5)
+    const int *cp = POINTER (5)
+    int *const pc = POINTER (5)
+    const int *const cpc = POINTER (5)
+    volatile int *vp = POINTER (5)
+    int *volatile pv = POINTER (5)
+    volatile int *volatile vpv = POINTER (5)
+    int *restrict pr = POINTER (5)
+    const volatile int *const volatile restrict cvprcv = POINTER (5)
+}
