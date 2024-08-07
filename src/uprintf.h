@@ -396,7 +396,7 @@ typedef struct {
 
 // ================= GLOBAL VARIABLES =====================
 
-#define _UPF_INITIAL_BUFFER_SIZE 32
+#define _UPF_INITIAL_BUFFER_SIZE 512
 
 static jmp_buf _upf_jmp_buf;
 static bool _upf_is_init = false;
@@ -1881,7 +1881,9 @@ static void _upf_print_type(const uint8_t *data, const _upf_type *type, int dept
                 memcpy(&temp, data, sizeof(temp));
                 enum_value = temp;
             } else if (underlying_type->kind == _UPF_TK_S4) {
-                memcpy(&enum_value, data, sizeof(enum_value));
+                int32_t temp;
+                memcpy(&temp, data, sizeof(temp));
+                enum_value = temp;
             } else {
                 _UPF_WARN("Expected enum to use int32_t or uint32_t. Ignoring this type.");
                 _upf_bprintf("(enum)");
