@@ -1903,7 +1903,6 @@ static void _upf_print_type(const uint8_t *data, const _upf_type *type, int dept
             _upf_bprintf(")");
         } break;
         case _UPF_TK_ARRAY: {
-            const uint8_t *array = data;
             const _upf_type *element_type = _upf_get_type(type->as.array.element_type);
 
             if (element_type->size == _UPF_INVALID) {
@@ -1928,7 +1927,7 @@ static void _upf_print_type(const uint8_t *data, const _upf_type *type, int dept
                 for (size_t i = 0; i < type->as.array.lengths.data[0]; i++) {
                     if (i > 0) _upf_bprintf(",\n");
                     _upf_bprintf("%*s", UPRINTF_INDENTATION_WIDTH * (depth + 1), "");
-                    _upf_print_type(array + subarray_size * i, &subarray, depth + 1);
+                    _upf_print_type(data + subarray_size * i, &subarray, depth + 1);
                 }
                 _upf_bprintf("\n%*s]", UPRINTF_INDENTATION_WIDTH * depth, "");
             } else {
@@ -1936,7 +1935,7 @@ static void _upf_print_type(const uint8_t *data, const _upf_type *type, int dept
                     _upf_bprintf("[");
                     for (size_t i = 0; i < type->as.array.lengths.data[0]; i++) {
                         if (i > 0) _upf_bprintf(", ");
-                        _upf_print_type(array + element_type->size * i, element_type, depth);
+                        _upf_print_type(data + element_type->size * i, element_type, depth);
                     }
                     _upf_bprintf("]");
                 } else {
@@ -1944,14 +1943,15 @@ static void _upf_print_type(const uint8_t *data, const _upf_type *type, int dept
                     for (size_t i = 0; i < type->as.array.lengths.data[0]; i++) {
                         if (i > 0) _upf_bprintf(",\n");
                         _upf_bprintf("%*s", UPRINTF_INDENTATION_WIDTH * (depth + 1), "");
-                        _upf_print_type(array + element_type->size * i, element_type, depth + 1);
+                        _upf_print_type(data + element_type->size * i, element_type, depth + 1);
                     }
                     _upf_bprintf("\n%*s]", UPRINTF_INDENTATION_WIDTH * depth, "");
                 }
             }
         } break;
         case _UPF_TK_POINTER: {
-            const void *ptr = *((void **) data);
+            void *ptr;
+            memcpy(&ptr, data, sizeof(ptr));
             if (ptr == NULL) {
                 _upf_bprintf("NULL");
                 return;
@@ -1986,35 +1986,53 @@ static void _upf_print_type(const uint8_t *data, const _upf_type *type, int dept
         case _UPF_TK_U1:
             _upf_bprintf("%hhu", *data);
             break;
-        case _UPF_TK_U2:
-            _upf_bprintf("%hu", *((uint16_t *) data));
-            break;
-        case _UPF_TK_U4:
-            _upf_bprintf("%u", *((uint32_t *) data));
-            break;
-        case _UPF_TK_U8:
-            _upf_bprintf("%lu", *((uint64_t *) data));
-            break;
-        case _UPF_TK_S1:
-            _upf_bprintf("%hhd", *((int8_t *) data));
-            break;
-        case _UPF_TK_S2:
-            _upf_bprintf("%hd", *((int16_t *) data));
-            break;
-        case _UPF_TK_S4:
-            _upf_bprintf("%d", *((int32_t *) data));
-            break;
-        case _UPF_TK_S8:
-            _upf_bprintf("%ld", *((int64_t *) data));
-            break;
-        case _UPF_TK_F4:
-            _upf_bprintf("%f", *((float *) data));
-            break;
-        case _UPF_TK_F8:
-            _upf_bprintf("%lf", *((double *) data));
-            break;
+        case _UPF_TK_U2: {
+            uint16_t temp;
+            memcpy(&temp, data, sizeof(temp));
+            _upf_bprintf("%hu", temp);
+        } break;
+        case _UPF_TK_U4: {
+            uint32_t temp;
+            memcpy(&temp, data, sizeof(temp));
+            _upf_bprintf("%u", temp);
+        } break;
+        case _UPF_TK_U8: {
+            uint64_t temp;
+            memcpy(&temp, data, sizeof(temp));
+            _upf_bprintf("%lu", temp);
+        } break;
+        case _UPF_TK_S1: {
+            int8_t temp;
+            memcpy(&temp, data, sizeof(temp));
+            _upf_bprintf("%hhd", temp);
+        } break;
+        case _UPF_TK_S2: {
+            int16_t temp;
+            memcpy(&temp, data, sizeof(temp));
+            _upf_bprintf("%hd", temp);
+        } break;
+        case _UPF_TK_S4: {
+            int32_t temp;
+            memcpy(&temp, data, sizeof(temp));
+            _upf_bprintf("%d", temp);
+        } break;
+        case _UPF_TK_S8: {
+            int64_t temp;
+            memcpy(&temp, data, sizeof(temp));
+            _upf_bprintf("%ld", temp);
+        } break;
+        case _UPF_TK_F4: {
+            float temp;
+            memcpy(&temp, data, sizeof(temp));
+            _upf_bprintf("%f", temp);
+        } break;
+        case _UPF_TK_F8: {
+            double temp;
+            memcpy(&temp, data, sizeof(temp));
+            _upf_bprintf("%lf", temp);
+        } break;
         case _UPF_TK_BOOL:
-            _upf_bprintf("%s", *((int8_t *) data) ? "true" : "false");
+            _upf_bprintf("%s", *data ? "true" : "false");
             break;
         case _UPF_TK_SCHAR: {
             char ch = *((char *) data);
