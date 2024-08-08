@@ -34,7 +34,7 @@ if [ ! -f $baseline ]; then
     exit 0
 fi
 
-sed -E "s/0x[0-9a-fA-F]{6,16}/POINTER/" -i $baseline -i $output
+sed -E "s/0x[0-9a-fA-F]{6,16}/POINTER/g" -i $baseline -i $output
 similarity=$(wdiff -123 --statistics $baseline $output | head -n 1 | \
     awk -F ':' '{print $NF}' | awk -F ' ' '{print $4}' | sed 's/%$//')
 echo "Similarity is $similarity%" >> $log
