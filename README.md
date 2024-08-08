@@ -63,6 +63,7 @@ macro |  description | default
 -|-|-
 `UPRINTF_INDENTATION_WIDTH` | The number of spaces to use for indentation | 4
 `UPRINTF_MAX_DEPTH` | How deep can nested structures be | 10
+`UPRINTF_IGNORE_STDIO_FILE` | Should `stdio.h`'s `FILE` be ignored | true
 
 ## How does it work?
 

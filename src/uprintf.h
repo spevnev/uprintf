@@ -74,6 +74,10 @@ void _upf_uprintf(const char *file, int line, const char *fmt, const char *args,
 #define UPRINTF_MAX_DEPTH 10
 #endif
 
+#ifndef UPRINTF_IGNORE_STDIO_FILE
+#define UPRINTF_IGNORE_STDIO_FILE true
+#endif
+
 // ===================== INCLUDES =========================
 
 #define __USE_XOPEN_EXTENDED
@@ -1872,6 +1876,13 @@ static void _upf_print_type(const uint8_t *data, const _upf_type *type, int dept
             _upf_bprintf("(union) ");
             __attribute__((fallthrough));  // Handle union as struct
         case _UPF_TK_STRUCT: {
+#if UPRINTF_IGNORE_STDIO_FILE
+            if (strcmp(type->name, "FILE") == 0) {
+                _upf_bprintf("(ignored)");
+                return;
+            }
+#endif
+
             _upf_member_vec members = type->as.cstruct.members;
 
             _upf_bprintf("{\n");
