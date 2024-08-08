@@ -19,9 +19,13 @@ This way you should be able to include it without copying the header to every pr
 
 ## Usage
 
-Requirements: elf.h, dwarf.h
 
 Adding uprintf to your project:
+
+0. Requirements: \
+    Minimum C version is 99 \
+    Compile with debug information, either `-g2` or `-g3` \
+    Have `elf.h` and `dwarf.h` in include path
 
 1. Pick a single file and define `UPRINTF_IMPLEMENTATION` before the include:
     ```c
@@ -40,11 +44,7 @@ Adding uprintf to your project:
     uprintf(fmt, ...);
     ```
     *fmt* - format string with `%S` format specifier (**NOTE: printf specifiers are NOT supported**). Use `%%` to print `%`. \
-    For each format specifier there must be a pointer to whatever should be printed in its place.
-
-4. Compile with debug information, i.e. `-g2` or `-g3`.
-
-Examples can be found in `tests/`.
+    For each format specifier there must be a pointer to whatever should be printed in its place (except `void*`).
 
 ### Options
 
