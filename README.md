@@ -19,6 +19,7 @@ This way you should be able to include it without copying the header to every pr
 
 ## Usage
 
+You can take a look at `examples/`, and build them using `make examples`
 
 Adding uprintf to your project:
 
@@ -83,7 +84,7 @@ Requirements: sed, awk, wdiff
 Tests take long to complete, so it is highly recommended to set `-j NUMBER_OF_CORES`.
 
 ```console
-$ make all_tests
+$ make tests
 ```
 
 Tests work by:

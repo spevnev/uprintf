@@ -3,7 +3,7 @@
 input="$TEST_DIR/$1.c"
 output_file="$1-$2-$3-$4"
 baseline="$BASELINE_DIR/$1.out"
-dir="$BUILD_DIR/all/$1"
+dir="$BUILD_DIR/test/$1"
 bin="$dir/$output_file"
 failed="$bin.failed"
 log="$bin.log"
