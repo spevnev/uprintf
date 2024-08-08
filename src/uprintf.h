@@ -1153,9 +1153,12 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
             if (subtype_offset != _UPF_INVALID) {
                 // `void*`s have invalid offset (since they don't point to any type), thus
                 // pointer with invalid type represents a `void*`
+
+                size_t subtype_idx = _upf_parse_type(cu, cu->base + subtype_offset);
+                // Pointers inside vector may become invalid if _upf_parse_type fills up the vector triggering realloc
                 _upf_type *type = &_upf_type_map.data[type_idx].type;
-                type->as.pointer.type = _upf_parse_type(cu, cu->base + subtype_offset);
-                type->name = _upf_get_type(type->as.pointer.type)->name;
+                type->as.pointer.type = subtype_idx;
+                type->name = _upf_get_type(subtype_idx)->name;
             }
 
             return type_idx;
@@ -2387,8 +2390,9 @@ static _upf_size_t_vec _upf_parse_args(_upf_tokenizer *t, uint64_t pc) {
                     casted_typename, t->args.data[t->arg_idx], t->file, t->line);
             }
         } else {
-            if (vars.length == 0)
+            if (vars.length == 0) {
                 _UPF_ERROR("Unable to find variable name while parsing \"%s\" at %s:%d.", t->args.data[t->arg_idx], t->file, t->line);
+            }
 
             for (size_t i = 0; i < _upf_cus.length; i++) {
                 const _upf_cu *cu = &_upf_cus.data[i];
@@ -2439,6 +2443,7 @@ static _upf_size_t_vec _upf_parse_args(_upf_tokenizer *t, uint64_t pc) {
                 } else if (dereference == dimensions) {
                     type_idx = type->as.array.element_type;
                 } else {
+                    // This may invalidate type pointer
                     type_idx = _upf_add_type(NULL, _upf_get_subarray(type, dereference));
                 }
 
