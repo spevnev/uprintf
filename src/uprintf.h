@@ -1218,7 +1218,20 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
             return _upf_add_type(base, type);
         }
         case DW_TAG_typedef: {
-            _UPF_ASSERT(name != NULL && subtype_offset != _UPF_INVALID);
+            _UPF_ASSERT(name != NULL);
+
+            if (subtype_offset == _UPF_INVALID) {
+                // void type is represented by absence of type attribute, e.g. typedef void NAME
+
+                _upf_type type = {
+                    .name = name,
+                    .kind = _UPF_TK_VOID,
+                    .modifiers = 0,
+                    .size = _UPF_INVALID,
+                };
+
+                return _upf_add_type(base, type);
+            }
 
             size_t type_idx = _upf_parse_type(cu, cu->base + subtype_offset);
             _upf_type type = *_upf_get_type(type_idx);
