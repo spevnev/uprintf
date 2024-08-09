@@ -1,5 +1,5 @@
 CC     := gcc
-FLAGS  := -g3 -O2 -std=c99
+FLAGS  := -O2 -g2 -std=c99
 CFLAGS := -Wall -Wextra -pedantic -I src -fsanitize=undefined,address,leak -DUPRINTF_TEST
 
 BUILD_DIR    := build
@@ -9,7 +9,7 @@ TEST_DIR     := tests
 BASELINE_DIR := tests/baselines
 
 COMPILERS := clang-18 gcc
-O_LEVELS  := O0 O1 O2 O3 Os
+O_LEVELS  := O0 O2 O3 Os
 G_LEVELS  := g2 g3
 
 EXAMPLES := $(patsubst $(EXAMPLE_DIR)/%.c, %, $(shell find $(EXAMPLE_DIR) -type f -name '*.c'))
@@ -32,6 +32,7 @@ install:
 uninstall:
 	rm /usr/local/include/uprintf.h
 
+
 .PHONY: examples
 examples: $(patsubst %, $(BUILD_DIR)/$(EXAMPLE_DIR)/%, $(EXAMPLES))
 
@@ -42,6 +43,7 @@ $(BUILD_DIR)/$(EXAMPLE_DIR)/vorbis: $(EXAMPLE_DIR)/vorbis.c $(LIB_DIR)/stb_vorbi
 $(LIB_DIR)/stb_vorbis.c:
 	@mkdir -p $(@D)
 	wget https://raw.githubusercontent.com/nothings/stb/master/stb_vorbis.c -O $@
+
 
 .PHONY: tests
 tests: $(foreach C,$(COMPILERS),$(foreach O,$(O_LEVELS),$(foreach G,$(G_LEVELS),$(foreach T,$(TESTS),$(BUILD_DIR)/test/$T/$T-$C-$O-$G))))
