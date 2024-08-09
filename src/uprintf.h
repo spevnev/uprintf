@@ -1243,6 +1243,9 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
             _upf_type type = *_upf_get_type(type_idx);
             type.name = name;
 
+            if (type.kind == _UPF_TK_SCHAR && strcmp(name, "int8_t") == 0) type.kind = _UPF_TK_S1;
+            else if (type.kind == _UPF_TK_UCHAR && strcmp(name, "uint8_t") == 0) type.kind = _UPF_TK_U1;
+
             return _upf_add_type(base, type);
         }
         case DW_TAG_base_type: {
