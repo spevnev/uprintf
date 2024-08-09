@@ -1885,6 +1885,11 @@ static void _upf_print_type(const uint8_t *data, const _upf_type *type, int dept
 
             _upf_member_vec members = type->as.cstruct.members;
 
+            if (members.length == 0) {
+                _upf_bprintf("{}");
+                return;
+            }
+
             _upf_bprintf("{\n");
             for (size_t i = 0; i < members.length; i++) {
                 const _upf_member *member = &members.data[i];
@@ -2493,7 +2498,7 @@ static _upf_size_t_vec _upf_parse_args(_upf_tokenizer *t, uint64_t pc) {
     return types;
 }
 
-// ====================== OTHER ===========================
+// ======================= ELF ============================
 
 static void _upf_parse_elf(void) {
     struct stat file_info;
@@ -2549,6 +2554,8 @@ static void _upf_parse_elf(void) {
     }
 }
 
+// ================== /proc/pid/maps ======================
+
 // Function returns the address to which this executable is mapped to.
 // It is retrieved by reading `/proc/self/maps` (see `man proc_pid_maps`).
 // It is used to convert between DWARF addresses and runtime/real ones: DWARF
@@ -2573,8 +2580,9 @@ static void *_upf_get_this_file_address(void) {
         if (line[read - 1] == '\n') line[read - 1] = '\0';
 
         int path_offset;
-        if (sscanf(line, "%lx-%*x %*s %*x %*x:%*x %*u %n", &address, &path_offset) != 1)
+        if (sscanf(line, "%lx-%*x %*s %*x %*x:%*x %*u %n", &address, &path_offset) != 1) {
             _UPF_ERROR("Unable to parse \"/proc/self/maps\": invalid format.");
+        }
 
         if (strcmp(this_path, line + path_offset) == 0) break;
     }
