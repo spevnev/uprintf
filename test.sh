@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 input="$TEST_DIR/$1.c"
 output_file="$1-$2-$3-$4"
@@ -9,6 +9,14 @@ failed="$bin.failed"
 log="$bin.log"
 output="$bin.out"
 diff="$bin.diff"
+
+# Some tests may not match baseline exactly, so they get custom target similarity percentage.
+function get_similarity {
+    # These tests contain stdint.h types which have different typenames in gcc and clang
+    if   [ "$1" = "struct" ]; then echo 90;
+    elif [ "$1" = "packed" ]; then echo 90;
+    else echo 100; fi
+}
 
 # Compiling
 mkdir -p $dir
@@ -38,7 +46,7 @@ sed -E "s/0x[0-9a-fA-F]{6,16}/POINTER/g" -i $baseline -i $output
 similarity=$(wdiff -123 --statistics $baseline $output | head -n 1 | \
     awk -F ':' '{print $NF}' | awk -F ' ' '{print $4}' | sed 's/%$//')
 echo "Similarity is $similarity%" >> $log
-if [ $similarity -lt 90 ]; then
+if [ $similarity -lt $(get_similarity $1) ]; then
     wdiff $baseline $output > $diff
     echo "[DIFF FAILED] Similarity is $similarity%. Diff: $diff. Log: $log. Rerun test: make $bin"
     exit 1
