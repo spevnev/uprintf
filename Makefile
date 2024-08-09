@@ -8,7 +8,7 @@ EXAMPLE_DIR  := examples
 TEST_DIR     := tests
 BASELINE_DIR := tests/baselines
 
-COMPILERS := clang-18 gcc
+COMPILERS := clang gcc
 O_LEVELS  := O0 O2 O3 Os
 G_LEVELS  := g2 g3
 

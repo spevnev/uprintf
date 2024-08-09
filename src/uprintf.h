@@ -78,6 +78,10 @@ void _upf_uprintf(const char *file, int line, const char *fmt, const char *args,
 #define UPRINTF_IGNORE_STDIO_FILE true
 #endif
 
+#ifndef UPRINTF_ARRAY_COMPRESSION_THRESHOLD
+#define UPRINTF_ARRAY_COMPRESSION_THRESHOLD 4
+#endif
+
 // ===================== INCLUDES =========================
 
 #define __USE_XOPEN_EXTENDED
@@ -1987,7 +1991,19 @@ static void _upf_print_type(const uint8_t *data, const _upf_type *type, int dept
                 for (size_t i = 0; i < type->as.array.lengths.data[0]; i++) {
                     if (i > 0) _upf_bprintf(",\n");
                     _upf_bprintf("%*s", UPRINTF_INDENTATION_WIDTH * (depth + 1), "");
-                    _upf_print_type(data + subarray_size * i, &subarray, depth + 1);
+
+                    const uint8_t *current = data + subarray_size * i;
+                    _upf_print_type(current, &subarray, depth + 1);
+
+#if UPRINTF_ARRAY_COMPRESSION_THRESHOLD > 0
+                    size_t j = i;
+                    while (j < type->as.array.lengths.data[0] && memcmp(current, data + subarray_size * j, subarray_size) == 0) j++;
+                    int count = j - i;
+                    if (count >= UPRINTF_ARRAY_COMPRESSION_THRESHOLD) {
+                        _upf_bprintf(" <repeats %d times>", count);
+                        i = j - 1;
+                    }
+#endif
                 }
                 _upf_bprintf("\n%*s]", UPRINTF_INDENTATION_WIDTH * depth, "");
             } else {
@@ -1995,7 +2011,20 @@ static void _upf_print_type(const uint8_t *data, const _upf_type *type, int dept
                     _upf_bprintf("[");
                     for (size_t i = 0; i < type->as.array.lengths.data[0]; i++) {
                         if (i > 0) _upf_bprintf(", ");
-                        _upf_print_type(data + element_type->size * i, element_type, depth);
+                        const uint8_t *current = data + element_type->size * i;
+                        _upf_print_type(current, element_type, depth);
+
+#if UPRINTF_ARRAY_COMPRESSION_THRESHOLD > 0
+                        size_t j = i;
+                        while (j < type->as.array.lengths.data[0]
+                               && memcmp(current, data + element_type->size * j, element_type->size) == 0)
+                            j++;
+                        int count = j - i;
+                        if (count >= UPRINTF_ARRAY_COMPRESSION_THRESHOLD) {
+                            _upf_bprintf(" <repeats %d times>", count);
+                            i = j - 1;
+                        }
+#endif
                     }
                     _upf_bprintf("]");
                 } else {
@@ -2003,7 +2032,20 @@ static void _upf_print_type(const uint8_t *data, const _upf_type *type, int dept
                     for (size_t i = 0; i < type->as.array.lengths.data[0]; i++) {
                         if (i > 0) _upf_bprintf(",\n");
                         _upf_bprintf("%*s", UPRINTF_INDENTATION_WIDTH * (depth + 1), "");
-                        _upf_print_type(data + element_type->size * i, element_type, depth + 1);
+                        const uint8_t *current = data + element_type->size * i;
+                        _upf_print_type(current, element_type, depth + 1);
+
+#if UPRINTF_ARRAY_COMPRESSION_THRESHOLD > 0
+                        size_t j = i;
+                        while (j < type->as.array.lengths.data[0]
+                               && memcmp(current, data + element_type->size * j, element_type->size) == 0)
+                            j++;
+                        int count = j - i;
+                        if (count >= UPRINTF_ARRAY_COMPRESSION_THRESHOLD) {
+                            _upf_bprintf(" <repeats %d times>", count);
+                            i = j - 1;
+                        }
+#endif
                     }
                     _upf_bprintf("\n%*s]", UPRINTF_INDENTATION_WIDTH * depth, "");
                 }
