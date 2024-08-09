@@ -1862,7 +1862,7 @@ static void _upf_print_type(const uint8_t *data, const _upf_type *type, int dept
     }
 
     if (type->kind == _UPF_TK_UNKNOWN) {
-        _upf_bprintf("(unknown)");
+        _upf_bprintf("<unknown>");
         return;
     }
 
@@ -1873,12 +1873,12 @@ static void _upf_print_type(const uint8_t *data, const _upf_type *type, int dept
 
     switch (type->kind) {
         case _UPF_TK_UNION:
-            _upf_bprintf("(union) ");
+            _upf_bprintf("<union> ");
             __attribute__((fallthrough));  // Handle union as struct
         case _UPF_TK_STRUCT: {
 #if UPRINTF_IGNORE_STDIO_FILE
             if (strcmp(type->name, "FILE") == 0) {
-                _upf_bprintf("(ignored)");
+                _upf_bprintf("<ignored>");
                 return;
             }
 #endif
@@ -1918,7 +1918,7 @@ static void _upf_print_type(const uint8_t *data, const _upf_type *type, int dept
                 enum_value = temp;
             } else {
                 _UPF_WARN("Expected enum to use int32_t or uint32_t. Ignoring this type.");
-                _upf_bprintf("(enum)");
+                _upf_bprintf("<enum>");
                 break;
             }
 
@@ -1930,7 +1930,7 @@ static void _upf_print_type(const uint8_t *data, const _upf_type *type, int dept
                 }
             }
 
-            _upf_bprintf("%s (", name ? name : "(unknown)");
+            _upf_bprintf("%s (", name ? name : "<unknown>");
             _upf_print_type(data, underlying_type, depth);
             _upf_bprintf(")");
         } break;
@@ -1938,12 +1938,12 @@ static void _upf_print_type(const uint8_t *data, const _upf_type *type, int dept
             const _upf_type *element_type = _upf_get_type(type->as.array.element_type);
 
             if (element_type->size == _UPF_INVALID) {
-                _upf_bprintf("(unknown)");
+                _upf_bprintf("<unknown>");
                 return;
             }
 
             if (type->as.array.lengths.length == 0) {
-                _upf_bprintf("(non-static array)");
+                _upf_bprintf("<non-static array>");
                 return;
             }
 
@@ -2080,7 +2080,7 @@ static void _upf_print_type(const uint8_t *data, const _upf_type *type, int dept
             _UPF_WARN("void must be a pointer. Ignoring this type.");
             break;
         case _UPF_TK_UNKNOWN:
-            _upf_bprintf("(unknown)");
+            _upf_bprintf("<unknown>");
             break;
     }
 
