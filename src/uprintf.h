@@ -396,6 +396,8 @@ typedef struct {
 
     char *ptr;
     size_t free;
+
+    _upf_range_vec addresses;
 } _upf_call_info;
 
 // ================= GLOBAL VARIABLES =====================
@@ -1847,6 +1849,29 @@ static void _upf_print_typename(const _upf_type *type) {
     }
 }
 
+__attribute__((no_sanitize_address)) static void _upf_print_char_ptr(const char *str) {
+    const char *end = NULL;
+    for (size_t i = 0; i < _upf_call.addresses.length; i++) {
+        _upf_range range = _upf_call.addresses.data[i];
+        if ((char *) range.start <= str && str <= (char *) range.end) {
+            end = (char *) range.end;
+            break;
+        }
+    }
+
+    if (end == NULL) {
+        _upf_bprintf("%p (<out-of-bounds>)", (void *) str);
+        return;
+    }
+
+    _upf_bprintf("%p (\"", (void *) str);
+    while (*str != '\0' && str < end) {
+        _upf_bprintf("%s", _upf_escape_char(*str));
+        str++;  // Increment inside of macro (_upf_bprintf) may be triggered twice
+    }
+    _upf_bprintf("\")");
+}
+
 static void _upf_print_type(const uint8_t *data, const _upf_type *type, int depth) {
     _UPF_ASSERT(type != NULL);
 
@@ -2001,13 +2026,7 @@ static void _upf_print_type(const uint8_t *data, const _upf_type *type, int dept
             }
 
             if (pointed_type->kind == _UPF_TK_SCHAR || pointed_type->kind == _UPF_TK_UCHAR) {
-                _upf_bprintf("%p (\"", ptr);
-                const char *str = ptr;
-                while (*str != '\0') {
-                    _upf_bprintf("%s", _upf_escape_char(*str));
-                    str++;  // Increment inside of macro (_upf_bprintf) may be triggered twice
-                }
-                _upf_bprintf("\")");
+                _upf_print_char_ptr(ptr);
                 return;
             }
 
@@ -2593,6 +2612,34 @@ static void *_upf_get_this_file_address(void) {
     return (void *) address;
 }
 
+static _upf_range_vec _upf_get_address_ranges(void) {
+    FILE *file = fopen("/proc/self/maps", "r");
+    if (file == NULL) _UPF_ERROR("Unable to open \"/proc/self/maps\": %s.", strerror(errno));
+
+    _upf_range_vec ranges = _UPF_VECTOR_NEW(&_upf_arena);
+    _upf_range range = {
+        .start = _UPF_INVALID,
+        .end = _UPF_INVALID,
+    };
+    size_t length = 0;
+    char *line = NULL;
+    ssize_t read;
+    while ((read = getline(&line, &length, file)) != -1) {
+        if (read == 0) continue;
+        if (line[read - 1] == '\n') line[read - 1] = '\0';
+
+        if (sscanf(line, "%lx-%lx %*s %*x %*x:%*x %*u", &range.start, &range.end) != 2) {
+            _UPF_ERROR("Unable to parse \"/proc/self/maps\": invalid format.");
+        }
+
+        _UPF_VECTOR_PUSH(&ranges, range);
+    }
+    if (line) free(line);
+    fclose(file);
+
+    return ranges;
+}
+
 // =================== ENTRY POINTS =======================
 
 __attribute__((constructor)) void _upf_init(void) {
@@ -2630,6 +2677,7 @@ __attribute__((noinline)) void _upf_uprintf(const char *file, int line, const ch
     }
     _upf_call.ptr = _upf_call.buffer;
     _upf_call.free = _upf_call.size;
+    _upf_call.addresses = _upf_get_address_ranges();
 
     void *return_pc = __builtin_extract_return_addr(__builtin_return_address(0));
     _UPF_ASSERT(return_pc != NULL);
