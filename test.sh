@@ -15,6 +15,10 @@ function get_similarity {
     # These tests contain stdint.h types which have different typenames in gcc and clang
     if   [ "$1" = "struct" ]; then echo 90;
     elif [ "$1" = "packed" ]; then echo 90;
+    # FILE has different implementation which is up to stdio.h and it often has pointers
+    # that point out-of-bounds causing uprintf to print garbage from the memory, thus the
+    # primary goal of the test is to check that there are no errors, i.e. segfaults, leaks.
+    elif [ "$1" = "stdio_file" ]; then echo 1;
     else echo 100; fi
 }
 
