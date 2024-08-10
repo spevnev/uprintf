@@ -22,6 +22,7 @@ all: examples
 .PHONY: clean
 clean:
 	rm -rf $(BUILD_DIR)
+	rm -rf $(LIB_DIR)
 
 .PHONY: install
 install:
@@ -44,6 +45,14 @@ $(LIB_DIR)/stb_vorbis.c:
 	@mkdir -p $(@D)
 	wget https://raw.githubusercontent.com/nothings/stb/master/stb_vorbis.c -O $@
 
+$(BUILD_DIR)/$(EXAMPLE_DIR)/avl: $(EXAMPLE_DIR)/avl.c $(LIB_DIR)/avl src/uprintf.h Makefile
+	@mkdir -p $(@D)
+	$(CC) $(FLAGS) $(CFLAGS) -I $(LIB_DIR)/avl -o $@ $< $(LIB_DIR)/avl/avl.c
+
+$(LIB_DIR)/avl:
+	@mkdir -p $(@D)
+	git clone --depth 1 https://github.com/etherealvisage/avl $(LIB_DIR)/avl_src
+	mv $(LIB_DIR)/avl_src/src $@
 
 .PHONY: tests
 tests: $(foreach C,$(COMPILERS),$(foreach O,$(O_LEVELS),$(foreach G,$(G_LEVELS),$(foreach T,$(TESTS),$(BUILD_DIR)/test/$T/$T-$C-$O-$G))))
