@@ -1968,8 +1968,9 @@ static void _upf_print_type(const uint8_t *data, const _upf_type *type, int dept
         } break;
         case _UPF_TK_ARRAY: {
             const _upf_type *element_type = _upf_get_type(type->as.array.element_type);
+            size_t element_size = element_type->size;
 
-            if (element_type->size == _UPF_INVALID) {
+            if (element_size == _UPF_INVALID) {
                 _upf_bprintf("<unknown>");
                 return;
             }
@@ -1979,76 +1980,41 @@ static void _upf_print_type(const uint8_t *data, const _upf_type *type, int dept
                 return;
             }
 
+            _upf_type subarray;
             if (type->as.array.lengths.length > 1) {
-                _upf_type subarray = _upf_get_subarray(type, 1);
+                subarray = _upf_get_subarray(type, 1);
+                element_type = &subarray;
 
-                size_t subarray_size = element_type->size;
-                for (size_t j = 0; j < subarray.as.array.lengths.length; j++) {
-                    subarray_size *= subarray.as.array.lengths.data[j];
+                for (size_t i = 0; i < subarray.as.array.lengths.length; i++) {
+                    element_size *= subarray.as.array.lengths.data[i];
                 }
+            }
 
-                _upf_bprintf("[\n");
-                for (size_t i = 0; i < type->as.array.lengths.data[0]; i++) {
-                    if (i > 0) _upf_bprintf(",\n");
-                    _upf_bprintf("%*s", UPRINTF_INDENTATION_WIDTH * (depth + 1), "");
+            bool is_primitive = _upf_is_primitive(element_type);
+            _upf_bprintf(is_primitive ? "[" : "[\n");
+            for (size_t i = 0; i < type->as.array.lengths.data[0]; i++) {
+                if (i > 0) _upf_bprintf(is_primitive ? ", " : ",\n");
+                if (!is_primitive) _upf_bprintf("%*s", UPRINTF_INDENTATION_WIDTH * (depth + 1), "");
 
-                    const uint8_t *current = data + subarray_size * i;
-                    _upf_print_type(current, &subarray, depth + 1);
+                const uint8_t *current = data + element_size * i;
+                _upf_print_type(current, element_type, depth + 1);
 
 #if UPRINTF_ARRAY_COMPRESSION_THRESHOLD > 0
-                    size_t j = i;
-                    while (j < type->as.array.lengths.data[0] && memcmp(current, data + subarray_size * j, subarray_size) == 0) j++;
-                    int count = j - i;
-                    if (count >= UPRINTF_ARRAY_COMPRESSION_THRESHOLD) {
-                        _upf_bprintf(" <repeats %d times>", count);
-                        i = j - 1;
-                    }
-#endif
+                size_t j = i;
+                while (j < type->as.array.lengths.data[0] && memcmp(current, data + element_size * j, element_size) == 0) j++;
+
+                int count = j - i;
+                if (j - i >= UPRINTF_ARRAY_COMPRESSION_THRESHOLD) {
+                    _upf_bprintf(" <repeats %d times>", count);
+                    i = j - 1;
                 }
-                _upf_bprintf("\n%*s]", UPRINTF_INDENTATION_WIDTH * depth, "");
+#endif
+            }
+
+            if (is_primitive) {
+                _upf_bprintf("]");
             } else {
-                if (_upf_is_primitive(element_type)) {
-                    _upf_bprintf("[");
-                    for (size_t i = 0; i < type->as.array.lengths.data[0]; i++) {
-                        if (i > 0) _upf_bprintf(", ");
-                        const uint8_t *current = data + element_type->size * i;
-                        _upf_print_type(current, element_type, depth);
-
-#if UPRINTF_ARRAY_COMPRESSION_THRESHOLD > 0
-                        size_t j = i;
-                        while (j < type->as.array.lengths.data[0]
-                               && memcmp(current, data + element_type->size * j, element_type->size) == 0)
-                            j++;
-                        int count = j - i;
-                        if (count >= UPRINTF_ARRAY_COMPRESSION_THRESHOLD) {
-                            _upf_bprintf(" <repeats %d times>", count);
-                            i = j - 1;
-                        }
-#endif
-                    }
-                    _upf_bprintf("]");
-                } else {
-                    _upf_bprintf("[\n");
-                    for (size_t i = 0; i < type->as.array.lengths.data[0]; i++) {
-                        if (i > 0) _upf_bprintf(",\n");
-                        _upf_bprintf("%*s", UPRINTF_INDENTATION_WIDTH * (depth + 1), "");
-                        const uint8_t *current = data + element_type->size * i;
-                        _upf_print_type(current, element_type, depth + 1);
-
-#if UPRINTF_ARRAY_COMPRESSION_THRESHOLD > 0
-                        size_t j = i;
-                        while (j < type->as.array.lengths.data[0]
-                               && memcmp(current, data + element_type->size * j, element_type->size) == 0)
-                            j++;
-                        int count = j - i;
-                        if (count >= UPRINTF_ARRAY_COMPRESSION_THRESHOLD) {
-                            _upf_bprintf(" <repeats %d times>", count);
-                            i = j - 1;
-                        }
-#endif
-                    }
-                    _upf_bprintf("\n%*s]", UPRINTF_INDENTATION_WIDTH * depth, "");
-                }
+                _upf_bprintf("\n%*s]", UPRINTF_INDENTATION_WIDTH * depth, "");
             }
         } break;
         case _UPF_TK_POINTER: {
