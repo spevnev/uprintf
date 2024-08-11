@@ -16,7 +16,7 @@ int cmp(void *k1, void *k2) {
     return 1;
 }
 
-int main() {
+int main(void) {
     avl_tree_t tree;
     avl_initialize(&tree, cmp, NULL);
 

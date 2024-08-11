@@ -21,8 +21,7 @@ all: examples
 
 .PHONY: clean
 clean:
-	rm -rf $(BUILD_DIR)
-	rm -rf $(LIB_DIR)
+	rm -rf $(BUILD_DIR) $(LIB_DIR)
 
 .PHONY: install
 install:

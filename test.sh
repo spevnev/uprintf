@@ -47,8 +47,9 @@ if [ ! -f $baseline ]; then
 fi
 
 sed -E "s/0x[0-9a-fA-F]{6,16}/POINTER/g" -i $baseline -i $output
-similarity=$(wdiff -123 --statistics $baseline $output | head -n 1 | \
-    awk -F ':' '{print $NF}' | awk -F ' ' '{print $4}' | sed 's/%$//')
+similarity=$(wdiff -123 --statistics $baseline $output | \
+    awk -F ':' '{print $NF}' | awk -F ' ' '{print $4}' | \
+    sed 's/%$//' | sort | tail -n 1)
 echo "Similarity is $similarity%" >> $log
 if [ $similarity -lt $(get_similarity $1) ]; then
     wdiff $baseline $output > $diff

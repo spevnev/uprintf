@@ -1852,7 +1852,7 @@ static void _upf_print_typename(const _upf_type *type) {
         _upf_print_modifiers(type->modifiers);
     } else {
         _upf_print_modifiers(type->modifiers);
-        _upf_bprintf("%s ", type->name ? type->name : "(unnamed)");
+        _upf_bprintf("%s ", type->name ? type->name : "<unnamed>");
     }
 }
 
