@@ -231,6 +231,7 @@ enum _upf_type_kind {
     _UPF_TK_ENUM,
     _UPF_TK_ARRAY,
     _UPF_TK_POINTER,
+    _UPF_TK_FUNCTION,
     _UPF_TK_U1,
     _UPF_TK_U2,
     _UPF_TK_U4,
@@ -288,6 +289,10 @@ typedef struct {
         struct {
             size_t type;
         } pointer;
+        struct {
+            size_t return_type;
+            _upf_size_t_vec arg_types;
+        } function;
     } as;
 } _upf_type;
 
@@ -593,6 +598,7 @@ static bool _upf_is_primitive(const _upf_type *type) {
         case _UPF_TK_UNION:
         case _UPF_TK_ARRAY:
             return false;
+        case _UPF_TK_FUNCTION:
         case _UPF_TK_ENUM:
         case _UPF_TK_POINTER:
         case _UPF_TK_U1:
@@ -1227,6 +1233,44 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
 
             return _upf_add_type(base, type);
         }
+        case DW_TAG_subroutine_type: {
+            _upf_type type = {
+                .name = name,
+                .kind = _UPF_TK_FUNCTION,
+                .modifiers = 0,
+                .size = size,
+                .as.function = {
+                    .return_type = _UPF_INVALID,
+                    .arg_types = _UPF_VECTOR_NEW(&_upf_arena),
+                },
+            };
+
+            if (subtype_offset != _UPF_INVALID) {
+                type.as.function.return_type = _upf_parse_type(cu, cu->base + subtype_offset);
+            }
+
+            while (1) {
+                die += _upf_uLEB_to_uint64(die, &code);
+                if (code == 0) break;
+
+                abbrev = _upf_get_abbrev(cu, code);
+                _UPF_ASSERT(abbrev->tag == DW_TAG_formal_parameter);
+
+                for (size_t i = 0; i < abbrev->attrs.length; i++) {
+                    _upf_attr attr = abbrev->attrs.data[i];
+
+                    if (attr.name == DW_AT_type) {
+                        const uint8_t *type_die = cu->base + _upf_get_ref(die, attr.form);
+                        size_t arg_type = _upf_parse_type(cu, type_die);
+                        _UPF_VECTOR_PUSH(&type.as.function.arg_types, arg_type);
+                    }
+
+                    die += _upf_get_attr_size(die, attr.form);
+                }
+            }
+
+            return _upf_add_type(base, type);
+        }
         case DW_TAG_typedef: {
             _UPF_ASSERT(name != NULL);
 
@@ -1850,6 +1894,21 @@ static void _upf_print_typename(const _upf_type *type) {
         }
         _upf_bprintf("*");
         _upf_print_modifiers(type->modifiers);
+    } else if (type->kind == _UPF_TK_FUNCTION) {
+        if (type->as.function.return_type == _UPF_INVALID) {
+            _upf_bprintf("void");
+        } else {
+            _upf_print_typename(_upf_get_type(type->as.function.return_type));
+            if (*(_upf_call.ptr - 1) == ' ') _upf_call.ptr--;
+        }
+
+        _upf_bprintf("(");
+        for (size_t i = 0; i < type->as.function.arg_types.length; i++) {
+            if (i > 0) _upf_bprintf(", ");
+            _upf_print_typename(_upf_get_type(type->as.function.arg_types.data[i]));
+            if (*(_upf_call.ptr - 1) == ' ') _upf_call.ptr--;
+        }
+        _upf_bprintf(") ");
     } else {
         _upf_print_modifiers(type->modifiers);
         _upf_bprintf("%s ", type->name ? type->name : "<unnamed>");
@@ -2031,7 +2090,7 @@ static void _upf_print_type(const uint8_t *data, const _upf_type *type, int dept
             }
 
             const _upf_type *pointed_type = _upf_get_type(type->as.pointer.type);
-            if (pointed_type->kind == _UPF_TK_POINTER || pointed_type->kind == _UPF_TK_VOID) {
+            if (pointed_type->kind == _UPF_TK_POINTER || pointed_type->kind == _UPF_TK_VOID || pointed_type->kind == _UPF_TK_FUNCTION) {
                 _upf_bprintf("%p", ptr);
                 return;
             }
@@ -2044,6 +2103,15 @@ static void _upf_print_type(const uint8_t *data, const _upf_type *type, int dept
             _upf_bprintf("%p (", ptr);
             _upf_print_type(ptr, pointed_type, depth);
             _upf_bprintf(")");
+        } break;
+        case _UPF_TK_FUNCTION: {
+            void *ptr;
+            memcpy(&ptr, data, sizeof(ptr));
+            if (ptr == NULL) {
+                _upf_bprintf("NULL");
+            } else {
+                _upf_bprintf("%p", ptr);
+            }
         } break;
         case _UPF_TK_U1:
             _upf_bprintf("%hhu", *data);
