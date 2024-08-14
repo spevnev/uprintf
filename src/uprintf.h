@@ -499,7 +499,7 @@ static char *_upf_arena_concat2(struct _upf_arena *a, ...) {
 
     size_t size = 0;
     va_start(va_args, a);
-    while (1) {
+    while (true) {
         const char *str = va_arg(va_args, const char *);
         if (str == NULL) break;
         size += strlen(str);
@@ -511,7 +511,7 @@ static char *_upf_arena_concat2(struct _upf_arena *a, ...) {
 
     char *p = result;
     va_start(va_args, a);
-    while (1) {
+    while (true) {
         const char *str = va_arg(va_args, const char *);
         if (str == NULL) break;
 
@@ -539,7 +539,7 @@ static size_t _upf_uLEB_to_uint64(const uint8_t *leb, uint64_t *result) {
     int shift = 0;
 
     *result = 0;
-    while (1) {
+    while (true) {
         uint8_t b = leb[i++];
         *result |= (((uint64_t) (b & BITS_MASK)) << shift);
         if ((b & CONTINUE_MASK) == 0) break;
@@ -562,7 +562,7 @@ static size_t _upf_LEB_to_int64(const uint8_t *leb, int64_t *result) {
     size_t shift = 0;
 
     *result = 0;
-    while (1) {
+    while (true) {
         b = leb[i++];
         *result |= (((uint64_t) (b & BITS_MASK)) << shift);
         shift += 7;
@@ -1049,7 +1049,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
 
             bool is_static = true;
             size_t array_size = element_type->size;
-            while (1) {
+            while (true) {
                 die += _upf_uLEB_to_uint64(die, &code);
                 if (code == 0) break;
 
@@ -1112,7 +1112,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
 
             if (type.size == _UPF_INVALID) type.size = _upf_get_type(type.as.cenum.underlying_type)->size;
 
-            while (1) {
+            while (true) {
                 die += _upf_uLEB_to_uint64(die, &code);
                 if (code == 0) break;
 
@@ -1192,7 +1192,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                 },
             };
 
-            while (1) {
+            while (true) {
                 die += _upf_uLEB_to_uint64(die, &code);
                 if (code == 0) break;
 
@@ -1249,7 +1249,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                 type.as.function.return_type = _upf_parse_type(cu, cu->base + subtype_offset);
             }
 
-            while (1) {
+            while (true) {
                 die += _upf_uLEB_to_uint64(die, &code);
                 if (code == 0) break;
 
@@ -1481,7 +1481,7 @@ static _upf_abbrev_vec _upf_parse_abbrevs(const uint8_t *abbrev_table) {
     _UPF_ASSERT(abbrev_table != NULL);
 
     _upf_abbrev_vec abbrevs = _UPF_VECTOR_NEW(&_upf_arena);
-    while (1) {
+    while (true) {
         _upf_abbrev abbrev = {
             .attrs = _UPF_VECTOR_NEW(&_upf_arena),
         };
@@ -1492,7 +1492,7 @@ static _upf_abbrev_vec _upf_parse_abbrevs(const uint8_t *abbrev_table) {
         abbrev.has_children = *abbrev_table;
         abbrev_table += sizeof(abbrev.has_children);
 
-        while (1) {
+        while (true) {
             _upf_attr attr = {0};
             abbrev_table += _upf_uLEB_to_uint64(abbrev_table, &attr.name);
             abbrev_table += _upf_uLEB_to_uint64(abbrev_table, &attr.form);
@@ -1837,7 +1837,7 @@ static void _upf_parse_dwarf(void) {
 // is why calls don't accept or return string pointers.
 
 #define _upf_bprintf(...)                                                                         \
-    while (1) {                                                                                   \
+    while (true) {                                                                                \
         int bytes = snprintf(_upf_call.ptr, _upf_call.free, __VA_ARGS__);                         \
         if (bytes < 0) _UPF_ERROR("Unexpected error occurred in snprintf: %s.", strerror(errno)); \
         if ((size_t) bytes >= _upf_call.free) {                                                   \
@@ -2358,7 +2358,7 @@ static _upf_token _upf_consume_any2(_upf_tokenizer *t, ...) {
 
     va_list va_args;
     va_start(va_args, t);
-    while (1) {
+    while (true) {
         enum _upf_token_kind kind = va_arg(va_args, enum _upf_token_kind);
         if (kind == _UPF_TOK_NONE) break;
 
@@ -2372,7 +2372,7 @@ static _upf_token _upf_consume_any2(_upf_tokenizer *t, ...) {
     va_start(va_args, t);
     static char tokens[104];
     char *ch = tokens;
-    while (1) {
+    while (true) {
         enum _upf_token_kind kind = va_arg(va_args, enum _upf_token_kind);
         if (kind == _UPF_TOK_NONE) break;
 
@@ -2776,7 +2776,7 @@ __attribute__((noinline)) void _upf_uprintf(const char *file, int line, const ch
     va_list va_args;
     va_start(va_args, args);
     const char *ch = fmt;
-    while (1) {
+    while (true) {
         const char *start = ch;
         while (*ch != '%' && *ch != '\0') ch++;
         _upf_bprintf("%.*s", (int) (ch - start), start);
