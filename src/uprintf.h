@@ -644,7 +644,7 @@ static bool _upf_is_primitive(const _upf_type *type) {
     _UPF_UNREACHABLE();
 }
 
-// ================== DWARF PARSING =======================
+// ====================== DWARF ===========================
 
 static uint64_t _upf_offset_cast(const uint8_t *die) {
     _UPF_ASSERT(die != NULL);
@@ -1880,356 +1880,60 @@ static void _upf_parse_dwarf(void) {
     }
 }
 
-// ===================== PRINTING =========================
+// ======================= ELF ============================
 
-// All the printing is done to the global buffer stored in the _upf_call, which
-// is why calls don't accept or return string pointers.
+static void _upf_parse_elf(void) {
+    struct stat file_info;
+    if (stat("/proc/self/exe", &file_info) == -1) _UPF_ERROR("Unable to stat \"/proc/self/exe\": %s.", strerror(errno));
+    size_t size = file_info.st_size;
+    _upf_dwarf.file_size = size;
 
-#define _upf_bprintf(...)                                                                         \
-    while (true) {                                                                                \
-        int bytes = snprintf(_upf_call.ptr, _upf_call.free, __VA_ARGS__);                         \
-        if (bytes < 0) _UPF_ERROR("Unexpected error occurred in snprintf: %s.", strerror(errno)); \
-        if ((size_t) bytes >= _upf_call.free) {                                                   \
-            size_t used = _upf_call.size - _upf_call.free;                                        \
-            _upf_call.size *= 2;                                                                  \
-            _upf_call.buffer = realloc(_upf_call.buffer, _upf_call.size);                         \
-            if (_upf_call.buffer == NULL) _UPF_OUT_OF_MEMORY();                                   \
-            _upf_call.ptr = _upf_call.buffer + used;                                              \
-            _upf_call.free = _upf_call.size - used;                                               \
-            continue;                                                                             \
-        }                                                                                         \
-        _upf_call.free -= bytes;                                                                  \
-        _upf_call.ptr += bytes;                                                                   \
-        break;                                                                                    \
+    int fd = open("/proc/self/exe", O_RDONLY);
+    _UPF_ASSERT(fd != -1);
+
+    uint8_t *file = (uint8_t *) mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
+    _UPF_ASSERT(file != MAP_FAILED);
+    _upf_dwarf.file = file;
+
+    close(fd);
+
+    const Elf64_Ehdr *header = (Elf64_Ehdr *) file;
+
+    if (memcmp(header->e_ident, ELFMAG, SELFMAG) != 0 || header->e_ident[EI_CLASS] != ELFCLASS64 || header->e_ident[EI_VERSION] != 1
+        || header->e_machine != EM_X86_64 || header->e_version != 1 || header->e_shentsize != sizeof(Elf64_Shdr)) {
+        _UPF_ERROR("Unsupported or invalid ELF file.");
     }
 
-static const char *_upf_escape_char(char ch) {
-    // clang-format off
-    switch (ch) {
-        case '\a': return "\\a";
-        case '\b': return "\\b";
-        case '\f': return "\\f";
-        case '\n': return "\\n";
-        case '\r': return "\\r";
-        case '\t': return "\\t";
-        case '\v': return "\\v";
-        case '\\': return "\\\\";
-    }
-    // clang-format on
+    const Elf64_Shdr *string_section = (Elf64_Shdr *) (file + header->e_shoff + header->e_shstrndx * header->e_shentsize);
+    const char *string_table = (char *) (file + string_section->sh_offset);
 
-    static char str[2];
-    str[0] = ch;
-    str[1] = '\0';
-    return str;
-}
+    const Elf64_Shdr *section = (Elf64_Shdr *) (file + header->e_shoff);
+    for (size_t i = 0; i < header->e_shnum; i++) {
+        const char *name = string_table + section->sh_name;
 
-static bool _upf_is_printable(char c) { return ' ' <= c && c <= '~'; }
-
-static void _upf_print_modifiers(int modifiers) {
-    if (modifiers & _UPF_MOD_CONST) _upf_bprintf("const ");
-    if (modifiers & _UPF_MOD_VOLATILE) _upf_bprintf("volatile ");
-    if (modifiers & _UPF_MOD_RESTRICT) _upf_bprintf("restrict ");
-    if (modifiers & _UPF_MOD_ATOMIC) _upf_bprintf("atomic ");
-}
-
-static void _upf_print_typename(const _upf_type *type) {
-    _UPF_ASSERT(type != NULL);
-
-    if (type->kind == _UPF_TK_POINTER) {
-        if (type->as.pointer.type == _UPF_INVALID) {
-            _upf_bprintf("void *");
-            _upf_print_modifiers(type->modifiers);
-        } else {
-            const _upf_type *pointer_type = _upf_get_type(type->as.pointer.type);
-            _upf_print_typename(pointer_type);
-            if (pointer_type->kind != _UPF_TK_FUNCTION) {
-                _upf_bprintf("*");
-                _upf_print_modifiers(type->modifiers);
-            }
-        }
-    } else if (type->kind == _UPF_TK_FUNCTION) {
-        if (type->as.function.return_type == _UPF_INVALID) {
-            _upf_bprintf("void");
-        } else {
-            _upf_print_typename(_upf_get_type(type->as.function.return_type));
-            if (*(_upf_call.ptr - 1) == ' ') _upf_call.ptr--;
+        if (strcmp(name, ".debug_info") == 0) {
+            _upf_dwarf.die = file + section->sh_offset;
+            _upf_dwarf.die_size = section->sh_size;
+        } else if (strcmp(name, ".debug_abbrev") == 0) {
+            _upf_dwarf.abbrev = file + section->sh_offset;
+        } else if (strcmp(name, ".debug_str") == 0) {
+            _upf_dwarf.str = (const char *) (file + section->sh_offset);
+        } else if (strcmp(name, ".debug_line_str") == 0) {
+            _upf_dwarf.line_str = (const char *) (file + section->sh_offset);
+        } else if (strcmp(name, ".debug_str_offsets") == 0) {
+            _upf_dwarf.str_offsets = file + section->sh_offset;
+        } else if (strcmp(name, ".debug_rnglists") == 0) {
+            _upf_dwarf.rnglists = file + section->sh_offset;
+        } else if (strcmp(name, ".debug_addr") == 0) {
+            _upf_dwarf.addr = file + section->sh_offset;
         }
 
-        _upf_bprintf("(");
-        for (size_t i = 0; i < type->as.function.arg_types.length; i++) {
-            if (i > 0) _upf_bprintf(", ");
-            _upf_print_typename(_upf_get_type(type->as.function.arg_types.data[i]));
-            if (*(_upf_call.ptr - 1) == ' ') _upf_call.ptr--;
-        }
-        _upf_bprintf(") ");
-    } else {
-        _upf_print_modifiers(type->modifiers);
-        _upf_bprintf("%s ", type->name ? type->name : "<unnamed>");
-    }
-}
-
-__attribute__((no_sanitize_address)) static void _upf_print_char_ptr(const char *str) {
-    const char *end = NULL;
-    for (size_t i = 0; i < _upf_call.addresses.length; i++) {
-        _upf_range range = _upf_call.addresses.data[i];
-        if ((char *) range.start <= str && str <= (char *) range.end) {
-            end = (char *) range.end;
-            break;
-        }
+        section++;
     }
 
-    if (end == NULL) {
-        _upf_bprintf("%p (<out-of-bounds>)", (void *) str);
-        return;
+    if (_upf_dwarf.die == NULL || _upf_dwarf.abbrev == NULL || _upf_dwarf.str == NULL) {
+        _UPF_ERROR("Unable to find debugging information. Ensure that the executable contains it by using -g2 or -g3.");
     }
-
-    _upf_bprintf("%p (\"", (void *) str);
-    while (*str != '\0' && str < end) {
-        _upf_bprintf("%s", _upf_escape_char(*str));
-        str++;  // Increment inside of macro (_upf_bprintf) may be triggered twice
-    }
-    _upf_bprintf("\")");
-}
-
-static void _upf_print_type(const uint8_t *data, const _upf_type *type, int depth) {
-    _UPF_ASSERT(type != NULL);
-
-    if (UPRINTF_MAX_DEPTH != -1 && depth >= UPRINTF_MAX_DEPTH) {
-        switch (type->kind) {
-            case _UPF_TK_UNION:
-            case _UPF_TK_STRUCT:
-                _upf_bprintf("{...}");
-                return;
-            default:
-                break;
-        }
-    }
-
-    if (type->kind == _UPF_TK_UNKNOWN) {
-        _upf_bprintf("<unknown>");
-        return;
-    }
-
-    if (data == NULL) {
-        _upf_bprintf("NULL");
-        return;
-    }
-
-    switch (type->kind) {
-        case _UPF_TK_UNION:
-            _upf_bprintf("<union> ");
-            __attribute__((fallthrough));  // Handle union as struct
-        case _UPF_TK_STRUCT: {
-#if UPRINTF_IGNORE_STDIO_FILE
-            if (strcmp(type->name, "FILE") == 0) {
-                _upf_bprintf("<ignored>");
-                return;
-            }
-#endif
-
-            _upf_member_vec members = type->as.cstruct.members;
-
-            if (members.length == 0) {
-                _upf_bprintf("{}");
-                return;
-            }
-
-            _upf_bprintf("{\n");
-            for (size_t i = 0; i < members.length; i++) {
-                const _upf_member *member = &members.data[i];
-                const _upf_type *member_type = _upf_get_type(member->type);
-
-                _upf_bprintf("%*s", UPRINTF_INDENTATION_WIDTH * (depth + 1), "");
-                _upf_print_typename(member_type);
-                _upf_bprintf("%s = ", member->name);
-                _upf_print_type(data + member->offset, member_type, depth + 1);
-                _upf_bprintf("\n");
-            }
-            _upf_bprintf("%*s}", UPRINTF_INDENTATION_WIDTH * depth, "");
-        } break;
-        case _UPF_TK_ENUM: {
-            _upf_enum_vec enums = type->as.cenum.enums;
-            const _upf_type *underlying_type = _upf_get_type(type->as.cenum.underlying_type);
-
-            int64_t enum_value;
-            if (underlying_type->kind == _UPF_TK_U4) {
-                uint32_t temp;
-                memcpy(&temp, data, sizeof(temp));
-                enum_value = temp;
-            } else if (underlying_type->kind == _UPF_TK_S4) {
-                int32_t temp;
-                memcpy(&temp, data, sizeof(temp));
-                enum_value = temp;
-            } else {
-                _UPF_WARN("Expected enum to use int32_t or uint32_t. Ignoring this type.");
-                _upf_bprintf("<enum>");
-                break;
-            }
-
-            const char *name = NULL;
-            for (size_t i = 0; i < enums.length; i++) {
-                if (enum_value == enums.data[i].value) {
-                    name = enums.data[i].name;
-                    break;
-                }
-            }
-
-            _upf_bprintf("%s (", name ? name : "<unknown>");
-            _upf_print_type(data, underlying_type, depth);
-            _upf_bprintf(")");
-        } break;
-        case _UPF_TK_ARRAY: {
-            const _upf_type *element_type = _upf_get_type(type->as.array.element_type);
-            size_t element_size = element_type->size;
-
-            if (element_size == _UPF_INVALID) {
-                _upf_bprintf("<unknown>");
-                return;
-            }
-
-            if (type->as.array.lengths.length == 0) {
-                _upf_bprintf("<non-static array>");
-                return;
-            }
-
-            _upf_type subarray;
-            if (type->as.array.lengths.length > 1) {
-                subarray = _upf_get_subarray(type, 1);
-                element_type = &subarray;
-
-                for (size_t i = 0; i < subarray.as.array.lengths.length; i++) {
-                    element_size *= subarray.as.array.lengths.data[i];
-                }
-            }
-
-            bool is_primitive = _upf_is_primitive(element_type);
-            _upf_bprintf(is_primitive ? "[" : "[\n");
-            for (size_t i = 0; i < type->as.array.lengths.data[0]; i++) {
-                if (i > 0) _upf_bprintf(is_primitive ? ", " : ",\n");
-                if (!is_primitive) _upf_bprintf("%*s", UPRINTF_INDENTATION_WIDTH * (depth + 1), "");
-
-                const uint8_t *current = data + element_size * i;
-                _upf_print_type(current, element_type, depth + 1);
-
-#if UPRINTF_ARRAY_COMPRESSION_THRESHOLD > 0
-                size_t j = i;
-                while (j < type->as.array.lengths.data[0] && memcmp(current, data + element_size * j, element_size) == 0) j++;
-
-                int count = j - i;
-                if (j - i >= UPRINTF_ARRAY_COMPRESSION_THRESHOLD) {
-                    _upf_bprintf(" <repeats %d times>", count);
-                    i = j - 1;
-                }
-#endif
-            }
-
-            if (is_primitive) {
-                _upf_bprintf("]");
-            } else {
-                _upf_bprintf("\n%*s]", UPRINTF_INDENTATION_WIDTH * depth, "");
-            }
-        } break;
-        case _UPF_TK_POINTER: {
-            void *ptr;
-            memcpy(&ptr, data, sizeof(ptr));
-            if (ptr == NULL) {
-                _upf_bprintf("NULL");
-                return;
-            }
-
-            if (type->as.pointer.type == _UPF_INVALID) {
-                _upf_bprintf("%p", ptr);
-                return;
-            }
-
-            const _upf_type *pointed_type = _upf_get_type(type->as.pointer.type);
-            if (pointed_type->kind == _UPF_TK_POINTER || pointed_type->kind == _UPF_TK_VOID || pointed_type->kind == _UPF_TK_FUNCTION) {
-                _upf_bprintf("%p", ptr);
-                return;
-            }
-
-            if (pointed_type->kind == _UPF_TK_SCHAR || pointed_type->kind == _UPF_TK_UCHAR) {
-                _upf_print_char_ptr(ptr);
-                return;
-            }
-
-            _upf_bprintf("%p (", ptr);
-            _upf_print_type(ptr, pointed_type, depth);
-            _upf_bprintf(")");
-        } break;
-        case _UPF_TK_FUNCTION:
-            _upf_bprintf("%p", (void *) data);
-            break;
-        case _UPF_TK_U1:
-            _upf_bprintf("%hhu", *data);
-            break;
-        case _UPF_TK_U2: {
-            uint16_t temp;
-            memcpy(&temp, data, sizeof(temp));
-            _upf_bprintf("%hu", temp);
-        } break;
-        case _UPF_TK_U4: {
-            uint32_t temp;
-            memcpy(&temp, data, sizeof(temp));
-            _upf_bprintf("%u", temp);
-        } break;
-        case _UPF_TK_U8: {
-            uint64_t temp;
-            memcpy(&temp, data, sizeof(temp));
-            _upf_bprintf("%lu", temp);
-        } break;
-        case _UPF_TK_S1: {
-            int8_t temp;
-            memcpy(&temp, data, sizeof(temp));
-            _upf_bprintf("%hhd", temp);
-        } break;
-        case _UPF_TK_S2: {
-            int16_t temp;
-            memcpy(&temp, data, sizeof(temp));
-            _upf_bprintf("%hd", temp);
-        } break;
-        case _UPF_TK_S4: {
-            int32_t temp;
-            memcpy(&temp, data, sizeof(temp));
-            _upf_bprintf("%d", temp);
-        } break;
-        case _UPF_TK_S8: {
-            int64_t temp;
-            memcpy(&temp, data, sizeof(temp));
-            _upf_bprintf("%ld", temp);
-        } break;
-        case _UPF_TK_F4: {
-            float temp;
-            memcpy(&temp, data, sizeof(temp));
-            _upf_bprintf("%f", temp);
-        } break;
-        case _UPF_TK_F8: {
-            double temp;
-            memcpy(&temp, data, sizeof(temp));
-            _upf_bprintf("%lf", temp);
-        } break;
-        case _UPF_TK_BOOL:
-            _upf_bprintf("%s", *data ? "true" : "false");
-            break;
-        case _UPF_TK_SCHAR: {
-            char ch = *((char *) data);
-            _upf_bprintf("%hhd", ch);
-            if (_upf_is_printable(ch)) _upf_bprintf(" ('%s')", _upf_escape_char(ch));
-        } break;
-        case _UPF_TK_UCHAR: {
-            char ch = *((char *) data);
-            _upf_bprintf("%hhu", ch);
-            if (_upf_is_printable(ch)) _upf_bprintf(" ('%s')", _upf_escape_char(ch));
-        } break;
-        case _UPF_TK_VOID:
-            _UPF_WARN("void must be a pointer. Ignoring this type.");
-            break;
-        case _UPF_TK_UNKNOWN:
-            _upf_bprintf("<unknown>");
-            break;
-    }
-
-    return;
 }
 
 // ==================== TOKENIZING ========================
@@ -3080,60 +2784,356 @@ static const _upf_type *_upf_get_arg_type(const char *arg, uint64_t pc, const ch
     return _upf_get_type(type);
 }
 
-// ======================= ELF ============================
+// ===================== PRINTING =========================
 
-static void _upf_parse_elf(void) {
-    struct stat file_info;
-    if (stat("/proc/self/exe", &file_info) == -1) _UPF_ERROR("Unable to stat \"/proc/self/exe\": %s.", strerror(errno));
-    size_t size = file_info.st_size;
-    _upf_dwarf.file_size = size;
+// All the printing is done to the global buffer stored in the _upf_call, which
+// is why calls don't accept or return string pointers.
 
-    int fd = open("/proc/self/exe", O_RDONLY);
-    _UPF_ASSERT(fd != -1);
-
-    uint8_t *file = (uint8_t *) mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
-    _UPF_ASSERT(file != MAP_FAILED);
-    _upf_dwarf.file = file;
-
-    close(fd);
-
-    const Elf64_Ehdr *header = (Elf64_Ehdr *) file;
-
-    if (memcmp(header->e_ident, ELFMAG, SELFMAG) != 0 || header->e_ident[EI_CLASS] != ELFCLASS64 || header->e_ident[EI_VERSION] != 1
-        || header->e_machine != EM_X86_64 || header->e_version != 1 || header->e_shentsize != sizeof(Elf64_Shdr)) {
-        _UPF_ERROR("Unsupported or invalid ELF file.");
+#define _upf_bprintf(...)                                                                         \
+    while (true) {                                                                                \
+        int bytes = snprintf(_upf_call.ptr, _upf_call.free, __VA_ARGS__);                         \
+        if (bytes < 0) _UPF_ERROR("Unexpected error occurred in snprintf: %s.", strerror(errno)); \
+        if ((size_t) bytes >= _upf_call.free) {                                                   \
+            size_t used = _upf_call.size - _upf_call.free;                                        \
+            _upf_call.size *= 2;                                                                  \
+            _upf_call.buffer = realloc(_upf_call.buffer, _upf_call.size);                         \
+            if (_upf_call.buffer == NULL) _UPF_OUT_OF_MEMORY();                                   \
+            _upf_call.ptr = _upf_call.buffer + used;                                              \
+            _upf_call.free = _upf_call.size - used;                                               \
+            continue;                                                                             \
+        }                                                                                         \
+        _upf_call.free -= bytes;                                                                  \
+        _upf_call.ptr += bytes;                                                                   \
+        break;                                                                                    \
     }
 
-    const Elf64_Shdr *string_section = (Elf64_Shdr *) (file + header->e_shoff + header->e_shstrndx * header->e_shentsize);
-    const char *string_table = (char *) (file + string_section->sh_offset);
+static const char *_upf_escape_char(char ch) {
+    // clang-format off
+    switch (ch) {
+        case '\a': return "\\a";
+        case '\b': return "\\b";
+        case '\f': return "\\f";
+        case '\n': return "\\n";
+        case '\r': return "\\r";
+        case '\t': return "\\t";
+        case '\v': return "\\v";
+        case '\\': return "\\\\";
+    }
+    // clang-format on
 
-    const Elf64_Shdr *section = (Elf64_Shdr *) (file + header->e_shoff);
-    for (size_t i = 0; i < header->e_shnum; i++) {
-        const char *name = string_table + section->sh_name;
+    static char str[2];
+    str[0] = ch;
+    str[1] = '\0';
+    return str;
+}
 
-        if (strcmp(name, ".debug_info") == 0) {
-            _upf_dwarf.die = file + section->sh_offset;
-            _upf_dwarf.die_size = section->sh_size;
-        } else if (strcmp(name, ".debug_abbrev") == 0) {
-            _upf_dwarf.abbrev = file + section->sh_offset;
-        } else if (strcmp(name, ".debug_str") == 0) {
-            _upf_dwarf.str = (const char *) (file + section->sh_offset);
-        } else if (strcmp(name, ".debug_line_str") == 0) {
-            _upf_dwarf.line_str = (const char *) (file + section->sh_offset);
-        } else if (strcmp(name, ".debug_str_offsets") == 0) {
-            _upf_dwarf.str_offsets = file + section->sh_offset;
-        } else if (strcmp(name, ".debug_rnglists") == 0) {
-            _upf_dwarf.rnglists = file + section->sh_offset;
-        } else if (strcmp(name, ".debug_addr") == 0) {
-            _upf_dwarf.addr = file + section->sh_offset;
+static bool _upf_is_printable(char c) { return ' ' <= c && c <= '~'; }
+
+static void _upf_print_modifiers(int modifiers) {
+    if (modifiers & _UPF_MOD_CONST) _upf_bprintf("const ");
+    if (modifiers & _UPF_MOD_VOLATILE) _upf_bprintf("volatile ");
+    if (modifiers & _UPF_MOD_RESTRICT) _upf_bprintf("restrict ");
+    if (modifiers & _UPF_MOD_ATOMIC) _upf_bprintf("atomic ");
+}
+
+static void _upf_print_typename(const _upf_type *type) {
+    _UPF_ASSERT(type != NULL);
+
+    if (type->kind == _UPF_TK_POINTER) {
+        if (type->as.pointer.type == _UPF_INVALID) {
+            _upf_bprintf("void *");
+            _upf_print_modifiers(type->modifiers);
+        } else {
+            const _upf_type *pointer_type = _upf_get_type(type->as.pointer.type);
+            _upf_print_typename(pointer_type);
+            if (pointer_type->kind != _UPF_TK_FUNCTION) {
+                _upf_bprintf("*");
+                _upf_print_modifiers(type->modifiers);
+            }
+        }
+    } else if (type->kind == _UPF_TK_FUNCTION) {
+        if (type->as.function.return_type == _UPF_INVALID) {
+            _upf_bprintf("void");
+        } else {
+            _upf_print_typename(_upf_get_type(type->as.function.return_type));
+            if (*(_upf_call.ptr - 1) == ' ') _upf_call.ptr--;
         }
 
-        section++;
+        _upf_bprintf("(");
+        for (size_t i = 0; i < type->as.function.arg_types.length; i++) {
+            if (i > 0) _upf_bprintf(", ");
+            _upf_print_typename(_upf_get_type(type->as.function.arg_types.data[i]));
+            if (*(_upf_call.ptr - 1) == ' ') _upf_call.ptr--;
+        }
+        _upf_bprintf(") ");
+    } else {
+        _upf_print_modifiers(type->modifiers);
+        _upf_bprintf("%s ", type->name ? type->name : "<unnamed>");
+    }
+}
+
+__attribute__((no_sanitize_address)) static void _upf_print_char_ptr(const char *str) {
+    const char *end = NULL;
+    for (size_t i = 0; i < _upf_call.addresses.length; i++) {
+        _upf_range range = _upf_call.addresses.data[i];
+        if ((char *) range.start <= str && str <= (char *) range.end) {
+            end = (char *) range.end;
+            break;
+        }
     }
 
-    if (_upf_dwarf.die == NULL || _upf_dwarf.abbrev == NULL || _upf_dwarf.str == NULL) {
-        _UPF_ERROR("Unable to find debugging information. Ensure that the executable contains it by using -g2 or -g3.");
+    if (end == NULL) {
+        _upf_bprintf("%p (<out-of-bounds>)", (void *) str);
+        return;
     }
+
+    _upf_bprintf("%p (\"", (void *) str);
+    while (*str != '\0' && str < end) {
+        _upf_bprintf("%s", _upf_escape_char(*str));
+        str++;  // Increment inside of macro (_upf_bprintf) may be triggered twice
+    }
+    _upf_bprintf("\")");
+}
+
+static void _upf_print_type(const uint8_t *data, const _upf_type *type, int depth) {
+    _UPF_ASSERT(type != NULL);
+
+    if (UPRINTF_MAX_DEPTH != -1 && depth >= UPRINTF_MAX_DEPTH) {
+        switch (type->kind) {
+            case _UPF_TK_UNION:
+            case _UPF_TK_STRUCT:
+                _upf_bprintf("{...}");
+                return;
+            default:
+                break;
+        }
+    }
+
+    if (type->kind == _UPF_TK_UNKNOWN) {
+        _upf_bprintf("<unknown>");
+        return;
+    }
+
+    if (data == NULL) {
+        _upf_bprintf("NULL");
+        return;
+    }
+
+    switch (type->kind) {
+        case _UPF_TK_UNION:
+            _upf_bprintf("<union> ");
+            __attribute__((fallthrough));  // Handle union as struct
+        case _UPF_TK_STRUCT: {
+#if UPRINTF_IGNORE_STDIO_FILE
+            if (strcmp(type->name, "FILE") == 0) {
+                _upf_bprintf("<ignored>");
+                return;
+            }
+#endif
+
+            _upf_member_vec members = type->as.cstruct.members;
+
+            if (members.length == 0) {
+                _upf_bprintf("{}");
+                return;
+            }
+
+            _upf_bprintf("{\n");
+            for (size_t i = 0; i < members.length; i++) {
+                const _upf_member *member = &members.data[i];
+                const _upf_type *member_type = _upf_get_type(member->type);
+
+                _upf_bprintf("%*s", UPRINTF_INDENTATION_WIDTH * (depth + 1), "");
+                _upf_print_typename(member_type);
+                _upf_bprintf("%s = ", member->name);
+                _upf_print_type(data + member->offset, member_type, depth + 1);
+                _upf_bprintf("\n");
+            }
+            _upf_bprintf("%*s}", UPRINTF_INDENTATION_WIDTH * depth, "");
+        } break;
+        case _UPF_TK_ENUM: {
+            _upf_enum_vec enums = type->as.cenum.enums;
+            const _upf_type *underlying_type = _upf_get_type(type->as.cenum.underlying_type);
+
+            int64_t enum_value;
+            if (underlying_type->kind == _UPF_TK_U4) {
+                uint32_t temp;
+                memcpy(&temp, data, sizeof(temp));
+                enum_value = temp;
+            } else if (underlying_type->kind == _UPF_TK_S4) {
+                int32_t temp;
+                memcpy(&temp, data, sizeof(temp));
+                enum_value = temp;
+            } else {
+                _UPF_WARN("Expected enum to use int32_t or uint32_t. Ignoring this type.");
+                _upf_bprintf("<enum>");
+                break;
+            }
+
+            const char *name = NULL;
+            for (size_t i = 0; i < enums.length; i++) {
+                if (enum_value == enums.data[i].value) {
+                    name = enums.data[i].name;
+                    break;
+                }
+            }
+
+            _upf_bprintf("%s (", name ? name : "<unknown>");
+            _upf_print_type(data, underlying_type, depth);
+            _upf_bprintf(")");
+        } break;
+        case _UPF_TK_ARRAY: {
+            const _upf_type *element_type = _upf_get_type(type->as.array.element_type);
+            size_t element_size = element_type->size;
+
+            if (element_size == _UPF_INVALID) {
+                _upf_bprintf("<unknown>");
+                return;
+            }
+
+            if (type->as.array.lengths.length == 0) {
+                _upf_bprintf("<non-static array>");
+                return;
+            }
+
+            _upf_type subarray;
+            if (type->as.array.lengths.length > 1) {
+                subarray = _upf_get_subarray(type, 1);
+                element_type = &subarray;
+
+                for (size_t i = 0; i < subarray.as.array.lengths.length; i++) {
+                    element_size *= subarray.as.array.lengths.data[i];
+                }
+            }
+
+            bool is_primitive = _upf_is_primitive(element_type);
+            _upf_bprintf(is_primitive ? "[" : "[\n");
+            for (size_t i = 0; i < type->as.array.lengths.data[0]; i++) {
+                if (i > 0) _upf_bprintf(is_primitive ? ", " : ",\n");
+                if (!is_primitive) _upf_bprintf("%*s", UPRINTF_INDENTATION_WIDTH * (depth + 1), "");
+
+                const uint8_t *current = data + element_size * i;
+                _upf_print_type(current, element_type, depth + 1);
+
+#if UPRINTF_ARRAY_COMPRESSION_THRESHOLD > 0
+                size_t j = i;
+                while (j < type->as.array.lengths.data[0] && memcmp(current, data + element_size * j, element_size) == 0) j++;
+
+                int count = j - i;
+                if (j - i >= UPRINTF_ARRAY_COMPRESSION_THRESHOLD) {
+                    _upf_bprintf(" <repeats %d times>", count);
+                    i = j - 1;
+                }
+#endif
+            }
+
+            if (is_primitive) {
+                _upf_bprintf("]");
+            } else {
+                _upf_bprintf("\n%*s]", UPRINTF_INDENTATION_WIDTH * depth, "");
+            }
+        } break;
+        case _UPF_TK_POINTER: {
+            void *ptr;
+            memcpy(&ptr, data, sizeof(ptr));
+            if (ptr == NULL) {
+                _upf_bprintf("NULL");
+                return;
+            }
+
+            if (type->as.pointer.type == _UPF_INVALID) {
+                _upf_bprintf("%p", ptr);
+                return;
+            }
+
+            const _upf_type *pointed_type = _upf_get_type(type->as.pointer.type);
+            if (pointed_type->kind == _UPF_TK_POINTER || pointed_type->kind == _UPF_TK_VOID || pointed_type->kind == _UPF_TK_FUNCTION) {
+                _upf_bprintf("%p", ptr);
+                return;
+            }
+
+            if (pointed_type->kind == _UPF_TK_SCHAR || pointed_type->kind == _UPF_TK_UCHAR) {
+                _upf_print_char_ptr(ptr);
+                return;
+            }
+
+            _upf_bprintf("%p (", ptr);
+            _upf_print_type(ptr, pointed_type, depth);
+            _upf_bprintf(")");
+        } break;
+        case _UPF_TK_FUNCTION:
+            _upf_bprintf("%p", (void *) data);
+            break;
+        case _UPF_TK_U1:
+            _upf_bprintf("%hhu", *data);
+            break;
+        case _UPF_TK_U2: {
+            uint16_t temp;
+            memcpy(&temp, data, sizeof(temp));
+            _upf_bprintf("%hu", temp);
+        } break;
+        case _UPF_TK_U4: {
+            uint32_t temp;
+            memcpy(&temp, data, sizeof(temp));
+            _upf_bprintf("%u", temp);
+        } break;
+        case _UPF_TK_U8: {
+            uint64_t temp;
+            memcpy(&temp, data, sizeof(temp));
+            _upf_bprintf("%lu", temp);
+        } break;
+        case _UPF_TK_S1: {
+            int8_t temp;
+            memcpy(&temp, data, sizeof(temp));
+            _upf_bprintf("%hhd", temp);
+        } break;
+        case _UPF_TK_S2: {
+            int16_t temp;
+            memcpy(&temp, data, sizeof(temp));
+            _upf_bprintf("%hd", temp);
+        } break;
+        case _UPF_TK_S4: {
+            int32_t temp;
+            memcpy(&temp, data, sizeof(temp));
+            _upf_bprintf("%d", temp);
+        } break;
+        case _UPF_TK_S8: {
+            int64_t temp;
+            memcpy(&temp, data, sizeof(temp));
+            _upf_bprintf("%ld", temp);
+        } break;
+        case _UPF_TK_F4: {
+            float temp;
+            memcpy(&temp, data, sizeof(temp));
+            _upf_bprintf("%f", temp);
+        } break;
+        case _UPF_TK_F8: {
+            double temp;
+            memcpy(&temp, data, sizeof(temp));
+            _upf_bprintf("%lf", temp);
+        } break;
+        case _UPF_TK_BOOL:
+            _upf_bprintf("%s", *data ? "true" : "false");
+            break;
+        case _UPF_TK_SCHAR: {
+            char ch = *((char *) data);
+            _upf_bprintf("%hhd", ch);
+            if (_upf_is_printable(ch)) _upf_bprintf(" ('%s')", _upf_escape_char(ch));
+        } break;
+        case _UPF_TK_UCHAR: {
+            char ch = *((char *) data);
+            _upf_bprintf("%hhu", ch);
+            if (_upf_is_printable(ch)) _upf_bprintf(" ('%s')", _upf_escape_char(ch));
+        } break;
+        case _UPF_TK_VOID:
+            _UPF_WARN("void must be a pointer. Ignoring this type.");
+            break;
+        case _UPF_TK_UNKNOWN:
+            _upf_bprintf("<unknown>");
+            break;
+    }
+
+    return;
 }
 
 // ================== /proc/pid/maps ======================
