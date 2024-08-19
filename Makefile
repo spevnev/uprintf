@@ -53,6 +53,10 @@ $(LIB_DIR)/avl:
 	git clone --depth 1 https://github.com/etherealvisage/avl $(LIB_DIR)/avl_src
 	mv $(LIB_DIR)/avl_src/src $@
 
+$(BUILD_DIR)/$(EXAMPLE_DIR)/parser: $(EXAMPLE_DIR)/parser.c src/uprintf.h Makefile
+	@mkdir -p $(@D)
+	$(CC) $(FLAGS) $(CFLAGS) -o $@ $<
+
 .PHONY: tests
 tests: $(foreach C,$(COMPILERS),$(foreach O,$(O_LEVELS),$(foreach G,$(G_LEVELS),$(foreach T,$(TESTS),$(BUILD_DIR)/test/$T/$T-$C-$O-$G))))
 

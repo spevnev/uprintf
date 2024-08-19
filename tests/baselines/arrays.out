@@ -9,14 +9,14 @@
         [6, 7, 6]
     ]
 ]
-2x2x1 subarray [
-    [4, 5, 4],
-    [6, 7, 6]
-]
-2x1x1 subarray [6, 7, 6]
-2x2x1 array [
+1x2x3 subarray [
     [0, 1, 0],
     [2, 3, 2]
 ]
-2x1x1 array [4, 5, 4]
+1x2x3 subarray [
+    [4, 5, 4],
+    [6, 7, 6]
+]
+1x1x3 subarray [4, 5, 4]
+1x1x3 subarray [6, 7, 6]
 int 6
