@@ -1,4 +1,6 @@
-#define UPRINTF_IMPLEMENTATION
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdlib.h>
 #include "uprintf.h"
 
 typedef int8_t i8_t;

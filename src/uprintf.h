@@ -58,6 +58,10 @@ void _upf_uprintf(const char *file, int line, const char *fmt, const char *args,
         __asm__("nop\n\t");                                                                      \
     } while (0)
 
+#ifdef UPRINTF_TEST
+extern int _upf_test_status;
+#endif
+
 #endif  // UPRINTF_H
 
 // ====================== SOURCE ==========================
@@ -112,7 +116,7 @@ ssize_t getline(char **lineptr, size_t *n, FILE *stream);
 // ===================== TESTING ==========================
 
 #ifdef UPRINTF_TEST
-static int _upf_test_status = EXIT_SUCCESS;
+int _upf_test_status = EXIT_SUCCESS;
 
 #define _UPF_SET_TEST_STATUS(status) _upf_test_status = status
 #else

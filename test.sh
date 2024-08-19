@@ -7,7 +7,6 @@ dir="$BUILD_DIR/test/$1"
 bin="$dir/$output_file"
 log="$bin.log"
 output="$bin.out"
-diff="$bin.diff"
 
 # Some tests may not match baseline exactly, so they get custom target similarity percentage.
 function get_similarity {
@@ -21,9 +20,26 @@ function get_similarity {
     else echo 100; fi
 }
 
+# Regular tests share single uprintf implementation, but option tests need their own.
+function uses_shared_implementation {
+    if   [ "$1" = "depth_option" ];       then echo false;
+    elif [ "$1" = "indentation_option" ]; then echo false;
+    elif [ "$1" = "stdio_file" ];         then echo false;
+    else echo true; fi
+}
+
 # Compiling
 mkdir -p $dir
-$2 $CFLAGS -Werror -$3 -$4 -o $bin $input > $log 2>&1
+if [ $(uses_shared_implementation $1) = false ]; then
+    $2 $CFLAGS -Werror -$3 -$4 -o $bin $input > $log 2>&1
+else
+    object="$bin.o"
+    implementation="$BUILD_DIR/impl/$2.o"
+
+    $2 $CFLAGS -Werror -$3 -$4 -c $input -o $object > $log 2>&1
+    $2 $CFLAGS -Werror -$3 -$4 -o $bin $object $implementation >> $log 2>&1
+fi
+
 if [ $? -ne 0 ]; then
     echo "[COMPILATION FAILED] Log: $log. Rerun test: make $bin"
     exit 1
@@ -50,7 +66,9 @@ similarity=$(wdiff -123 --statistics $baseline $output | \
     sed 's/%$//' | sort | tail -n 1)
 echo "Similarity is $similarity%" >> $log
 if [ $similarity -lt $(get_similarity $1) ]; then
+    diff="$bin.diff"
     wdiff $baseline $output > $diff
+    
     echo "[DIFF FAILED] Similarity is $similarity%. Diff: $diff. Log: $log. Rerun test: make $bin"
     exit 1
 fi

@@ -1,4 +1,3 @@
-#define UPRINTF_IMPLEMENTATION
 #include "uprintf.h"
 
 enum DefaultEnum { ZERO, ONE, TWO, THREE };

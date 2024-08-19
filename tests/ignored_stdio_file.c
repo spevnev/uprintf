@@ -1,5 +1,4 @@
 #include <stdio.h>
-#define UPRINTF_IMPLEMENTATION
 #include "uprintf.h"
 
 int main(void) {

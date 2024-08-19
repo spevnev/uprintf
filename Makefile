@@ -64,7 +64,7 @@ tests: $(foreach C,$(COMPILERS),$(foreach O,$(O_LEVELS),$(foreach G,$(G_LEVELS),
 export
 
 define TEST_TEMPLATE
-$(BUILD_DIR)/test/$1/$1-$2-$3-$4: $(TEST_DIR)/$1.c src/uprintf.h Makefile test.sh
+$(BUILD_DIR)/test/$1/$1-$2-$3-$4: $(BUILD_DIR)/impl/$2.o $(TEST_DIR)/$1.c src/uprintf.h Makefile test.sh
 	@./test.sh $1 $2 $3 $4
 endef
 
@@ -77,3 +77,11 @@ $(foreach C,$(COMPILERS),                                 \
 		)                                                 \
 	)                                                     \
 )
+
+define IMPL_TEMPLATE
+$(BUILD_DIR)/impl/$1.o: src/impl.c src/uprintf.h Makefile
+	@mkdir -p $$(@D)
+	$1 $(FLAGS) $(CFLAGS) -c $$< -o $$@
+endef
+
+$(foreach C,$(COMPILERS),$(eval $(call IMPL_TEMPLATE,$C)))

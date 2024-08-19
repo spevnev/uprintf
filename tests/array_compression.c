@@ -1,4 +1,5 @@
-#define UPRINTF_IMPLEMENTATION
+#include <stdint.h>
+#include <string.h>
 #include "uprintf.h"
 
 int main(void) {

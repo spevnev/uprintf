@@ -1,5 +1,4 @@
 #include <stdlib.h>
-#define UPRINTF_IMPLEMENTATION
 #include "uprintf.h"
 
 #define NODES 5
