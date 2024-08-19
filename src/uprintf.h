@@ -146,7 +146,7 @@ static int _upf_test_status = EXIT_SUCCESS;
 #define _UPF_ASSERT(condition)                                                                        \
     do {                                                                                              \
         if (!(condition)) _UPF_ERROR("Assert (%s) failed at %s:%d.", #condition, __FILE__, __LINE__); \
-    } while (0);
+    } while (0)
 
 #define _UPF_OUT_OF_MEMORY() _UPF_ERROR("Process ran out of memory.")
 #define _UPF_UNREACHABLE() _UPF_ERROR("Unreachable.");
@@ -185,7 +185,7 @@ static int _upf_test_status = EXIT_SUCCESS;
             (vec)->data = new_data;                                        \
         }                                                                  \
         (vec)->data[(vec)->length++] = (element);                          \
-    } while (0);
+    } while (0)
 
 #define _UPF_VECTOR_TOP(vec) (vec)->data[(vec)->length - 1]
 
@@ -1675,7 +1675,7 @@ static void _upf_parse_cu_type(_upf_cu *cu, const uint8_t *die) {
 }
 
 static void _upf_parse_cu_function(_upf_cu *cu, const uint8_t *die, const _upf_abbrev *abbrev) {
-    _UPF_ASSERT(cu != NULL && die != NULL);
+    _UPF_ASSERT(cu != NULL && die != NULL && abbrev != NULL);
 
     _upf_named_type function = {
         .die = NULL,
@@ -1939,6 +1939,8 @@ static void _upf_parse_elf(void) {
 // ==================== TOKENIZING ========================
 
 static _upf_cstr_vec _upf_get_args(char *string) {
+    _UPF_ASSERT(string != NULL);
+
     _upf_cstr_vec args = _UPF_VECTOR_NEW(&_upf_arena);
 
     bool in_quotes = false;
@@ -2758,7 +2760,7 @@ static size_t _upf_dereference_type(size_t type_idx, int dereference, const char
 }
 
 static const _upf_type *_upf_get_arg_type(const char *arg, uint64_t pc, const char *file, int line) {
-    _UPF_ASSERT(arg != NULL && file != NULL && line > 0)
+    _UPF_ASSERT(arg != NULL && file != NULL && line > 0);
 
     _upf_tokenizer t = {
         .tokens = _UPF_VECTOR_NEW(&_upf_arena),
@@ -3318,7 +3320,7 @@ __attribute__((noinline)) void _upf_uprintf(const char *file, int line, const ch
 #undef _UPF_INITIAL_BUFFER_SIZE
 #undef _UPF_INITIAL_ARENA_SIZE
 #undef _upf_arena_concat
+#undef _upf_consume
 #undef _upf_bprintf
-#undef _upf_consume_any
 
 #endif  // UPRINTF_IMPLEMENTATION
