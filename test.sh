@@ -32,15 +32,17 @@ function uses_shared_implementation {
 mkdir -p $dir
 if [ $(uses_shared_implementation $1) = false ]; then
     $2 $CFLAGS -Werror -$3 -$4 -o $bin $input > $log 2>&1
+    ret=$?
 else
     object="$bin.o"
     implementation="$BUILD_DIR/impl/$2.o"
 
     $2 $CFLAGS -Werror -$3 -$4 -c $input -o $object > $log 2>&1
+    ret=$?
     $2 $CFLAGS -Werror -$3 -$4 -o $bin $object $implementation >> $log 2>&1
 fi
 
-if [ $? -ne 0 ]; then
+if [ $ret -ne 0 ]; then
     echo "[COMPILATION FAILED] Log: $log. Rerun test: make $bin"
     exit 1
 fi

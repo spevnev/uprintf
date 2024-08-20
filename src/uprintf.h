@@ -88,7 +88,10 @@ extern int _upf_test_status;
 
 // ===================== INCLUDES =========================
 
+#ifndef __USE_XOPEN_EXTENDED
 #define __USE_XOPEN_EXTENDED
+#endif
+
 #include <dwarf.h>
 #include <elf.h>
 #include <errno.h>
