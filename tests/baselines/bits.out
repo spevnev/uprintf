@@ -1,0 +1,9 @@
+Bit fields: {
+    int byte_field1 = 100
+    uint16_t bit_field1 = 31 <5 bits>
+    uint8_t bit_field2 = 255 <6 bits>
+    unsigned int bit_field3 = 3 <2 bits>
+    uint64_t bit_field4 = 2 <1 bit>
+    _Bool bit_field5 = 1 <1 bit>
+    int byte_field2 = -100
+}
