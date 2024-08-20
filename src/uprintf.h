@@ -260,6 +260,7 @@ typedef struct {
     const char *name;
     size_t type;
     size_t offset;
+    int bit_size;
 } _upf_member;
 
 _UPF_VECTOR_TYPEDEF(_upf_member_vec, _upf_member);
@@ -1236,6 +1237,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                     .name = NULL,
                     .type = _UPF_INVALID,
                     .offset = is_struct ? _UPF_INVALID : 0,
+                    .bit_size = 0,
                 };
                 for (size_t i = 0; i < abbrev->attrs.length; i++) {
                     _upf_attr attr = abbrev->attrs.data[i];
@@ -1250,6 +1252,15 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                             member.offset = _upf_get_data(die, attr);
                         } else {
                             _UPF_WARN("Non-constant member offsets aren't supported. Ignoring this type.");
+                            goto unknown_type;
+                        }
+                    } else if (attr.name == DW_AT_data_bit_offset) {
+                        member.offset = _upf_get_data(die, attr);
+                    } else if (attr.name == DW_AT_bit_size) {
+                        if (_upf_is_data(attr.form)) {
+                            member.bit_size = _upf_get_data(die, attr);
+                        } else {
+                            _UPF_WARN("Non-constant bit field sizes aren't supported. Ignoring this type.");
                             goto unknown_type;
                         }
                     }
@@ -2881,6 +2892,16 @@ static void _upf_print_typename(const _upf_type *type) {
     }
 }
 
+static void _upf_print_bit_field(const uint8_t *data, int total_bit_offset, int bit_size) {
+    int byte_offset = total_bit_offset / 8;
+    int bit_offset = total_bit_offset % 8;
+
+    uint8_t value;
+    memcpy(&value, data + byte_offset, sizeof(value));
+    value = (value << (8 - bit_size - bit_offset)) >> (8 - bit_size);
+    _upf_bprintf("%hhu <%d bit%s>", value, bit_size, bit_size > 1 ? "s" : "");
+}
+
 __attribute__((no_sanitize_address)) static void _upf_print_char_ptr(const char *str) {
     const char *end = NULL;
     for (size_t i = 0; i < _upf_call.addresses.length; i++) {
@@ -2955,7 +2976,11 @@ static void _upf_print_type(const uint8_t *data, const _upf_type *type, int dept
                 _upf_bprintf("%*s", UPRINTF_INDENTATION_WIDTH * (depth + 1), "");
                 _upf_print_typename(member_type);
                 _upf_bprintf("%s = ", member->name);
-                _upf_print_type(data + member->offset, member_type, depth + 1);
+                if (member->bit_size == 0) {
+                    _upf_print_type(data + member->offset, member_type, depth + 1);
+                } else {
+                    _upf_print_bit_field(data, member->offset, member->bit_size);
+                }
                 _upf_bprintf("\n");
             }
             _upf_bprintf("%*s}", UPRINTF_INDENTATION_WIDTH * depth, "");
