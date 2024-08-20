@@ -1,0 +1,49 @@
+&fun2: POINTER
+fun2(): POINTER
+fun2()(): POINTER
+fun2()()(): {
+    int num = 100
+    int *() f0 = POINTER
+}
+fun2()()().num: 100
+fun2()()().f0: POINTER
+&fun2()()().f0: POINTER
+fun2()()().f0(): 200
+&var_fun: POINTER
+var_fun(): {
+    int num = 100
+    int *() f0 = POINTER
+}
+var_fun().num: 100
+var_fun().f0: POINTER
+&var_fun().f0: POINTER
+var_fun().f0(): 200
+ptr_fun: POINTER
+(*ptr_fun)(): {
+    int num = 100
+    int *() f0 = POINTER
+}
+(*ptr_fun)().num: 100
+(*ptr_fun)().f0: POINTER
+&(*ptr_fun)().f0: POINTER
+(*ptr_fun)().f0(): 200
+&functions.f: POINTER
+functions.f(): POINTER
+functions.f()(): {
+    int num = 100
+    int *() f0 = POINTER
+}
+functions.f()().num: 100
+functions.f()().f0: POINTER
+&functions.f()().f0: POINTER
+functions.f()().f0()(): 200
+functions.fp: POINTER
+(*functions.fp)(): POINTER
+(*functions.fp)()(): {
+    int num = 100
+    int *() f0 = POINTER
+}
+(*functions.fp)()().num: 100
+(*functions.fp)()().f0: POINTER
+&(*functions.fp)()().f0: POINTER
+(*functions.fp)()().f0()(): 200
