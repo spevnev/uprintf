@@ -1024,8 +1024,10 @@ static _upf_type _upf_get_subarray(const _upf_type *array, int count) {
 }
 
 static size_t _upf_add_type(const uint8_t *type_die, _upf_type type) {
-    for (size_t i = 0; i < _upf_type_map.length; i++) {
-        if (_upf_type_map.data[i].die == type_die) return i;
+    if (type_die != NULL) {
+        for (size_t i = 0; i < _upf_type_map.length; i++) {
+            if (_upf_type_map.data[i].die == type_die) return i;
+        }
     }
 
     _upf_type_map_entry entry = {
