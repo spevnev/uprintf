@@ -1,0 +1,11 @@
+Circular struct: <#0> {
+    int value = 1
+    B *b = POINTER ({
+        float value = 1.230000
+        A *a = POINTER (<points to #0>)
+        C *c = POINTER (<#1> {
+            const char *value = POINTER ("value")
+        })
+    })
+    C *c = POINTER (<points to #1>)
+}
