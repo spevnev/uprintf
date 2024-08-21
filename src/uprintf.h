@@ -318,6 +318,15 @@ typedef struct {
 
 _UPF_VECTOR_TYPEDEF(_upf_named_type_vec, _upf_named_type);
 
+typedef struct {
+    const void *data;
+    const _upf_type *type;
+    bool is_visited;
+    int id;
+} _upf_indexed_struct;
+
+_UPF_VECTOR_TYPEDEF(_upf_indexed_struct_vec, _upf_indexed_struct);
+
 struct _upf_scope;
 _UPF_VECTOR_TYPEDEF(_upf_scope_vec, struct _upf_scope);
 
@@ -438,6 +447,8 @@ typedef struct {
     size_t free;
 
     _upf_range_vec addresses;
+
+    int circular_id;
 } _upf_call_info;
 
 // ================= GLOBAL VARIABLES =====================
@@ -1013,6 +1024,10 @@ static _upf_type _upf_get_subarray(const _upf_type *array, int count) {
 }
 
 static size_t _upf_add_type(const uint8_t *type_die, _upf_type type) {
+    for (size_t i = 0; i < _upf_type_map.length; i++) {
+        if (_upf_type_map.data[i].die == type_die) return i;
+    }
+
     _upf_type_map_entry entry = {
         .die = type_die,
         .type = type,
@@ -2925,7 +2940,57 @@ __attribute__((no_sanitize_address)) static void _upf_print_char_ptr(const char 
     _upf_bprintf("\")");
 }
 
-static void _upf_print_type(const uint8_t *data, const _upf_type *type, int depth) {
+static void _upf_collect_circular_structs(_upf_indexed_struct_vec *seen, _upf_indexed_struct_vec *circular, const uint8_t *data,
+                                          const _upf_type *type, int depth) {
+    _UPF_ASSERT(seen != NULL && circular != NULL && type != NULL);
+
+    if (UPRINTF_MAX_DEPTH != -1 && depth >= UPRINTF_MAX_DEPTH) return;
+    if (data == NULL) return;
+
+    if (type->kind == _UPF_TK_POINTER) {
+        void *ptr;
+        memcpy(&ptr, data, sizeof(ptr));
+        if (ptr == NULL || type->as.pointer.type == _UPF_INVALID) return;
+
+        const _upf_type *pointed_type = _upf_get_type(type->as.pointer.type);
+
+        _upf_collect_circular_structs(seen, circular, ptr, pointed_type, depth);
+        return;
+    }
+
+    if (type->kind != _UPF_TK_STRUCT && type->kind != _UPF_TK_UNION) return;
+
+    for (size_t i = 0; i < circular->length; i++) {
+        if (data == circular->data[i].data && type == circular->data[i].type) {
+            return;
+        }
+    }
+
+    for (size_t i = 0; i < seen->length; i++) {
+        if (data == seen->data[i].data && type == seen->data[i].type) {
+            _UPF_VECTOR_PUSH(circular, seen->data[i]);
+            return;
+        }
+    }
+
+    _upf_indexed_struct indexed_struct = {
+        .data = data,
+        .type = type,
+        .is_visited = false,
+        .id = -1,
+    };
+    _UPF_VECTOR_PUSH(seen, indexed_struct);
+
+    _upf_member_vec members = type->as.cstruct.members;
+    for (size_t i = 0; i < members.length; i++) {
+        const _upf_member *member = &members.data[i];
+        if (member->bit_size != 0) continue;
+
+        _upf_collect_circular_structs(seen, circular, data + member->offset, _upf_get_type(member->type), depth + 1);
+    }
+}
+
+static void _upf_print_type(_upf_indexed_struct_vec *circular, const uint8_t *data, const _upf_type *type, int depth) {
     _UPF_ASSERT(type != NULL);
 
     if (UPRINTF_MAX_DEPTH != -1 && depth >= UPRINTF_MAX_DEPTH) {
@@ -2968,6 +3033,19 @@ static void _upf_print_type(const uint8_t *data, const _upf_type *type, int dept
                 return;
             }
 
+            for (size_t i = 0; i < circular->length; i++) {
+                if (data == circular->data[i].data && type == circular->data[i].type) {
+                    if (circular->data[i].is_visited) {
+                        _upf_bprintf("<points to #%d>", circular->data[i].id);
+                        return;
+                    }
+
+                    circular->data[i].is_visited = true;
+                    circular->data[i].id = _upf_call.circular_id++;
+                    _upf_bprintf("<#%d> ", circular->data[i].id);
+                }
+            }
+
             _upf_bprintf("{\n");
             for (size_t i = 0; i < members.length; i++) {
                 const _upf_member *member = &members.data[i];
@@ -2977,7 +3055,7 @@ static void _upf_print_type(const uint8_t *data, const _upf_type *type, int dept
                 _upf_print_typename(member_type);
                 _upf_bprintf("%s = ", member->name);
                 if (member->bit_size == 0) {
-                    _upf_print_type(data + member->offset, member_type, depth + 1);
+                    _upf_print_type(circular, data + member->offset, member_type, depth + 1);
                 } else {
                     _upf_print_bit_field(data, member->offset, member->bit_size);
                 }
@@ -3013,7 +3091,7 @@ static void _upf_print_type(const uint8_t *data, const _upf_type *type, int dept
             }
 
             _upf_bprintf("%s (", name ? name : "<unknown>");
-            _upf_print_type(data, underlying_type, depth);
+            _upf_print_type(circular, data, underlying_type, depth);
             _upf_bprintf(")");
         } break;
         case _UPF_TK_ARRAY: {
@@ -3047,7 +3125,7 @@ static void _upf_print_type(const uint8_t *data, const _upf_type *type, int dept
                 if (!is_primitive) _upf_bprintf("%*s", UPRINTF_INDENTATION_WIDTH * (depth + 1), "");
 
                 const uint8_t *current = data + element_size * i;
-                _upf_print_type(current, element_type, depth + 1);
+                _upf_print_type(circular, current, element_type, depth + 1);
 
 #if UPRINTF_ARRAY_COMPRESSION_THRESHOLD > 0
                 size_t j = i;
@@ -3092,7 +3170,7 @@ static void _upf_print_type(const uint8_t *data, const _upf_type *type, int dept
             }
 
             _upf_bprintf("%p (", ptr);
-            _upf_print_type(ptr, pointed_type, depth);
+            _upf_print_type(circular, ptr, pointed_type, depth);
             _upf_bprintf(")");
         } break;
         case _UPF_TK_FUNCTION:
@@ -3166,8 +3244,6 @@ static void _upf_print_type(const uint8_t *data, const _upf_type *type, int dept
             _upf_bprintf("<unknown>");
             break;
     }
-
-    return;
 }
 
 // ================== /proc/pid/maps ======================
@@ -3275,6 +3351,7 @@ __attribute__((noinline)) void _upf_uprintf(const char *file, int line, const ch
     _upf_call.ptr = _upf_call.buffer;
     _upf_call.free = _upf_call.size;
     _upf_call.addresses = _upf_get_address_ranges();
+    _upf_call.circular_id = 0;
 
     void *return_pc = __builtin_extract_return_addr(__builtin_return_address(0));
     _UPF_ASSERT(return_pc != NULL);
@@ -3287,6 +3364,8 @@ __attribute__((noinline)) void _upf_uprintf(const char *file, int line, const ch
     uint64_t pc = (uint64_t) return_pc;
 #endif
 
+    _upf_indexed_struct_vec seen = _UPF_VECTOR_NEW(&_upf_arena);
+    _upf_indexed_struct_vec circular = _UPF_VECTOR_NEW(&_upf_arena);
     char *args_string_copy = _upf_arena_string(&_upf_arena, args_string, args_string + strlen(args_string));
     _upf_cstr_vec args = _upf_get_args(args_string_copy);
     size_t arg_idx = 0;
@@ -3311,7 +3390,10 @@ __attribute__((noinline)) void _upf_uprintf(const char *file, int line, const ch
 
                 const void *ptr = va_arg(va_args, void *);
                 const _upf_type *type = _upf_get_arg_type(args.data[arg_idx++], pc, file, line);
-                _upf_print_type(ptr, type, 0);
+                seen.length = 0;
+                circular.length = 0;
+                _upf_collect_circular_structs(&seen, &circular, ptr, type, 0);
+                _upf_print_type(&circular, ptr, type, 0);
             } break;
             case '\0':
             case '\n':
