@@ -1100,6 +1100,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
 
             bool is_static = true;
             size_t array_size = element_type->size;
+            if (!abbrev->has_children) return _upf_add_type(base, type);
             while (true) {
                 die += _upf_uLEB_to_uint64(die, &code);
                 if (code == 0) break;
@@ -1163,6 +1164,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
 
             if (type.size == _UPF_INVALID) type.size = _upf_get_type(type.as.cenum.underlying_type)->size;
 
+            if (!abbrev->has_children) return _upf_add_type(base, type);
             while (true) {
                 die += _upf_uLEB_to_uint64(die, &code);
                 if (code == 0) break;
@@ -1243,6 +1245,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                 },
             };
 
+            if (!abbrev->has_children) return _upf_add_type(base, type);
             while (true) {
                 die += _upf_uLEB_to_uint64(die, &code);
                 if (code == 0) break;
@@ -1310,6 +1313,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                 type.as.function.return_type = _upf_parse_type(cu, cu->base + subtype_offset);
             }
 
+            if (!abbrev->has_children) return _upf_add_type(base, type);
             while (true) {
                 die += _upf_uLEB_to_uint64(die, &code);
                 if (code == 0) break;
