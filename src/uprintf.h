@@ -2827,6 +2827,83 @@ static const _upf_type *_upf_get_arg_type(const char *arg, uint64_t pc) {
     return _upf_get_type(type);
 }
 
+// ================== /proc/pid/maps ======================
+
+// Function returns the address to which this executable is mapped to.
+// It is retrieved by reading `/proc/self/maps` (see `man proc_pid_maps`).
+// It is used to convert between DWARF addresses and runtime/real ones: DWARF
+// addresses are relative to the beginning of the file, thus real = base + dwarf.
+static void *_upf_get_this_file_address(void) {
+    static const ssize_t PATH_BUFFER_SIZE = 1024;
+
+    char this_path[PATH_BUFFER_SIZE];
+    ssize_t read = readlink("/proc/self/exe", this_path, PATH_BUFFER_SIZE);
+    if (read == -1) _UPF_ERROR("Unable to readlink \"/proc/self/exe\": %s.", strerror(errno));
+    if (read == PATH_BUFFER_SIZE) _UPF_ERROR("Unable to readlink \"/proc/self/exe\": path is too long.");
+    this_path[read] = '\0';
+
+    FILE *file = fopen("/proc/self/maps", "r");
+    if (file == NULL) _UPF_ERROR("Unable to open \"/proc/self/maps\": %s.", strerror(errno));
+
+    uint64_t address = _UPF_INVALID;
+    size_t length = 0;
+    char *line = NULL;
+    while ((read = getline(&line, &length, file)) != -1) {
+        if (read == 0) continue;
+        if (line[read - 1] == '\n') line[read - 1] = '\0';
+
+        int path_offset;
+        if (sscanf(line, "%lx-%*x %*s %*x %*x:%*x %*u %n", &address, &path_offset) != 1) {
+            _UPF_ERROR("Unable to parse \"/proc/self/maps\": invalid format.");
+        }
+
+        if (strcmp(this_path, line + path_offset) == 0) break;
+    }
+    if (line) free(line);
+    fclose(file);
+
+    _UPF_ASSERT(address != _UPF_INVALID);
+    return (void *) address;
+}
+
+static _upf_range_vec _upf_get_address_ranges(void) {
+    FILE *file = fopen("/proc/self/maps", "r");
+    if (file == NULL) _UPF_ERROR("Unable to open \"/proc/self/maps\": %s.", strerror(errno));
+
+    _upf_range_vec ranges = _UPF_VECTOR_NEW(&_upf_arena);
+    _upf_range range = {
+        .start = _UPF_INVALID,
+        .end = _UPF_INVALID,
+    };
+    size_t length = 0;
+    char *line = NULL;
+    ssize_t read;
+    while ((read = getline(&line, &length, file)) != -1) {
+        if (read == 0) continue;
+        if (line[read - 1] == '\n') line[read - 1] = '\0';
+
+        if (sscanf(line, "%lx-%lx %*s %*x %*x:%*x %*u", &range.start, &range.end) != 2) {
+            _UPF_ERROR("Unable to parse \"/proc/self/maps\": invalid format.");
+        }
+
+        _UPF_VECTOR_PUSH(&ranges, range);
+    }
+    if (line) free(line);
+    fclose(file);
+
+    return ranges;
+}
+
+static const void *_upf_get_memory_region_end(const void *ptr) {
+    for (size_t i = 0; i < _upf_call.addresses.length; i++) {
+        _upf_range range = _upf_call.addresses.data[i];
+        if ((void *) range.start <= ptr && ptr <= (void *) range.end) {
+            return (void *) range.end;
+        }
+    }
+    return NULL;
+}
+
 // ===================== PRINTING =========================
 
 // All the printing is done to the global buffer stored in the _upf_call, which
@@ -2926,15 +3003,7 @@ static void _upf_print_bit_field(const uint8_t *data, int total_bit_offset, int 
 }
 
 __attribute__((no_sanitize_address)) static void _upf_print_char_ptr(const char *str) {
-    const char *end = NULL;
-    for (size_t i = 0; i < _upf_call.addresses.length; i++) {
-        _upf_range range = _upf_call.addresses.data[i];
-        if ((char *) range.start <= str && str <= (char *) range.end) {
-            end = (char *) range.end;
-            break;
-        }
-    }
-
+    const char *end = _upf_get_memory_region_end(str);
     if (end == NULL) {
         _upf_bprintf("%p (<out-of-bounds>)", (void *) str);
         return;
@@ -2953,7 +3022,7 @@ static void _upf_collect_circular_structs(_upf_indexed_struct_vec *seen, _upf_in
     _UPF_ASSERT(seen != NULL && circular != NULL && type != NULL);
 
     if (UPRINTF_MAX_DEPTH != -1 && depth >= UPRINTF_MAX_DEPTH) return;
-    if (data == NULL) return;
+    if (data == NULL || _upf_get_memory_region_end(data) == NULL) return;
 
     if (type->kind == _UPF_TK_POINTER) {
         void *ptr;
@@ -3019,6 +3088,11 @@ static void _upf_print_type(_upf_indexed_struct_vec *circular, const uint8_t *da
 
     if (data == NULL) {
         _upf_bprintf("NULL");
+        return;
+    }
+
+    if (_upf_get_memory_region_end(data) == NULL) {
+        _upf_bprintf("<out-of-bounds>");
         return;
     }
 
@@ -3252,73 +3326,6 @@ static void _upf_print_type(_upf_indexed_struct_vec *circular, const uint8_t *da
             _upf_bprintf("<unknown>");
             break;
     }
-}
-
-// ================== /proc/pid/maps ======================
-
-// Function returns the address to which this executable is mapped to.
-// It is retrieved by reading `/proc/self/maps` (see `man proc_pid_maps`).
-// It is used to convert between DWARF addresses and runtime/real ones: DWARF
-// addresses are relative to the beginning of the file, thus real = base + dwarf.
-static void *_upf_get_this_file_address(void) {
-    static const ssize_t PATH_BUFFER_SIZE = 1024;
-
-    char this_path[PATH_BUFFER_SIZE];
-    ssize_t read = readlink("/proc/self/exe", this_path, PATH_BUFFER_SIZE);
-    if (read == -1) _UPF_ERROR("Unable to readlink \"/proc/self/exe\": %s.", strerror(errno));
-    if (read == PATH_BUFFER_SIZE) _UPF_ERROR("Unable to readlink \"/proc/self/exe\": path is too long.");
-    this_path[read] = '\0';
-
-    FILE *file = fopen("/proc/self/maps", "r");
-    if (file == NULL) _UPF_ERROR("Unable to open \"/proc/self/maps\": %s.", strerror(errno));
-
-    uint64_t address = _UPF_INVALID;
-    size_t length = 0;
-    char *line = NULL;
-    while ((read = getline(&line, &length, file)) != -1) {
-        if (read == 0) continue;
-        if (line[read - 1] == '\n') line[read - 1] = '\0';
-
-        int path_offset;
-        if (sscanf(line, "%lx-%*x %*s %*x %*x:%*x %*u %n", &address, &path_offset) != 1) {
-            _UPF_ERROR("Unable to parse \"/proc/self/maps\": invalid format.");
-        }
-
-        if (strcmp(this_path, line + path_offset) == 0) break;
-    }
-    if (line) free(line);
-    fclose(file);
-
-    _UPF_ASSERT(address != _UPF_INVALID);
-    return (void *) address;
-}
-
-static _upf_range_vec _upf_get_address_ranges(void) {
-    FILE *file = fopen("/proc/self/maps", "r");
-    if (file == NULL) _UPF_ERROR("Unable to open \"/proc/self/maps\": %s.", strerror(errno));
-
-    _upf_range_vec ranges = _UPF_VECTOR_NEW(&_upf_arena);
-    _upf_range range = {
-        .start = _UPF_INVALID,
-        .end = _UPF_INVALID,
-    };
-    size_t length = 0;
-    char *line = NULL;
-    ssize_t read;
-    while ((read = getline(&line, &length, file)) != -1) {
-        if (read == 0) continue;
-        if (line[read - 1] == '\n') line[read - 1] = '\0';
-
-        if (sscanf(line, "%lx-%lx %*s %*x %*x:%*x %*u", &range.start, &range.end) != 2) {
-            _UPF_ERROR("Unable to parse \"/proc/self/maps\": invalid format.");
-        }
-
-        _UPF_VECTOR_PUSH(&ranges, range);
-    }
-    if (line) free(line);
-    fclose(file);
-
-    return ranges;
 }
 
 // =================== ENTRY POINTS =======================
