@@ -449,6 +449,9 @@ typedef struct {
     _upf_range_vec addresses;
 
     int circular_id;
+
+    const char *file;
+    int line;
 } _upf_call_info;
 
 // ================= GLOBAL VARIABLES =====================
@@ -1344,7 +1347,6 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                     .modifiers = 0,
                     .size = _UPF_INVALID,
                 };
-
                 return _upf_add_type(base, type);
             }
 
@@ -2008,7 +2010,7 @@ static _upf_cstr_vec _upf_get_args(char *string) {
     return args;
 }
 
-static void _upf_tokenize(_upf_tokenizer *t, const char *string, const char *file, int line) {
+static void _upf_tokenize(_upf_tokenizer *t, const char *string) {
     _UPF_ASSERT(t != NULL && string != NULL);
 
     // Signs should be ordered so that longer ones go first in order to avoid multi character sign
@@ -2116,7 +2118,9 @@ static void _upf_tokenize(_upf_tokenizer *t, const char *string, const char *fil
                     found = true;
                 }
             }
-            if (!found) _UPF_ERROR("Unknown character '%c' when parsing arguments \"%s\" at %s:%d.", *ch, string, file, line);
+            if (!found) {
+                _UPF_ERROR("Unknown character '%c' when parsing arguments \"%s\" at %s:%d.", *ch, string, _upf_call.file, _upf_call.line);
+            }
         }
     }
 }
@@ -2674,7 +2678,7 @@ static size_t _upf_find_function(_upf_parser_state *p, uint64_t pc) {
     return _UPF_INVALID;
 }
 
-static size_t _upf_get_base_type(_upf_parser_state *p, uint64_t pc, const char *arg, const char *file, int line) {
+static size_t _upf_get_base_type(_upf_parser_state *p, uint64_t pc, const char *arg) {
     size_t type_idx = _UPF_INVALID;
     switch (p->base_type) {
         case _UPF_BT_TYPENAME:
@@ -2684,7 +2688,7 @@ static size_t _upf_get_base_type(_upf_parser_state *p, uint64_t pc, const char *
                 _UPF_ERROR(
                     "Unable to find type \"%s\" in \"%s\" at %s:%d. "
                     "Ensure that the executable contains debugging information of at least 2nd level (-g2 or -g3).",
-                    p->base, arg, file, line);
+                    p->base, arg, _upf_call.file, _upf_call.line);
             }
             break;
         case _UPF_BT_VARIABLE:
@@ -2705,7 +2709,7 @@ static size_t _upf_get_base_type(_upf_parser_state *p, uint64_t pc, const char *
                 _UPF_ERROR(
                     "Unable to find type of \"%s\" in \"%s\" at %s:%d. "
                     "Ensure that the executable contains debugging information of at least 2nd level (-g2 or -g3).",
-                    p->base, arg, file, line);
+                    p->base, arg, _upf_call.file, _upf_call.line);
             }
             break;
         case _UPF_BT_FUNCTION:
@@ -2728,7 +2732,7 @@ static size_t _upf_get_base_type(_upf_parser_state *p, uint64_t pc, const char *
                 _UPF_ERROR(
                     "Unable to find type of function \"%s\" in \"%s\" at %s:%d. "
                     "Ensure that the executable contains debugging information of at least 2nd level (-g2 or -g3).",
-                    p->base, arg, file, line);
+                    p->base, arg, _upf_call.file, _upf_call.line);
             }
 
             if (p->members.length == 0 && p->suffix_calls > 0) p->suffix_calls--;
@@ -2739,7 +2743,7 @@ static size_t _upf_get_base_type(_upf_parser_state *p, uint64_t pc, const char *
     return type_idx;
 }
 
-static size_t _upf_dereference_type(size_t type_idx, int dereference, const char *arg, const char *file, int line) {
+static size_t _upf_dereference_type(size_t type_idx, int dereference, const char *arg) {
     // Arguments are pointers to data that should be printed, so they get dereferenced
     // in order not to be interpreted as actual pointers.
     dereference++;
@@ -2780,28 +2784,28 @@ static size_t _upf_dereference_type(size_t type_idx, int dereference, const char
         } else {
         not_pointer_error:
             _UPF_ERROR("Arguments must be pointers to data that should be printed. You must take pointer (&) of \"%s\" at %s:%d.", arg,
-                       file, line);
+                       _upf_call.file, _upf_call.line);
         }
 
         if (type_idx == _UPF_INVALID) {
             _UPF_ERROR(
                 "Unable to print void* because it can point to arbitrary data of any length. "
                 "To print the pointer itself, you must take pointer (&) of \"%s\" at %s:%d.",
-                arg, file, line);
+                arg, _upf_call.file, _upf_call.line);
         }
     }
 
     return type_idx;
 }
 
-static const _upf_type *_upf_get_arg_type(const char *arg, uint64_t pc, const char *file, int line) {
-    _UPF_ASSERT(arg != NULL && file != NULL && line > 0);
+static const _upf_type *_upf_get_arg_type(const char *arg, uint64_t pc) {
+    _UPF_ASSERT(arg != NULL);
 
     _upf_tokenizer t = {
         .tokens = _UPF_VECTOR_NEW(&_upf_arena),
         .idx = 0,
     };
-    _upf_tokenize(&t, arg, file, line);
+    _upf_tokenize(&t, arg);
 
     _upf_parser_state p = {
         .dereference = 0,
@@ -2810,12 +2814,14 @@ static const _upf_type *_upf_get_arg_type(const char *arg, uint64_t pc, const ch
         .base_type = 0,
         .members = _UPF_VECTOR_NEW(&_upf_arena),
     };
-    if (!_upf_parse_expr(&t, &p) || t.idx != t.tokens.length) _UPF_ERROR("Unable to parse argument \"%s\" at %s:%d.", arg, file, line);
+    if (!_upf_parse_expr(&t, &p) || t.idx != t.tokens.length) {
+        _UPF_ERROR("Unable to parse argument \"%s\" at %s:%d.", arg, _upf_call.file, _upf_call.line);
+    }
 
-    size_t base_type = _upf_get_base_type(&p, pc, arg, file, line);
+    size_t base_type = _upf_get_base_type(&p, pc, arg);
     size_t member_type = _upf_get_member_type(&p.members, 0, base_type);
     if (p.suffix_calls > 0) member_type = _upf_get_return_type(member_type, p.suffix_calls);
-    size_t type = _upf_dereference_type(member_type, p.dereference, arg, file, line);
+    size_t type = _upf_dereference_type(member_type, p.dereference, arg);
 
     _UPF_ASSERT(type != _UPF_INVALID);
     return _upf_get_type(type);
@@ -3354,6 +3360,8 @@ __attribute__((noinline)) void _upf_uprintf(const char *file, int line, const ch
     _upf_call.free = _upf_call.size;
     _upf_call.addresses = _upf_get_address_ranges();
     _upf_call.circular_id = 0;
+    _upf_call.file = file;
+    _upf_call.line = line;
 
     void *return_pc = __builtin_extract_return_addr(__builtin_return_address(0));
     _UPF_ASSERT(return_pc != NULL);
@@ -3391,7 +3399,7 @@ __attribute__((noinline)) void _upf_uprintf(const char *file, int line, const ch
                 if (arg_idx >= args.length) _UPF_ERROR("There are more format specifiers than arguments provided at %s:%d.", file, line);
 
                 const void *ptr = va_arg(va_args, void *);
-                const _upf_type *type = _upf_get_arg_type(args.data[arg_idx++], pc, file, line);
+                const _upf_type *type = _upf_get_arg_type(args.data[arg_idx++], pc);
                 seen.length = 0;
                 circular.length = 0;
                 _upf_collect_circular_structs(&seen, &circular, ptr, type, 0);
