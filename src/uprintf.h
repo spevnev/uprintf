@@ -2920,7 +2920,7 @@ static const void *_upf_get_memory_region_end(const void *ptr) {
         if ((size_t) bytes >= _upf_call.free) {                                                   \
             size_t used = _upf_call.size - _upf_call.free;                                        \
             _upf_call.size *= 2;                                                                  \
-            _upf_call.buffer = realloc(_upf_call.buffer, _upf_call.size);                         \
+            _upf_call.buffer = (char *) realloc(_upf_call.buffer, _upf_call.size);                \
             if (_upf_call.buffer == NULL) _UPF_OUT_OF_MEMORY();                                   \
             _upf_call.ptr = _upf_call.buffer + used;                                              \
             _upf_call.free = _upf_call.size - used;                                               \
@@ -2960,39 +2960,50 @@ static void _upf_print_modifiers(int modifiers) {
     if (modifiers & _UPF_MOD_ATOMIC) _upf_bprintf("atomic ");
 }
 
-static void _upf_print_typename(const _upf_type *type) {
+static void _upf_print_typename(const _upf_type *type, bool print_trailing_whitespace) {
     _UPF_ASSERT(type != NULL);
-
-    if (type->kind == _UPF_TK_POINTER) {
-        if (type->as.pointer.type == _UPF_INVALID) {
-            _upf_bprintf("void *");
-            _upf_print_modifiers(type->modifiers);
-        } else {
-            const _upf_type *pointer_type = _upf_get_type(type->as.pointer.type);
-            _upf_print_typename(pointer_type);
-            if (pointer_type->kind != _UPF_TK_FUNCTION) {
-                _upf_bprintf("*");
+    switch (type->kind) {
+        case _UPF_TK_POINTER:
+            if (type->as.pointer.type == _UPF_INVALID) {
+                _upf_bprintf("void *");
                 _upf_print_modifiers(type->modifiers);
+                break;
             }
-        }
-    } else if (type->kind == _UPF_TK_FUNCTION) {
-        if (type->as.function.return_type == _UPF_INVALID) {
-            _upf_bprintf("void");
-        } else {
-            _upf_print_typename(_upf_get_type(type->as.function.return_type));
-            if (*(_upf_call.ptr - 1) == ' ') _upf_call.ptr--;
-        }
 
-        _upf_bprintf("(");
-        for (size_t i = 0; i < type->as.function.arg_types.length; i++) {
-            if (i > 0) _upf_bprintf(", ");
-            _upf_print_typename(_upf_get_type(type->as.function.arg_types.data[i]));
-            if (*(_upf_call.ptr - 1) == ' ') _upf_call.ptr--;
-        }
-        _upf_bprintf(") ");
-    } else {
-        _upf_print_modifiers(type->modifiers);
-        _upf_bprintf("%s ", type->name ? type->name : "<unnamed>");
+            const _upf_type *pointer_type = _upf_get_type(type->as.pointer.type);
+            if (pointer_type->kind == _UPF_TK_FUNCTION) {
+                _upf_print_typename(pointer_type, print_trailing_whitespace);
+                break;
+            }
+
+            _upf_print_typename(pointer_type, true);
+            _upf_bprintf("*");
+            _upf_print_modifiers(type->modifiers);
+            break;
+        case _UPF_TK_FUNCTION:
+            if (type->as.function.return_type == _UPF_INVALID) {
+                _upf_bprintf("void");
+            } else {
+                _upf_print_typename(_upf_get_type(type->as.function.return_type), false);
+            }
+
+            _upf_bprintf("(");
+            for (size_t i = 0; i < type->as.function.arg_types.length; i++) {
+                if (i > 0) _upf_bprintf(", ");
+                _upf_print_typename(_upf_get_type(type->as.function.arg_types.data[i]), false);
+            }
+            _upf_bprintf(")");
+            if (print_trailing_whitespace) _upf_bprintf(" ");
+            break;
+        default:
+            _upf_print_modifiers(type->modifiers);
+            if (type->name) {
+                _upf_bprintf("%s", type->name);
+            } else {
+                _upf_bprintf("<unnamed>");
+            }
+            if (print_trailing_whitespace) _upf_bprintf(" ");
+            break;
     }
 }
 
@@ -3138,7 +3149,7 @@ static void _upf_print_type(_upf_indexed_struct_vec *circular, const uint8_t *da
                 const _upf_type *member_type = _upf_get_type(member->type);
 
                 _upf_bprintf("%*s", UPRINTF_INDENTATION_WIDTH * (depth + 1), "");
-                _upf_print_typename(member_type);
+                _upf_print_typename(member_type, true);
                 _upf_bprintf("%s = ", member->name);
                 if (member->bit_size == 0) {
                     _upf_print_type(circular, data + member->offset, member_type, depth + 1);
