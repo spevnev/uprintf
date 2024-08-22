@@ -146,7 +146,7 @@ int _upf_test_status = EXIT_SUCCESS;
 
 #define _UPF_WARN(...)                      \
     do {                                    \
-        _UPF_LOG("WARN", __VA_ARGS__);      \
+        _UPF_LOG("WARNING", __VA_ARGS__);   \
         _UPF_SET_TEST_STATUS(EXIT_FAILURE); \
     } while (0)
 
@@ -938,9 +938,7 @@ static enum _upf_type_kind _upf_get_type_kind(int64_t encoding, int64_t size) {
             _UPF_WARN("Expected boolean to be 1 byte long. Ignoring this type.");
             return _UPF_TK_UNKNOWN;
         case DW_ATE_address:
-            _UPF_WARN(
-                "Segmented addresses aren't supported since x86_64/amd64 (the only supported architecture) doesn't have them. "
-                "Ignoring this type.");
+            _UPF_WARN("Segmented addresses aren't supported. Ignoring this type.");
             return _UPF_TK_UNKNOWN;
         case DW_ATE_signed:
             if (size == 1) return _UPF_TK_S1;
