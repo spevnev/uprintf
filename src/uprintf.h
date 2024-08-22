@@ -695,7 +695,6 @@ static size_t _upf_get_attr_size(const uint8_t *die, uint64_t form) {
         case DW_FORM_flag:
         case DW_FORM_ref1:
         case DW_FORM_data1:
-        case DW_FORM_block1:
             return 1;
         case DW_FORM_strx2:
         case DW_FORM_addrx2:
@@ -710,7 +709,6 @@ static size_t _upf_get_attr_size(const uint8_t *die, uint64_t form) {
         case DW_FORM_addrx4:
         case DW_FORM_ref4:
         case DW_FORM_data4:
-        case DW_FORM_block4:
             return 4;
         case DW_FORM_ref_sig8:
         case DW_FORM_ref_sup8:
@@ -719,6 +717,21 @@ static size_t _upf_get_attr_size(const uint8_t *die, uint64_t form) {
             return 8;
         case DW_FORM_data16:
             return 16;
+        case DW_FORM_block1: {
+            uint8_t length;
+            memcpy(&length, die, sizeof(length));
+            return sizeof(length) + length;
+        }
+        case DW_FORM_block2: {
+            uint16_t length;
+            memcpy(&length, die, sizeof(length));
+            return sizeof(length) + length;
+        }
+        case DW_FORM_block4: {
+            uint32_t length;
+            memcpy(&length, die, sizeof(length));
+            return sizeof(length) + length;
+        }
         case DW_FORM_sdata: {
             int64_t result;
             return _upf_LEB_to_int64(die, &result);
