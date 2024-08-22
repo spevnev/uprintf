@@ -63,6 +63,9 @@ $(LIB_DIR)/sqlite/sqlite3.c:
 	cd $(LIB_DIR) && unzip sqlite.zip && mv sqlite-amalgamation-3460100 sqlite
 	rm $(LIB_DIR)/sqlite.zip
 
+.PHONY: test
+test: tests
+
 .PHONY: tests
 tests: $(foreach C,$(COMPILERS),$(foreach O,$(O_LEVELS),$(foreach G,$(G_LEVELS),$(foreach T,$(TESTS),$(BUILD_DIR)/test/$T/$T-$C-$O-$G))))
 
