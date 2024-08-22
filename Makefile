@@ -53,6 +53,16 @@ $(LIB_DIR)/avl:
 	git clone --depth 1 https://github.com/etherealvisage/avl $(LIB_DIR)/avl_src
 	mv $(LIB_DIR)/avl_src/src $@
 
+$(BUILD_DIR)/$(EXAMPLE_DIR)/sqlite: $(EXAMPLE_DIR)/sqlite.c $(LIB_DIR)/sqlite/sqlite3.c src/uprintf.h Makefile
+	@mkdir -p $(@D)
+	$(CC) $(FLAGS) $(CFLAGS) -I $(LIB_DIR)/sqlite -o $@ $<
+
+$(LIB_DIR)/sqlite/sqlite3.c:
+	mkdir -p $(LIB_DIR)
+	wget https://www.sqlite.org/2024/sqlite-amalgamation-3460100.zip -O $(LIB_DIR)/sqlite.zip
+	cd $(LIB_DIR) && unzip sqlite.zip && mv sqlite-amalgamation-3460100 sqlite
+	rm $(LIB_DIR)/sqlite.zip
+
 .PHONY: tests
 tests: $(foreach C,$(COMPILERS),$(foreach O,$(O_LEVELS),$(foreach G,$(G_LEVELS),$(foreach T,$(TESTS),$(BUILD_DIR)/test/$T/$T-$C-$O-$G))))
 
