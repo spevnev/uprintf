@@ -4,7 +4,7 @@
 
 int main(int argc, char *argv[]) {
     if (argc < 2) {
-        fprintf(stderr, "usage: %s [path-to-ogg]\n", argv[0]);
+        fprintf(stderr, "usage: %s <path-to-ogg>\n", argv[0]);
         return EXIT_FAILURE;
     }
 
