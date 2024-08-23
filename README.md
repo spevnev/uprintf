@@ -1,7 +1,8 @@
 # Universal printf
 
 uprintf is a single-header library for printing structures in C. \
-It only works on Linux when the executable is built with debug information.
+It only works on Linux and requires the executable to contain debugging information. \
+Only tested on x86_64/amd64.
 
 ### What is a single header library?
 
