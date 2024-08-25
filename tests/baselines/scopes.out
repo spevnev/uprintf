@@ -5,3 +5,8 @@ int8_t = -5
 int8_t = -5
 size_t = 3
 size_t = 4
+void* NULL
+bool false
+int 333
+float 0.123000
+c_str POINTER ("var")

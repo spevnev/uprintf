@@ -52,6 +52,7 @@ $(LIB_DIR)/avl:
 	@mkdir -p $(@D)
 	git clone --depth 1 https://github.com/etherealvisage/avl $(LIB_DIR)/avl_src
 	mv $(LIB_DIR)/avl_src/src $@
+	rm -rf $(LIB_DIR)/avl_src
 
 $(BUILD_DIR)/$(EXAMPLE_DIR)/sqlite: $(EXAMPLE_DIR)/sqlite.c $(LIB_DIR)/sqlite/sqlite3.c src/uprintf.h Makefile
 	@mkdir -p $(@D)
