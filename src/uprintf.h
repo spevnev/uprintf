@@ -55,7 +55,7 @@ void _upf_uprintf(const char *file, int line, const char *fmt, const char *args,
 #define uprintf(fmt, ...)                                                                        \
     do {                                                                                         \
         _upf_uprintf(__FILE__, __LINE__, fmt, _upf_stringify_va_args(__VA_ARGS__), __VA_ARGS__); \
-        __asm__("nop\n\t");                                                                      \
+        __asm__ volatile("nop");                                                                 \
     } while (0)
 
 #ifdef UPRINTF_TEST
