@@ -3053,7 +3053,7 @@ static void _upf_print_bit_field(const uint8_t *data, int total_bit_offset, int 
 
     uint8_t value;
     memcpy(&value, data + byte_offset, sizeof(value));
-    value = (value << (8 - bit_size - bit_offset)) >> (8 - bit_size);
+    value = (value >> bit_offset) & ((1 << bit_size) - 1);
     _upf_bprintf("%hhu <%d bit%s>", value, bit_size, bit_size > 1 ? "s" : "");
 }
 
