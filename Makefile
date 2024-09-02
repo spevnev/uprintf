@@ -89,9 +89,9 @@ $(foreach C,$(COMPILERS),                                 \
 )
 
 define IMPL_TEMPLATE
-$(BUILD_DIR)/impl/$1.o: src/impl.c src/uprintf.h Makefile
+$(BUILD_DIR)/impl/$1.o: src/uprintf.h Makefile
 	@mkdir -p $$(@D)
-	$1 $(FLAGS) $(CFLAGS) -c $$< -o $$@
+	$1 $(FLAGS) $(CFLAGS) -DUPRINTF_IMPLEMENTATION -x c -c $$< -o $$@
 endef
 
 $(foreach C,$(COMPILERS),$(eval $(call IMPL_TEMPLATE,$C)))
