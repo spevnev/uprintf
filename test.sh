@@ -70,7 +70,7 @@ echo "Similarity is $similarity%" >> $log
 if [ $similarity -lt $(get_similarity $1) ]; then
     diff="$bin.diff"
     wdiff $baseline $output > $diff
-    
+
     echo "[DIFF FAILED] Similarity is $similarity%. Diff: $diff. Log: $log. Rerun test: make $bin"
     exit 1
 fi

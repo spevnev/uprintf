@@ -194,6 +194,16 @@ int _upf_test_status = EXIT_SUCCESS;
         (vec)->data[(vec)->length++] = (element);                          \
     } while (0)
 
+#define _UPF_VECTOR_COPY(dst, src)                            \
+    do {                                                      \
+        (dst)->arena = (src)->arena;                          \
+        (dst)->capacity = (src)->length;                      \
+        (dst)->length = (src)->length;                        \
+        size_t size = (dst)->capacity * sizeof(*(dst)->data); \
+        (dst)->data = _upf_arena_alloc((dst)->arena, size);   \
+        memcpy((dst)->data, (src)->data, size);               \
+    } while (0);
+
 #define _UPF_VECTOR_TOP(vec) (vec)->data[(vec)->length - 1]
 
 #define _UPF_VECTOR_POP(vec) (vec)->length--
@@ -414,6 +424,10 @@ struct _upf_dwarf {
     const uint8_t *str_offsets;
     const uint8_t *addr;
     const uint8_t *rnglists;
+
+    _upf_range_vec uprintf_ranges;
+    bool init_pc;
+    uint8_t *pc_base;
 };
 
 typedef struct {
@@ -1627,11 +1641,11 @@ static _upf_range_vec _upf_get_cu_ranges(const _upf_cu *cu, const uint8_t *low_p
     return ranges;
 }
 
-static void _upf_parse_cu_scope(const _upf_cu *cu, _upf_scope_stack *scope_stack, int depth, const uint8_t *die,
+static bool _upf_parse_cu_scope(const _upf_cu *cu, _upf_scope_stack *scope_stack, int depth, const uint8_t *die,
                                 const _upf_abbrev *abbrev) {
     _UPF_ASSERT(cu != NULL && scope_stack != NULL && die != NULL && abbrev != NULL);
 
-    if (!abbrev->has_children) return;
+    if (!abbrev->has_children) return false;
     _UPF_ASSERT(scope_stack->length > 0);
 
     _upf_scope new_scope = {
@@ -1694,6 +1708,7 @@ static void _upf_parse_cu_scope(const _upf_cu *cu, _upf_scope_stack *scope_stack
     }
 
     _UPF_VECTOR_PUSH(scope_stack, stack_entry);
+    return new_scope.ranges.length > 0;
 }
 
 static void _upf_parse_cu_type(_upf_cu *cu, const uint8_t *die) {
@@ -1726,7 +1741,7 @@ static void _upf_parse_cu_type(_upf_cu *cu, const uint8_t *die) {
     _UPF_VECTOR_PUSH(&cu->types, type);
 }
 
-static void _upf_parse_cu_function(_upf_cu *cu, const uint8_t *die, const _upf_abbrev *abbrev) {
+static const char *_upf_parse_cu_function(_upf_cu *cu, const uint8_t *die, const _upf_abbrev *abbrev) {
     _UPF_ASSERT(cu != NULL && die != NULL && abbrev != NULL);
 
     _upf_named_type function = {
@@ -1741,9 +1756,9 @@ static void _upf_parse_cu_function(_upf_cu *cu, const uint8_t *die, const _upf_a
 
         die += _upf_get_attr_size(die, attr.form);
     }
-    if (function.name == NULL) return;
+    if (function.name != NULL) _UPF_VECTOR_PUSH(&cu->functions, function);
 
-    _UPF_VECTOR_PUSH(&cu->functions, function);
+    return function.name;
 }
 
 static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *die, const uint8_t *die_end, const uint8_t *abbrev_table) {
@@ -1827,14 +1842,22 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *die, const uint
         abbrev = _upf_get_abbrev(&cu, code);
         if (abbrev->has_children) depth++;
 
+        bool is_uprintf = false;
         switch (abbrev->tag) {
-            case DW_TAG_subprogram:
-                _upf_parse_cu_function(&cu, die, abbrev);
+            case DW_TAG_subprogram: {
+                const char *function_name = _upf_parse_cu_function(&cu, die, abbrev);
+                if (function_name != NULL && strcmp(function_name, "_upf_uprintf") == 0) is_uprintf = true;
                 __attribute__((fallthrough));
+            }
             case DW_TAG_lexical_block:
-            case DW_TAG_inlined_subroutine:
-                _upf_parse_cu_scope(&cu, &scope_stack, depth, die, abbrev);
-                break;
+            case DW_TAG_inlined_subroutine: {
+                bool scope = _upf_parse_cu_scope(&cu, &scope_stack, depth, die, abbrev);
+                if (is_uprintf && scope) {
+                    _UPF_ASSERT(_upf_dwarf.uprintf_ranges.length == 0);
+                    _UPF_VECTOR_COPY(&_upf_dwarf.uprintf_ranges, &_UPF_VECTOR_TOP(&scope_stack).scope->ranges);
+                }
+                is_uprintf = false;
+            } break;
             case DW_TAG_array_type:
             case DW_TAG_enumeration_type:
             case DW_TAG_pointer_type:
@@ -2842,7 +2865,7 @@ static const _upf_type *_upf_get_arg_type(const char *arg, uint64_t pc) {
     return _upf_get_type(type);
 }
 
-// ================== /proc/pid/maps ======================
+// ===================== GETTING PC =======================
 
 // Function returns the address to which this executable is mapped to.
 // It is retrieved by reading `/proc/self/maps` (see `man proc_pid_maps`).
@@ -2880,6 +2903,12 @@ static void *_upf_get_this_file_address(void) {
     _UPF_ASSERT(address != _UPF_INVALID);
     return (void *) address;
 }
+
+__attribute__((noinline)) static uint64_t _upf_get_pc(void) {
+    return (uint64_t) __builtin_extract_return_addr(__builtin_return_address(0));
+}
+
+// ================== /proc/pid/maps ======================
 
 static _upf_range_vec _upf_get_address_ranges(void) {
     FILE *file = fopen("/proc/self/maps", "r");
@@ -3396,11 +3425,21 @@ __attribute__((noinline)) void _upf_uprintf(const char *file, int line, const ch
     _upf_call.file = file;
     _upf_call.line = line;
 
-    void *return_pc = __builtin_extract_return_addr(__builtin_return_address(0));
-    _UPF_ASSERT(return_pc != NULL);
-    static char *this_file = NULL;
-    if (this_file == NULL) this_file = _upf_get_this_file_address();
-    uint64_t pc = ((char *) return_pc) - this_file;
+    if (!_upf_dwarf.init_pc) {
+        _upf_dwarf.init_pc = true;
+
+        _UPF_ASSERT(_upf_dwarf.uprintf_ranges.length > 0);
+        bool is_pc_absolute = _upf_is_in_range(_upf_get_pc(), _upf_dwarf.uprintf_ranges);
+        if (is_pc_absolute) {
+            _upf_dwarf.pc_base = NULL;
+        } else {
+            _upf_dwarf.pc_base = _upf_get_this_file_address();
+        }
+    }
+
+    uint8_t *pc_ptr = __builtin_extract_return_addr(__builtin_return_address(0));
+    _UPF_ASSERT(pc_ptr != NULL);
+    uint64_t pc = pc_ptr - _upf_dwarf.pc_base;
 
     _upf_indexed_struct_vec seen = _UPF_VECTOR_NEW(&_upf_arena);
     _upf_indexed_struct_vec circular = _UPF_VECTOR_NEW(&_upf_arena);
