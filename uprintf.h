@@ -3398,14 +3398,9 @@ __attribute__((noinline)) void _upf_uprintf(const char *file, int line, const ch
 
     void *return_pc = __builtin_extract_return_addr(__builtin_return_address(0));
     _UPF_ASSERT(return_pc != NULL);
-#ifdef __clang__
     static char *this_file = NULL;
     if (this_file == NULL) this_file = _upf_get_this_file_address();
     uint64_t pc = ((char *) return_pc) - this_file;
-#else
-    (void) _upf_get_this_file_address;
-    uint64_t pc = (uint64_t) return_pc;
-#endif
 
     _upf_indexed_struct_vec seen = _UPF_VECTOR_NEW(&_upf_arena);
     _upf_indexed_struct_vec circular = _UPF_VECTOR_NEW(&_upf_arena);

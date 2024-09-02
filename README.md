@@ -13,7 +13,7 @@ However, by defining a macro the header start to act as a .c file, i.e. contains
 
 ## Installation
 
-Installing a single header library is as simple as downloading `src/uprintf.h`.
+Installing a single header library is as simple as downloading `uprintf.h`.
 
 If you have cloned the repository, it can be installed to `/usr/local/include` by running `make install`. \
 This way you should be able to include it without copying the header to every project (since it is a default include path).

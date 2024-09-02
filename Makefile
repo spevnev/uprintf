@@ -1,6 +1,6 @@
 CC     := gcc
 FLAGS  := -O2 -g2 -std=c99
-CFLAGS := -Wall -Wextra -pedantic -I src -fsanitize=undefined,address,leak -DUPRINTF_TEST
+CFLAGS := -Wall -Wextra -pedantic -I . -fsanitize=undefined,address,leak -DUPRINTF_TEST
 
 BUILD_DIR    := build
 LIB_DIR      := libs
@@ -25,7 +25,7 @@ clean:
 
 .PHONY: install
 install:
-	cp src/uprintf.h /usr/local/include/uprintf.h
+	cp uprintf.h /usr/local/include/uprintf.h
 	chmod 644 /usr/local/include/uprintf.h
 
 .PHONY: uninstall
@@ -36,7 +36,7 @@ uninstall:
 .PHONY: examples
 examples: $(patsubst %, $(BUILD_DIR)/$(EXAMPLE_DIR)/%, $(EXAMPLES))
 
-$(BUILD_DIR)/$(EXAMPLE_DIR)/vorbis: $(EXAMPLE_DIR)/vorbis.c $(LIB_DIR)/stb_vorbis.c src/uprintf.h Makefile
+$(BUILD_DIR)/$(EXAMPLE_DIR)/vorbis: $(EXAMPLE_DIR)/vorbis.c $(LIB_DIR)/stb_vorbis.c uprintf.h Makefile
 	@mkdir -p $(@D)
 	$(CC) $(FLAGS) $(CFLAGS) -I $(LIB_DIR) -o $@ $< -lm
 
@@ -44,7 +44,7 @@ $(LIB_DIR)/stb_vorbis.c:
 	@mkdir -p $(@D)
 	wget https://raw.githubusercontent.com/nothings/stb/master/stb_vorbis.c -O $@
 
-$(BUILD_DIR)/$(EXAMPLE_DIR)/avl: $(EXAMPLE_DIR)/avl.c $(LIB_DIR)/avl src/uprintf.h Makefile
+$(BUILD_DIR)/$(EXAMPLE_DIR)/avl: $(EXAMPLE_DIR)/avl.c $(LIB_DIR)/avl uprintf.h Makefile
 	@mkdir -p $(@D)
 	$(CC) $(FLAGS) $(CFLAGS) -I $(LIB_DIR)/avl -o $@ $< $(LIB_DIR)/avl/avl.c
 
@@ -54,7 +54,7 @@ $(LIB_DIR)/avl:
 	mv $(LIB_DIR)/avl_src/src $@
 	rm -rf $(LIB_DIR)/avl_src
 
-$(BUILD_DIR)/$(EXAMPLE_DIR)/sqlite: $(EXAMPLE_DIR)/sqlite.c $(LIB_DIR)/sqlite/sqlite3.c src/uprintf.h Makefile
+$(BUILD_DIR)/$(EXAMPLE_DIR)/sqlite: $(EXAMPLE_DIR)/sqlite.c $(LIB_DIR)/sqlite/sqlite3.c uprintf.h Makefile
 	@mkdir -p $(@D)
 	$(CC) $(FLAGS) $(CFLAGS) -I $(LIB_DIR)/sqlite -o $@ $<
 
@@ -74,7 +74,7 @@ tests: $(foreach C,$(COMPILERS),$(foreach O,$(O_LEVELS),$(foreach G,$(G_LEVELS),
 export
 
 define TEST_TEMPLATE
-$(BUILD_DIR)/test/$1/$1-$2-$3-$4: $(BUILD_DIR)/impl/$2.o $(TEST_DIR)/$1.c src/uprintf.h Makefile test.sh
+$(BUILD_DIR)/test/$1/$1-$2-$3-$4: $(BUILD_DIR)/impl/$2.o $(TEST_DIR)/$1.c uprintf.h Makefile test.sh
 	@./test.sh $1 $2 $3 $4
 endef
 
@@ -89,7 +89,7 @@ $(foreach C,$(COMPILERS),                                 \
 )
 
 define IMPL_TEMPLATE
-$(BUILD_DIR)/impl/$1.o: src/uprintf.h Makefile
+$(BUILD_DIR)/impl/$1.o: uprintf.h Makefile
 	@mkdir -p $$(@D)
 	$1 $(FLAGS) $(CFLAGS) -DUPRINTF_IMPLEMENTATION -x c -c $$< -o $$@
 endef
