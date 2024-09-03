@@ -160,7 +160,15 @@ int _upf_test_status = EXIT_SUCCESS;
 
 // ====================== VECTOR ==========================
 
-#define _UPF_INITIAL_VECTOR_CAPACITY 16
+#define _UPF_INITIAL_VECTOR_CAPACITY 4
+
+#define _UPF_VECTOR_TYPEDEF(name, type) \
+    typedef struct {                    \
+        struct _upf_arena *arena;       \
+        uint32_t capacity;              \
+        uint32_t length;                \
+        type *data;                     \
+    } name
 
 #define _UPF_VECTOR_NEW(a) \
     {                      \
@@ -170,22 +178,14 @@ int _upf_test_status = EXIT_SUCCESS;
         .data = NULL,      \
     }
 
-#define _UPF_VECTOR_TYPEDEF(name, type) \
-    typedef struct {                    \
-        struct _upf_arena *arena;       \
-        size_t capacity;                \
-        size_t length;                  \
-        type *data;                     \
-    } name
-
 #define _UPF_VECTOR_PUSH(vec, element)                                     \
     do {                                                                   \
         if ((vec)->capacity == 0) {                                        \
             (vec)->capacity = _UPF_INITIAL_VECTOR_CAPACITY;                \
-            size_t size = (vec)->capacity * sizeof(*(vec)->data);          \
+            uint32_t size = (vec)->capacity * sizeof(*(vec)->data);        \
             (vec)->data = _upf_arena_alloc((vec)->arena, size);            \
         } else if ((vec)->capacity == (vec)->length) {                     \
-            size_t old_size = (vec)->capacity * sizeof(*(vec)->data);      \
+            uint32_t old_size = (vec)->capacity * sizeof(*(vec)->data);    \
             (vec)->capacity *= 2;                                          \
             void *new_data = _upf_arena_alloc((vec)->arena, old_size * 2); \
             memcpy(new_data, (vec)->data, old_size);                       \
@@ -194,14 +194,14 @@ int _upf_test_status = EXIT_SUCCESS;
         (vec)->data[(vec)->length++] = (element);                          \
     } while (0)
 
-#define _UPF_VECTOR_COPY(dst, src)                            \
-    do {                                                      \
-        (dst)->arena = (src)->arena;                          \
-        (dst)->capacity = (src)->length;                      \
-        (dst)->length = (src)->length;                        \
-        size_t size = (dst)->capacity * sizeof(*(dst)->data); \
-        (dst)->data = _upf_arena_alloc((dst)->arena, size);   \
-        memcpy((dst)->data, (src)->data, size);               \
+#define _UPF_VECTOR_COPY(dst, src)                              \
+    do {                                                        \
+        (dst)->arena = (src)->arena;                            \
+        (dst)->capacity = (src)->length;                        \
+        (dst)->length = (src)->length;                          \
+        uint32_t size = (dst)->capacity * sizeof(*(dst)->data); \
+        (dst)->data = _upf_arena_alloc((dst)->arena, size);     \
+        memcpy((dst)->data, (src)->data, size);                 \
     } while (0);
 
 #define _UPF_VECTOR_TOP(vec) (vec)->data[(vec)->length - 1]
@@ -482,7 +482,7 @@ static _upf_call_info _upf_call = {0};
 
 // ====================== ARENA ===========================
 
-#define _UPF_INITIAL_ARENA_SIZE 4096
+#define _UPF_INITIAL_ARENA_SIZE 65535
 
 static _upf_arena_region *_upf_arena_alloc_region(size_t capacity) {
     _upf_arena_region *region = (_upf_arena_region *) malloc(sizeof(*region));
