@@ -1287,6 +1287,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                     .offset = is_struct ? _UPF_INVALID : 0,
                     .bit_size = 0,
                 };
+                bool skip_member = false;
                 for (size_t i = 0; i < abbrev->attrs.length; i++) {
                     _upf_attr attr = abbrev->attrs.data[i];
 
@@ -1299,24 +1300,28 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                         if (_upf_is_data(attr.form)) {
                             member.offset = _upf_get_data(die, attr);
                         } else {
-                            _UPF_WARN("Non-constant member offsets aren't supported. Ignoring this type.");
-                            goto unknown_type;
+                            _UPF_WARN("Non-constant member offsets aren't supported. Skipping this field.");
+                            skip_member = true;
                         }
+                    } else if (attr.name == DW_AT_bit_offset) {
+                        _UPF_WARN("Bit offset uses old format. Skipping this field.");
+                        skip_member = true;
                     } else if (attr.name == DW_AT_data_bit_offset) {
                         member.offset = _upf_get_data(die, attr);
                     } else if (attr.name == DW_AT_bit_size) {
                         if (_upf_is_data(attr.form)) {
                             member.bit_size = _upf_get_data(die, attr);
                         } else {
-                            _UPF_WARN("Non-constant bit field sizes aren't supported. Ignoring this type.");
-                            goto unknown_type;
+                            _UPF_WARN("Non-constant bit field sizes aren't supported. Skipping this field.");
+                            skip_member = true;
                         }
                     }
 
                     die += _upf_get_attr_size(die, attr.form);
                 }
-                _UPF_ASSERT(member.name != NULL && member.type != _UPF_INVALID && member.offset != _UPF_INVALID);
+                if (skip_member) continue;
 
+                _UPF_ASSERT(member.name != NULL && member.type != _UPF_INVALID && member.offset != _UPF_INVALID);
                 _UPF_VECTOR_PUSH(&type.as.cstruct.members, member);
             }
 
