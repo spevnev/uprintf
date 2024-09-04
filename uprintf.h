@@ -459,25 +459,28 @@ _UPF_VECTOR_TYPEDEF(_upf_cu_vec, _upf_cu);
 
 // =================== GLOBAL STATE =======================
 
-// TODO: add spacing and comments
 struct _upf_state {
     bool is_init;
+    _upf_arena arena;
+    _upf_dwarf dwarf;
+
+    int circular_id;
+    _upf_range_vec addresses;
+    _upf_type_map_vec type_map;
+    _upf_cu_vec cus;
+
     jmp_buf jmp_buf;
+    const char *file;
+    int line;
+
     char *buffer;
     size_t size;
     char *ptr;
     size_t free;
-    _upf_range_vec addresses;
-    int circular_id;
-    const char *file;
-    int line;
-    _upf_dwarf dwarf;
+
     _upf_range_vec uprintf_ranges;
     bool init_pc;
     uint8_t *pc_base;
-    _upf_arena arena;
-    _upf_type_map_vec type_map;
-    _upf_cu_vec cus;
 };
 
 static struct _upf_state _upf_state = {0};
