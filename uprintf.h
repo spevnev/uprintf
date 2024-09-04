@@ -137,11 +137,11 @@ int _upf_test_status = EXIT_SUCCESS;
         fprintf(stderr, "\n");                    \
     } while (0)
 
-#define _UPF_ERROR(...)                      \
-    do {                                     \
-        _UPF_LOG("ERROR", __VA_ARGS__);      \
-        _UPF_SET_TEST_STATUS(EXIT_FAILURE);  \
-        longjmp(_upf_jmp_buf, EXIT_FAILURE); \
+#define _UPF_ERROR(...)                            \
+    do {                                           \
+        _UPF_LOG("ERROR", __VA_ARGS__);            \
+        _UPF_SET_TEST_STATUS(EXIT_FAILURE);        \
+        longjmp(_upf_state.jmp_buf, EXIT_FAILURE); \
     } while (0)
 
 #define _UPF_WARN(...)                      \
@@ -164,7 +164,7 @@ int _upf_test_status = EXIT_SUCCESS;
 
 #define _UPF_VECTOR_TYPEDEF(name, type) \
     typedef struct {                    \
-        struct _upf_arena *arena;       \
+        _upf_arena *arena;              \
         uint32_t capacity;              \
         uint32_t length;                \
         type *data;                     \
@@ -177,6 +177,14 @@ int _upf_test_status = EXIT_SUCCESS;
         .length = 0,       \
         .data = NULL,      \
     }
+
+#define _UPF_VECTOR_INIT(vec, a) \
+    do {                         \
+        (vec)->arena = (a);      \
+        (vec)->capacity = 0;     \
+        (vec)->length = 0;       \
+        (vec)->data = NULL;      \
+    } while (0)
 
 #define _UPF_VECTOR_PUSH(vec, element)                                     \
     do {                                                                   \
@@ -202,7 +210,7 @@ int _upf_test_status = EXIT_SUCCESS;
         uint32_t size = (dst)->capacity * sizeof(*(dst)->data); \
         (dst)->data = _upf_arena_alloc((dst)->arena, size);     \
         memcpy((dst)->data, (src)->data, size);                 \
-    } while (0);
+    } while (0)
 
 #define _UPF_VECTOR_TOP(vec) (vec)->data[(vec)->length - 1]
 
@@ -217,10 +225,10 @@ typedef struct _upf_arena_region {
     struct _upf_arena_region *next;
 } _upf_arena_region;
 
-struct _upf_arena {
+typedef struct {
     _upf_arena_region *tail;
     _upf_arena_region *head;
-};
+} _upf_arena;
 
 _UPF_VECTOR_TYPEDEF(_upf_size_t_vec, size_t);
 _UPF_VECTOR_TYPEDEF(_upf_cstr_vec, const char *);
@@ -408,7 +416,7 @@ typedef struct {
     _upf_cstr_vec members;
 } _upf_parser_state;
 
-struct _upf_dwarf {
+typedef struct {
     uint8_t *file;
     off_t file_size;
 
@@ -424,11 +432,7 @@ struct _upf_dwarf {
     const uint8_t *str_offsets;
     const uint8_t *addr;
     const uint8_t *rnglists;
-
-    _upf_range_vec uprintf_ranges;
-    bool init_pc;
-    uint8_t *pc_base;
-};
+} _upf_dwarf;
 
 typedef struct {
     const uint8_t *die;
@@ -453,32 +457,30 @@ typedef struct {
 
 _UPF_VECTOR_TYPEDEF(_upf_cu_vec, _upf_cu);
 
-typedef struct {
+// =================== GLOBAL STATE =======================
+
+// TODO: add spacing and comments
+struct _upf_state {
+    bool is_init;
+    jmp_buf jmp_buf;
     char *buffer;
     size_t size;
-
     char *ptr;
     size_t free;
-
     _upf_range_vec addresses;
-
     int circular_id;
-
     const char *file;
     int line;
-} _upf_call_info;
+    _upf_dwarf dwarf;
+    _upf_range_vec uprintf_ranges;
+    bool init_pc;
+    uint8_t *pc_base;
+    _upf_arena arena;
+    _upf_type_map_vec type_map;
+    _upf_cu_vec cus;
+};
 
-// ================= GLOBAL VARIABLES =====================
-
-#define _UPF_INITIAL_BUFFER_SIZE 512
-
-static jmp_buf _upf_jmp_buf;
-static bool _upf_is_init = false;
-static struct _upf_arena _upf_arena;
-static struct _upf_dwarf _upf_dwarf = {0};
-static _upf_type_map_vec _upf_type_map = _UPF_VECTOR_NEW(&_upf_arena);
-static _upf_cu_vec _upf_cus = _UPF_VECTOR_NEW(&_upf_arena);
-static _upf_call_info _upf_call = {0};
+static struct _upf_state _upf_state = {0};
 
 // ====================== ARENA ===========================
 
@@ -495,7 +497,7 @@ static _upf_arena_region *_upf_arena_alloc_region(size_t capacity) {
     return region;
 }
 
-static void _upf_arena_init(struct _upf_arena *a) {
+static void _upf_arena_init(_upf_arena *a) {
     _UPF_ASSERT(a != NULL);
 
     _upf_arena_region *region = _upf_arena_alloc_region(_UPF_INITIAL_ARENA_SIZE);
@@ -503,7 +505,7 @@ static void _upf_arena_init(struct _upf_arena *a) {
     a->tail = region;
 }
 
-static void *_upf_arena_alloc(struct _upf_arena *a, size_t size) {
+static void *_upf_arena_alloc(_upf_arena *a, size_t size) {
     _UPF_ASSERT(a != NULL && a->head != NULL && a->tail != NULL);
 
     size_t alignment = (a->head->length % sizeof(void *));
@@ -521,7 +523,7 @@ static void *_upf_arena_alloc(struct _upf_arena *a, size_t size) {
     return memory;
 }
 
-static void _upf_arena_free(struct _upf_arena *a) {
+static void _upf_arena_free(_upf_arena *a) {
     if (a == NULL || a->head == NULL || a->tail == NULL) return;
 
     _upf_arena_region *region = a->tail;
@@ -539,7 +541,7 @@ static void _upf_arena_free(struct _upf_arena *a) {
 }
 
 // Copies [begin, end) to arena-allocated string
-static char *_upf_arena_string(struct _upf_arena *a, const char *begin, const char *end) {
+static char *_upf_arena_string(_upf_arena *a, const char *begin, const char *end) {
     _UPF_ASSERT(a != NULL && begin != NULL && end != NULL);
 
     size_t len = end - begin;
@@ -551,7 +553,7 @@ static char *_upf_arena_string(struct _upf_arena *a, const char *begin, const ch
     return string;
 }
 
-static char *_upf_arena_concat2(struct _upf_arena *a, ...) {
+static char *_upf_arena_concat2(_upf_arena *a, ...) {
     _UPF_ASSERT(a != NULL);
 
     va_list va_args;
@@ -638,8 +640,8 @@ static const _upf_abbrev *_upf_get_abbrev(const _upf_cu *cu, size_t code) {
 }
 
 static const _upf_type *_upf_get_type(size_t type_idx) {
-    _UPF_ASSERT(type_idx != _UPF_INVALID && type_idx < _upf_type_map.length);
-    return &_upf_type_map.data[type_idx].type;
+    _UPF_ASSERT(type_idx != _UPF_INVALID && type_idx < _upf_state.type_map.length);
+    return &_upf_state.type_map.data[type_idx].type;
 }
 
 static bool _upf_is_in_range(uint64_t pc, _upf_range_vec ranges) {
@@ -686,7 +688,7 @@ static uint64_t _upf_offset_cast(const uint8_t *die) {
     _UPF_ASSERT(die != NULL);
 
     uint64_t offset = 0;
-    memcpy(&offset, die, _upf_dwarf.offset_size);
+    memcpy(&offset, die, _upf_state.dwarf.offset_size);
     return offset;
 }
 
@@ -694,7 +696,7 @@ static uint64_t _upf_address_cast(const uint8_t *die) {
     _UPF_ASSERT(die != NULL);
 
     uint64_t address = 0;
-    memcpy(&address, die, _upf_dwarf.address_size);
+    memcpy(&address, die, _upf_state.dwarf.address_size);
     return address;
 }
 
@@ -703,7 +705,7 @@ static size_t _upf_get_attr_size(const uint8_t *die, uint64_t form) {
 
     switch (form) {
         case DW_FORM_addr:
-            return _upf_dwarf.address_size;
+            return _upf_state.dwarf.address_size;
         case DW_FORM_strx1:
         case DW_FORM_addrx1:
         case DW_FORM_flag:
@@ -772,7 +774,7 @@ static size_t _upf_get_attr_size(const uint8_t *die, uint64_t form) {
         case DW_FORM_sec_offset:
         case DW_FORM_ref_addr:
         case DW_FORM_strp:
-            return _upf_dwarf.offset_size;
+            return _upf_state.dwarf.offset_size;
         case DW_FORM_indirect: {
             uint64_t form;
             size_t offset = _upf_uLEB_to_uint64(die, &form);
@@ -819,10 +821,10 @@ static const char *_upf_get_str(const _upf_cu *cu, const uint8_t *die, uint64_t 
 
     switch (form) {
         case DW_FORM_strp:
-            return _upf_dwarf.str + _upf_offset_cast(die);
+            return _upf_state.dwarf.str + _upf_offset_cast(die);
         case DW_FORM_line_strp:
-            _UPF_ASSERT(_upf_dwarf.line_str != NULL);
-            return _upf_dwarf.line_str + _upf_offset_cast(die);
+            _UPF_ASSERT(_upf_state.dwarf.line_str != NULL);
+            return _upf_state.dwarf.line_str + _upf_offset_cast(die);
         case DW_FORM_string:
             return (const char *) die;
         case DW_FORM_strx:
@@ -830,9 +832,9 @@ static const char *_upf_get_str(const _upf_cu *cu, const uint8_t *die, uint64_t 
         case DW_FORM_strx2:
         case DW_FORM_strx3:
         case DW_FORM_strx4: {
-            _UPF_ASSERT(_upf_dwarf.str_offsets != NULL && cu->str_offsets_base != _UPF_INVALID);
-            uint64_t offset = _upf_get_x_offset(die, form) * _upf_dwarf.offset_size;
-            return _upf_dwarf.str + _upf_offset_cast(_upf_dwarf.str_offsets + cu->str_offsets_base + offset);
+            _UPF_ASSERT(_upf_state.dwarf.str_offsets != NULL && cu->str_offsets_base != _UPF_INVALID);
+            uint64_t offset = _upf_get_x_offset(die, form) * _upf_state.dwarf.offset_size;
+            return _upf_state.dwarf.str + _upf_offset_cast(_upf_state.dwarf.str_offsets + cu->str_offsets_base + offset);
         }
     }
     _UPF_UNREACHABLE();
@@ -927,9 +929,9 @@ static uint64_t _upf_get_addr(const _upf_cu *cu, const uint8_t *die, uint64_t fo
         case DW_FORM_addrx3:
         case DW_FORM_addrx4:
         case DW_FORM_addrx: {
-            _UPF_ASSERT(_upf_dwarf.addr != NULL);
-            uint64_t offset = cu->addr_base + _upf_get_x_offset(die, form) * _upf_dwarf.address_size;
-            return _upf_address_cast(_upf_dwarf.addr + offset);
+            _UPF_ASSERT(_upf_state.dwarf.addr != NULL);
+            uint64_t offset = cu->addr_base + _upf_get_x_offset(die, form) * _upf_state.dwarf.address_size;
+            return _upf_address_cast(_upf_state.dwarf.addr + offset);
         }
     }
     _UPF_UNREACHABLE();
@@ -1043,7 +1045,7 @@ static _upf_type _upf_get_subarray(const _upf_type *array, int count) {
 
     _upf_type subarray = *array;
     if (array->name != NULL) {
-        subarray.name = _upf_arena_string(&_upf_arena, array->name, array->name + strlen(array->name) - 2 * count);
+        subarray.name = _upf_arena_string(&_upf_state.arena, array->name, array->name + strlen(array->name) - 2 * count);
     }
     subarray.as.array.lengths.length -= count;
     subarray.as.array.lengths.data += count;
@@ -1053,8 +1055,8 @@ static _upf_type _upf_get_subarray(const _upf_type *array, int count) {
 
 static size_t _upf_add_type(const uint8_t *type_die, _upf_type type) {
     if (type_die != NULL) {
-        for (size_t i = 0; i < _upf_type_map.length; i++) {
-            if (_upf_type_map.data[i].die == type_die) return i;
+        for (size_t i = 0; i < _upf_state.type_map.length; i++) {
+            if (_upf_state.type_map.data[i].die == type_die) return i;
         }
     }
 
@@ -1062,16 +1064,16 @@ static size_t _upf_add_type(const uint8_t *type_die, _upf_type type) {
         .die = type_die,
         .type = type,
     };
-    _UPF_VECTOR_PUSH(&_upf_type_map, entry);
+    _UPF_VECTOR_PUSH(&_upf_state.type_map, entry);
 
-    return _upf_type_map.length - 1;
+    return _upf_state.type_map.length - 1;
 }
 
 static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
     _UPF_ASSERT(cu != NULL && die != NULL);
 
-    for (size_t i = 0; i < _upf_type_map.length; i++) {
-        if (_upf_type_map.data[i].die == die) return i;
+    for (size_t i = 0; i < _upf_state.type_map.length; i++) {
+        if (_upf_state.type_map.data[i].die == die) return i;
     }
 
     const uint8_t *base = die;
@@ -1114,7 +1116,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                 .size = size,
                 .as.array = {
                     .element_type = _upf_parse_type(cu, cu->base + subtype_offset),
-                    .lengths = _UPF_VECTOR_NEW(&_upf_arena),
+                    .lengths = _UPF_VECTOR_NEW(&_upf_state.arena),
                 },
             };
 
@@ -1164,7 +1166,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                     _UPF_VECTOR_PUSH(&type.as.array.lengths, length);
                 }
 
-                if (generate_name) type.name = _upf_arena_concat(&_upf_arena, type.name, "[]");
+                if (generate_name) type.name = _upf_arena_concat(&_upf_state.arena, type.name, "[]");
             }
 
             if (element_type->size != _UPF_INVALID && type.size == _UPF_INVALID) {
@@ -1183,7 +1185,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                 .size = size,
                 .as.cenum = {
                     .underlying_type = _upf_parse_type(cu, cu->base + subtype_offset),
-                    .enums = _UPF_VECTOR_NEW(&_upf_arena),
+                    .enums = _UPF_VECTOR_NEW(&_upf_state.arena),
                 },
             };
 
@@ -1250,7 +1252,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
 
                 size_t subtype_idx = _upf_parse_type(cu, cu->base + subtype_offset);
                 // Pointers inside vector may become invalid if _upf_parse_type fills up the vector triggering realloc
-                _upf_type *type = &_upf_type_map.data[type_idx].type;
+                _upf_type *type = &_upf_state.type_map.data[type_idx].type;
                 type->as.pointer.type = subtype_idx;
                 type->name = _upf_get_type(subtype_idx)->name;
             }
@@ -1266,7 +1268,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                 .modifiers = 0,
                 .size = size,
                 .as.cstruct = {
-                    .members = _UPF_VECTOR_NEW(&_upf_arena),
+                    .members = _UPF_VECTOR_NEW(&_upf_state.arena),
                 },
             };
 
@@ -1335,7 +1337,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                 .size = size,
                 .as.function = {
                     .return_type = _UPF_INVALID,
-                    .arg_types = _UPF_VECTOR_NEW(&_upf_arena),
+                    .arg_types = _UPF_VECTOR_NEW(&_upf_state.arena),
                 },
             };
 
@@ -1443,17 +1445,17 @@ unknown_type:
 }
 
 static _upf_range_vec _upf_get_ranges(const _upf_cu *cu, const uint8_t *die, uint64_t form) {
-    _UPF_ASSERT(cu != NULL && die != NULL && _upf_dwarf.rnglists != NULL);
+    _UPF_ASSERT(cu != NULL && die != NULL && _upf_state.dwarf.rnglists != NULL);
 
     const uint8_t *rnglist = NULL;
     if (form == DW_FORM_sec_offset) {
-        rnglist = _upf_dwarf.rnglists + _upf_offset_cast(die);
+        rnglist = _upf_state.dwarf.rnglists + _upf_offset_cast(die);
     } else {
         _UPF_ASSERT(cu->rnglists_base != _UPF_INVALID);
         uint64_t index;
         _upf_uLEB_to_uint64(die, &index);
-        uint64_t rnglist_offset = _upf_offset_cast(_upf_dwarf.rnglists + cu->rnglists_base + index * _upf_dwarf.offset_size);
-        rnglist = _upf_dwarf.rnglists + cu->rnglists_base + rnglist_offset;
+        uint64_t rnglist_offset = _upf_offset_cast(_upf_state.dwarf.rnglists + cu->rnglists_base + index * _upf_state.dwarf.offset_size);
+        rnglist = _upf_state.dwarf.rnglists + cu->rnglists_base + rnglist_offset;
     }
     _UPF_ASSERT(rnglist != NULL);
 
@@ -1462,7 +1464,7 @@ static _upf_range_vec _upf_get_ranges(const _upf_cu *cu, const uint8_t *die, uin
         base = cu->scope.ranges.data[0].start;
     }
 
-    _upf_range_vec ranges = _UPF_VECTOR_NEW(&_upf_arena);
+    _upf_range_vec ranges = _UPF_VECTOR_NEW(&_upf_state.arena);
     while (*rnglist != DW_RLE_end_of_list) {
         switch (*rnglist++) {
             case DW_RLE_base_addressx:
@@ -1509,13 +1511,13 @@ static _upf_range_vec _upf_get_ranges(const _upf_cu *cu, const uint8_t *die, uin
             } break;
             case DW_RLE_base_address:
                 base = _upf_address_cast(rnglist);
-                rnglist += _upf_dwarf.address_size;
+                rnglist += _upf_state.dwarf.address_size;
                 break;
             case DW_RLE_start_end: {
                 uint64_t start = _upf_address_cast(rnglist);
-                rnglist += _upf_dwarf.address_size;
+                rnglist += _upf_state.dwarf.address_size;
                 uint64_t end = _upf_address_cast(rnglist);
-                rnglist += _upf_dwarf.address_size;
+                rnglist += _upf_state.dwarf.address_size;
 
                 _upf_range range = {
                     .start = start,
@@ -1526,7 +1528,7 @@ static _upf_range_vec _upf_get_ranges(const _upf_cu *cu, const uint8_t *die, uin
             } break;
             case DW_RLE_start_length: {
                 uint64_t address = _upf_address_cast(rnglist);
-                rnglist += _upf_dwarf.address_size;
+                rnglist += _upf_state.dwarf.address_size;
                 uint64_t length;
                 rnglist += _upf_uLEB_to_uint64(rnglist, &length);
 
@@ -1577,10 +1579,10 @@ static _upf_named_type _upf_get_var(const _upf_cu *cu, const uint8_t *die) {
 static _upf_abbrev_vec _upf_parse_abbrevs(const uint8_t *abbrev_table) {
     _UPF_ASSERT(abbrev_table != NULL);
 
-    _upf_abbrev_vec abbrevs = _UPF_VECTOR_NEW(&_upf_arena);
+    _upf_abbrev_vec abbrevs = _UPF_VECTOR_NEW(&_upf_state.arena);
     while (true) {
         _upf_abbrev abbrev = {
-            .attrs = _UPF_VECTOR_NEW(&_upf_arena),
+            .attrs = _UPF_VECTOR_NEW(&_upf_state.arena),
         };
         abbrev_table += _upf_uLEB_to_uint64(abbrev_table, &abbrev.code);
         if (abbrev.code == 0) break;
@@ -1622,7 +1624,7 @@ static _upf_range_vec _upf_get_cu_ranges(const _upf_cu *cu, const uint8_t *low_p
 
     if (ranges_die != NULL) return _upf_get_ranges(cu, ranges_die, ranges_attr.form);
 
-    _upf_range_vec ranges = _UPF_VECTOR_NEW(&_upf_arena);
+    _upf_range_vec ranges = _UPF_VECTOR_NEW(&_upf_state.arena);
     _upf_range range = {
         .start = _UPF_INVALID,
         .end = _UPF_INVALID,
@@ -1654,9 +1656,9 @@ static bool _upf_parse_cu_scope(const _upf_cu *cu, _upf_scope_stack *scope_stack
     _UPF_ASSERT(scope_stack->length > 0);
 
     _upf_scope new_scope = {
-        .ranges = _UPF_VECTOR_NEW(&_upf_arena),
-        .vars = _UPF_VECTOR_NEW(&_upf_arena),
-        .scopes = _UPF_VECTOR_NEW(&_upf_arena),
+        .ranges = _UPF_VECTOR_NEW(&_upf_state.arena),
+        .vars = _UPF_VECTOR_NEW(&_upf_state.arena),
+        .scopes = _UPF_VECTOR_NEW(&_upf_state.arena),
     };
 
     uint64_t low_pc = _UPF_INVALID;
@@ -1772,15 +1774,15 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *die, const uint
     _upf_cu cu = {
         .base = cu_base,
         .abbrevs = _upf_parse_abbrevs(abbrev_table),
-        .types = _UPF_VECTOR_NEW(&_upf_arena),
-        .functions = _UPF_VECTOR_NEW(&_upf_arena),
+        .types = _UPF_VECTOR_NEW(&_upf_state.arena),
+        .functions = _UPF_VECTOR_NEW(&_upf_state.arena),
         .addr_base = 0,
         .str_offsets_base = _UPF_INVALID,
         .rnglists_base = _UPF_INVALID,
         .scope = {
             .ranges = {0},
-            .vars = _UPF_VECTOR_NEW(&_upf_arena),
-            .scopes = _UPF_VECTOR_NEW(&_upf_arena),
+            .vars = _UPF_VECTOR_NEW(&_upf_state.arena),
+            .scopes = _UPF_VECTOR_NEW(&_upf_state.arena),
         },
     };
 
@@ -1825,7 +1827,7 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *die, const uint
     cu.scope.ranges = _upf_get_cu_ranges(&cu, low_pc_die, low_pc_attr, high_pc_die, high_pc_attr, ranges_die, ranges_attr);
 
     int depth = 0;
-    _upf_scope_stack scope_stack = _UPF_VECTOR_NEW(&_upf_arena);
+    _upf_scope_stack scope_stack = _UPF_VECTOR_NEW(&_upf_state.arena);
 
     _upf_scope_stack_entry stack_entry = {
         .depth = depth,
@@ -1858,8 +1860,8 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *die, const uint
             case DW_TAG_inlined_subroutine: {
                 bool scope = _upf_parse_cu_scope(&cu, &scope_stack, depth, die, abbrev);
                 if (is_uprintf && scope) {
-                    _UPF_ASSERT(_upf_dwarf.uprintf_ranges.length == 0);
-                    _UPF_VECTOR_COPY(&_upf_dwarf.uprintf_ranges, &_UPF_VECTOR_TOP(&scope_stack).scope->ranges);
+                    _UPF_ASSERT(_upf_state.uprintf_ranges.length == 0);
+                    _UPF_VECTOR_COPY(&_upf_state.uprintf_ranges, &_UPF_VECTOR_TOP(&scope_stack).scope->ranges);
                 }
                 is_uprintf = false;
             } break;
@@ -1913,12 +1915,12 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *die, const uint
         }
     }
 
-    _UPF_VECTOR_PUSH(&_upf_cus, cu);
+    _UPF_VECTOR_PUSH(&_upf_state.cus, cu);
 }
 
 static void _upf_parse_dwarf(void) {
-    const uint8_t *die = _upf_dwarf.die;
-    const uint8_t *die_end = die + _upf_dwarf.die_size;
+    const uint8_t *die = _upf_state.dwarf.die;
+    const uint8_t *die_end = die + _upf_state.dwarf.die_size;
     while (die < die_end) {
         const uint8_t *cu_base = die;
 
@@ -1926,14 +1928,14 @@ static void _upf_parse_dwarf(void) {
         memcpy(&length, die, sizeof(uint32_t));
         die += sizeof(uint32_t);
 
-        _upf_dwarf.is64bit = false;
+        _upf_state.dwarf.is64bit = false;
         if (length == 0xffffffffU) {
             memcpy(&length, die, sizeof(uint64_t));
             die += sizeof(uint64_t);
-            _upf_dwarf.is64bit = true;
+            _upf_state.dwarf.is64bit = true;
         }
 
-        _upf_dwarf.offset_size = _upf_dwarf.is64bit ? 8 : 4;
+        _upf_state.dwarf.offset_size = _upf_state.dwarf.is64bit ? 8 : 4;
 
         const uint8_t *next = die + length;
 
@@ -1947,14 +1949,14 @@ static void _upf_parse_dwarf(void) {
         _UPF_ASSERT(type == DW_UT_compile);
 
         uint8_t address_size = *die;
-        _UPF_ASSERT(_upf_dwarf.address_size == 0 || _upf_dwarf.address_size == address_size);
-        _upf_dwarf.address_size = address_size;
+        _UPF_ASSERT(_upf_state.dwarf.address_size == 0 || _upf_state.dwarf.address_size == address_size);
+        _upf_state.dwarf.address_size = address_size;
         die += sizeof(address_size);
 
         uint64_t abbrev_offset = _upf_offset_cast(die);
-        die += _upf_dwarf.offset_size;
+        die += _upf_state.dwarf.offset_size;
 
-        _upf_parse_cu(cu_base, die, next, _upf_dwarf.abbrev + abbrev_offset);
+        _upf_parse_cu(cu_base, die, next, _upf_state.dwarf.abbrev + abbrev_offset);
 
         die = next;
     }
@@ -1966,14 +1968,14 @@ static void _upf_parse_elf(void) {
     struct stat file_info;
     if (stat("/proc/self/exe", &file_info) == -1) _UPF_ERROR("Unable to stat \"/proc/self/exe\": %s.", strerror(errno));
     size_t size = file_info.st_size;
-    _upf_dwarf.file_size = size;
+    _upf_state.dwarf.file_size = size;
 
     int fd = open("/proc/self/exe", O_RDONLY);
     _UPF_ASSERT(fd != -1);
 
     uint8_t *file = (uint8_t *) mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
     _UPF_ASSERT(file != MAP_FAILED);
-    _upf_dwarf.file = file;
+    _upf_state.dwarf.file = file;
 
     close(fd);
 
@@ -1992,26 +1994,26 @@ static void _upf_parse_elf(void) {
         const char *name = string_table + section->sh_name;
 
         if (strcmp(name, ".debug_info") == 0) {
-            _upf_dwarf.die = file + section->sh_offset;
-            _upf_dwarf.die_size = section->sh_size;
+            _upf_state.dwarf.die = file + section->sh_offset;
+            _upf_state.dwarf.die_size = section->sh_size;
         } else if (strcmp(name, ".debug_abbrev") == 0) {
-            _upf_dwarf.abbrev = file + section->sh_offset;
+            _upf_state.dwarf.abbrev = file + section->sh_offset;
         } else if (strcmp(name, ".debug_str") == 0) {
-            _upf_dwarf.str = (const char *) (file + section->sh_offset);
+            _upf_state.dwarf.str = (const char *) (file + section->sh_offset);
         } else if (strcmp(name, ".debug_line_str") == 0) {
-            _upf_dwarf.line_str = (const char *) (file + section->sh_offset);
+            _upf_state.dwarf.line_str = (const char *) (file + section->sh_offset);
         } else if (strcmp(name, ".debug_str_offsets") == 0) {
-            _upf_dwarf.str_offsets = file + section->sh_offset;
+            _upf_state.dwarf.str_offsets = file + section->sh_offset;
         } else if (strcmp(name, ".debug_rnglists") == 0) {
-            _upf_dwarf.rnglists = file + section->sh_offset;
+            _upf_state.dwarf.rnglists = file + section->sh_offset;
         } else if (strcmp(name, ".debug_addr") == 0) {
-            _upf_dwarf.addr = file + section->sh_offset;
+            _upf_state.dwarf.addr = file + section->sh_offset;
         }
 
         section++;
     }
 
-    if (_upf_dwarf.die == NULL || _upf_dwarf.abbrev == NULL || _upf_dwarf.str == NULL) {
+    if (_upf_state.dwarf.die == NULL || _upf_state.dwarf.abbrev == NULL || _upf_state.dwarf.str == NULL) {
         _UPF_ERROR("Unable to find debugging information. Ensure that the executable contains it by using -g2 or -g3.");
     }
 }
@@ -2021,7 +2023,7 @@ static void _upf_parse_elf(void) {
 static _upf_cstr_vec _upf_get_args(char *string) {
     _UPF_ASSERT(string != NULL);
 
-    _upf_cstr_vec args = _UPF_VECTOR_NEW(&_upf_arena);
+    _upf_cstr_vec args = _UPF_VECTOR_NEW(&_upf_state.arena);
 
     bool in_quotes = false;
     int paren = 0;
@@ -2097,7 +2099,7 @@ static void _upf_tokenize(_upf_tokenizer *t, const char *string) {
 
             _upf_token token = {
                 .kind = _UPF_TOK_NUMBER,
-                .string = _upf_arena_string(&_upf_arena, ch, end),
+                .string = _upf_arena_string(&_upf_state.arena, ch, end),
             };
             _UPF_VECTOR_PUSH(&t->tokens, token);
 
@@ -2106,7 +2108,7 @@ static void _upf_tokenize(_upf_tokenizer *t, const char *string) {
             const char *end = ch;
             while (('a' <= *end && *end <= 'z') || ('A' <= *end && *end <= 'Z') || ('0' <= *end && *end <= '9') || *end == '_') end++;
 
-            const char *string = _upf_arena_string(&_upf_arena, ch, end);
+            const char *string = _upf_arena_string(&_upf_state.arena, ch, end);
 
             enum _upf_token_kind kind = _UPF_TOK_ID;
 
@@ -2146,7 +2148,7 @@ static void _upf_tokenize(_upf_tokenizer *t, const char *string) {
 
             _upf_token token = {
                 .kind = _UPF_TOK_STRING,
-                .string = _upf_arena_string(&_upf_arena, ch, end),
+                .string = _upf_arena_string(&_upf_state.arena, ch, end),
             };
             _UPF_VECTOR_PUSH(&t->tokens, token);
 
@@ -2162,7 +2164,7 @@ static void _upf_tokenize(_upf_tokenizer *t, const char *string) {
                 }
             }
             if (!found) {
-                _UPF_ERROR("Unknown character '%c' when parsing arguments \"%s\" at %s:%d.", *ch, string, _upf_call.file, _upf_call.line);
+                _UPF_ERROR("Unknown character '%c' when parsing arguments \"%s\" at %s:%d.", *ch, string, _upf_state.file, _upf_state.line);
             }
         }
     }
@@ -2233,7 +2235,7 @@ static const char *_upf_modifier_typename_to_stdint(int type, bool is_signed, in
         return "double";
     } else if (type == DW_ATE_signed) {
         int offset;
-        char *name = _upf_arena_alloc(&_upf_arena, 9);
+        char *name = _upf_arena_alloc(&_upf_state.arena, 9);
         if (is_signed) {
             offset = 3;
             memcpy(name, "int", offset);
@@ -2679,8 +2681,8 @@ no_member_error:
 }
 
 static size_t _upf_find_typename(_upf_parser_state *p, uint64_t pc) {
-    for (size_t i = 0; i < _upf_cus.length; i++) {
-        const _upf_cu *cu = &_upf_cus.data[i];
+    for (size_t i = 0; i < _upf_state.cus.length; i++) {
+        const _upf_cu *cu = &_upf_state.cus.data[i];
         if (!_upf_is_in_range(pc, cu->scope.ranges)) continue;
 
         for (size_t j = 0; j < cu->types.length; j++) {
@@ -2694,8 +2696,8 @@ static size_t _upf_find_typename(_upf_parser_state *p, uint64_t pc) {
 }
 
 static size_t _upf_find_variable(_upf_parser_state *p, uint64_t pc) {
-    for (size_t i = 0; i < _upf_cus.length; i++) {
-        const _upf_cu *cu = &_upf_cus.data[i];
+    for (size_t i = 0; i < _upf_state.cus.length; i++) {
+        const _upf_cu *cu = &_upf_state.cus.data[i];
 
         const uint8_t *type_die = _upf_find_var_type(pc, p->base, &cu->scope);
         if (type_die == NULL) continue;
@@ -2707,8 +2709,8 @@ static size_t _upf_find_variable(_upf_parser_state *p, uint64_t pc) {
 }
 
 static size_t _upf_find_function(_upf_parser_state *p, uint64_t pc) {
-    for (size_t i = 0; i < _upf_cus.length; i++) {
-        const _upf_cu *cu = &_upf_cus.data[i];
+    for (size_t i = 0; i < _upf_state.cus.length; i++) {
+        const _upf_cu *cu = &_upf_state.cus.data[i];
         if (!_upf_is_in_range(pc, cu->scope.ranges)) continue;
 
         for (size_t j = 0; j < cu->functions.length; j++) {
@@ -2731,7 +2733,7 @@ static size_t _upf_get_base_type(_upf_parser_state *p, uint64_t pc, const char *
                 _UPF_ERROR(
                     "Unable to find type \"%s\" in \"%s\" at %s:%d. "
                     "Ensure that the executable contains debugging information of at least 2nd level (-g2 or -g3).",
-                    p->base, arg, _upf_call.file, _upf_call.line);
+                    p->base, arg, _upf_state.file, _upf_state.line);
             }
             break;
         case _UPF_BT_VARIABLE:
@@ -2752,7 +2754,7 @@ static size_t _upf_get_base_type(_upf_parser_state *p, uint64_t pc, const char *
                 _UPF_ERROR(
                     "Unable to find type of \"%s\" in \"%s\" at %s:%d. "
                     "Ensure that the executable contains debugging information of at least 2nd level (-g2 or -g3).",
-                    p->base, arg, _upf_call.file, _upf_call.line);
+                    p->base, arg, _upf_state.file, _upf_state.line);
             }
             break;
         case _UPF_BT_FUNCTION:
@@ -2775,7 +2777,7 @@ static size_t _upf_get_base_type(_upf_parser_state *p, uint64_t pc, const char *
                 _UPF_ERROR(
                     "Unable to find type of function \"%s\" in \"%s\" at %s:%d. "
                     "Ensure that the executable contains debugging information of at least 2nd level (-g2 or -g3).",
-                    p->base, arg, _upf_call.file, _upf_call.line);
+                    p->base, arg, _upf_state.file, _upf_state.line);
             }
 
             if (p->members.length == 0 && p->suffix_calls > 0) p->suffix_calls--;
@@ -2827,14 +2829,14 @@ static size_t _upf_dereference_type(size_t type_idx, int dereference, const char
         } else {
         not_pointer_error:
             _UPF_ERROR("Arguments must be pointers to data that should be printed. You must take pointer (&) of \"%s\" at %s:%d.", arg,
-                       _upf_call.file, _upf_call.line);
+                       _upf_state.file, _upf_state.line);
         }
 
         if (type_idx == _UPF_INVALID) {
             _UPF_ERROR(
                 "Unable to print void* because it can point to arbitrary data of any length. "
                 "To print the pointer itself, you must take pointer (&) of \"%s\" at %s:%d.",
-                arg, _upf_call.file, _upf_call.line);
+                arg, _upf_state.file, _upf_state.line);
         }
     }
 
@@ -2845,7 +2847,7 @@ static const _upf_type *_upf_get_arg_type(const char *arg, uint64_t pc) {
     _UPF_ASSERT(arg != NULL);
 
     _upf_tokenizer t = {
-        .tokens = _UPF_VECTOR_NEW(&_upf_arena),
+        .tokens = _UPF_VECTOR_NEW(&_upf_state.arena),
         .idx = 0,
     };
     _upf_tokenize(&t, arg);
@@ -2855,10 +2857,10 @@ static const _upf_type *_upf_get_arg_type(const char *arg, uint64_t pc) {
         .suffix_calls = 0,
         .base = NULL,
         .base_type = 0,
-        .members = _UPF_VECTOR_NEW(&_upf_arena),
+        .members = _UPF_VECTOR_NEW(&_upf_state.arena),
     };
     if (!_upf_parse_expr(&t, &p) || t.idx != t.tokens.length) {
-        _UPF_ERROR("Unable to parse argument \"%s\" at %s:%d.", arg, _upf_call.file, _upf_call.line);
+        _UPF_ERROR("Unable to parse argument \"%s\" at %s:%d.", arg, _upf_state.file, _upf_state.line);
     }
 
     size_t base_type = _upf_get_base_type(&p, pc, arg);
@@ -2919,7 +2921,7 @@ static _upf_range_vec _upf_get_address_ranges(void) {
     FILE *file = fopen("/proc/self/maps", "r");
     if (file == NULL) _UPF_ERROR("Unable to open \"/proc/self/maps\": %s.", strerror(errno));
 
-    _upf_range_vec ranges = _UPF_VECTOR_NEW(&_upf_arena);
+    _upf_range_vec ranges = _UPF_VECTOR_NEW(&_upf_state.arena);
     _upf_range range = {
         .start = _UPF_INVALID,
         .end = _UPF_INVALID,
@@ -2944,8 +2946,8 @@ static _upf_range_vec _upf_get_address_ranges(void) {
 }
 
 static const void *_upf_get_memory_region_end(const void *ptr) {
-    for (size_t i = 0; i < _upf_call.addresses.length; i++) {
-        _upf_range range = _upf_call.addresses.data[i];
+    for (size_t i = 0; i < _upf_state.addresses.length; i++) {
+        _upf_range range = _upf_state.addresses.data[i];
         if ((void *) range.start <= ptr && ptr <= (void *) range.end) {
             return (void *) range.end;
         }
@@ -2955,24 +2957,26 @@ static const void *_upf_get_memory_region_end(const void *ptr) {
 
 // ===================== PRINTING =========================
 
-// All the printing is done to the global buffer stored in the _upf_call, which
+// All the printing is done to the global buffer stored in the _upf_state, which
 // is why calls don't accept or return string pointers.
+
+#define _UPF_INITIAL_BUFFER_SIZE 512
 
 #define _upf_bprintf(...)                                                                         \
     while (true) {                                                                                \
-        int bytes = snprintf(_upf_call.ptr, _upf_call.free, __VA_ARGS__);                         \
+        int bytes = snprintf(_upf_state.ptr, _upf_state.free, __VA_ARGS__);                       \
         if (bytes < 0) _UPF_ERROR("Unexpected error occurred in snprintf: %s.", strerror(errno)); \
-        if ((size_t) bytes >= _upf_call.free) {                                                   \
-            size_t used = _upf_call.size - _upf_call.free;                                        \
-            _upf_call.size *= 2;                                                                  \
-            _upf_call.buffer = (char *) realloc(_upf_call.buffer, _upf_call.size);                \
-            if (_upf_call.buffer == NULL) _UPF_OUT_OF_MEMORY();                                   \
-            _upf_call.ptr = _upf_call.buffer + used;                                              \
-            _upf_call.free = _upf_call.size - used;                                               \
+        if ((size_t) bytes >= _upf_state.free) {                                                  \
+            size_t used = _upf_state.size - _upf_state.free;                                      \
+            _upf_state.size *= 2;                                                                 \
+            _upf_state.buffer = (char *) realloc(_upf_state.buffer, _upf_state.size);             \
+            if (_upf_state.buffer == NULL) _UPF_OUT_OF_MEMORY();                                  \
+            _upf_state.ptr = _upf_state.buffer + used;                                            \
+            _upf_state.free = _upf_state.size - used;                                             \
             continue;                                                                             \
         }                                                                                         \
-        _upf_call.free -= bytes;                                                                  \
-        _upf_call.ptr += bytes;                                                                   \
+        _upf_state.free -= bytes;                                                                 \
+        _upf_state.ptr += bytes;                                                                  \
         break;                                                                                    \
     }
 
@@ -3183,7 +3187,7 @@ static void _upf_print_type(_upf_indexed_struct_vec *circular, const uint8_t *da
                     }
 
                     circular->data[i].is_visited = true;
-                    circular->data[i].id = _upf_call.circular_id++;
+                    circular->data[i].id = _upf_state.circular_id++;
                     _upf_bprintf("<#%d> ", circular->data[i].id);
                 }
             }
@@ -3391,64 +3395,66 @@ static void _upf_print_type(_upf_indexed_struct_vec *circular, const uint8_t *da
 // =================== ENTRY POINTS =======================
 
 __attribute__((constructor)) void _upf_init(void) {
-    if (setjmp(_upf_jmp_buf) != 0) return;
+    if (setjmp(_upf_state.jmp_buf) != 0) return;
 
     if (access("/proc/self/exe", R_OK) != 0) _UPF_ERROR("Expected \"/proc/self/exe\" to be a valid path.");
     if (access("/proc/self/maps", R_OK) != 0) _UPF_ERROR("Expected \"/proc/self/maps\" to be a valid path.");
 
-    _upf_arena_init(&_upf_arena);
+    _upf_arena_init(&_upf_state.arena);
+    _UPF_VECTOR_INIT(&_upf_state.cus, &_upf_state.arena);
+    _UPF_VECTOR_INIT(&_upf_state.type_map, &_upf_state.arena);
 
     _upf_parse_elf();
     _upf_parse_dwarf();
 
-    _upf_is_init = true;
+    _upf_state.is_init = true;
 }
 
 __attribute__((destructor)) void _upf_fini(void) {
     // Must be unloaded at the end of the program because many variables point
-    // into the _upf_dwarf.file to avoid unnecessarily copying date.
-    if (_upf_dwarf.file != NULL) munmap(_upf_dwarf.file, _upf_dwarf.file_size);
-    if (_upf_call.buffer != NULL) free(_upf_call.buffer);
-    _upf_arena_free(&_upf_arena);
+    // into the _upf_state.dwarf.file to avoid unnecessarily copying date.
+    if (_upf_state.dwarf.file != NULL) munmap(_upf_state.dwarf.file, _upf_state.dwarf.file_size);
+    if (_upf_state.buffer != NULL) free(_upf_state.buffer);
+    _upf_arena_free(&_upf_state.arena);
 }
 
 __attribute__((noinline)) void _upf_uprintf(const char *file, int line, const char *fmt, const char *args_string, ...) {
     _UPF_ASSERT(file != NULL && line > 0 && fmt != NULL && args_string != NULL);
 
-    if (!_upf_is_init) return;
-    if (setjmp(_upf_jmp_buf) != 0) return;
+    if (!_upf_state.is_init) return;
+    if (setjmp(_upf_state.jmp_buf) != 0) return;
 
-    if (_upf_call.buffer == NULL) {
-        _upf_call.size = _UPF_INITIAL_BUFFER_SIZE;
-        _upf_call.buffer = (char *) malloc(_upf_call.size * sizeof(*_upf_call.buffer));
-        if (_upf_call.buffer == NULL) _UPF_OUT_OF_MEMORY();
+    if (_upf_state.buffer == NULL) {
+        _upf_state.size = _UPF_INITIAL_BUFFER_SIZE;
+        _upf_state.buffer = (char *) malloc(_upf_state.size * sizeof(*_upf_state.buffer));
+        if (_upf_state.buffer == NULL) _UPF_OUT_OF_MEMORY();
     }
-    _upf_call.ptr = _upf_call.buffer;
-    _upf_call.free = _upf_call.size;
-    _upf_call.addresses = _upf_get_address_ranges();
-    _upf_call.circular_id = 0;
-    _upf_call.file = file;
-    _upf_call.line = line;
+    _upf_state.ptr = _upf_state.buffer;
+    _upf_state.free = _upf_state.size;
+    _upf_state.addresses = _upf_get_address_ranges();
+    _upf_state.circular_id = 0;
+    _upf_state.file = file;
+    _upf_state.line = line;
 
-    if (!_upf_dwarf.init_pc) {
-        _upf_dwarf.init_pc = true;
+    if (!_upf_state.init_pc) {
+        _upf_state.init_pc = true;
 
-        _UPF_ASSERT(_upf_dwarf.uprintf_ranges.length > 0);
-        bool is_pc_absolute = _upf_is_in_range(_upf_get_pc(), _upf_dwarf.uprintf_ranges);
+        _UPF_ASSERT(_upf_state.uprintf_ranges.length > 0);
+        bool is_pc_absolute = _upf_is_in_range(_upf_get_pc(), _upf_state.uprintf_ranges);
         if (is_pc_absolute) {
-            _upf_dwarf.pc_base = NULL;
+            _upf_state.pc_base = NULL;
         } else {
-            _upf_dwarf.pc_base = _upf_get_this_file_address();
+            _upf_state.pc_base = _upf_get_this_file_address();
         }
     }
 
     uint8_t *pc_ptr = __builtin_extract_return_addr(__builtin_return_address(0));
     _UPF_ASSERT(pc_ptr != NULL);
-    uint64_t pc = pc_ptr - _upf_dwarf.pc_base;
+    uint64_t pc = pc_ptr - _upf_state.pc_base;
 
-    _upf_indexed_struct_vec seen = _UPF_VECTOR_NEW(&_upf_arena);
-    _upf_indexed_struct_vec circular = _UPF_VECTOR_NEW(&_upf_arena);
-    char *args_string_copy = _upf_arena_string(&_upf_arena, args_string, args_string + strlen(args_string));
+    _upf_indexed_struct_vec seen = _UPF_VECTOR_NEW(&_upf_state.arena);
+    _upf_indexed_struct_vec circular = _UPF_VECTOR_NEW(&_upf_state.arena);
+    char *args_string_copy = _upf_arena_string(&_upf_state.arena, args_string, args_string + strlen(args_string));
     _upf_cstr_vec args = _upf_get_args(args_string_copy);
     size_t arg_idx = 0;
 
@@ -3489,7 +3495,7 @@ __attribute__((noinline)) void _upf_uprintf(const char *file, int line, const ch
 
     if (arg_idx < args.length) _UPF_ERROR("There are more arguments provided than format specifiers at %s:%d.", file, line);
 
-    printf("%s", _upf_call.buffer);
+    printf("%s", _upf_state.buffer);
     fflush(stdout);
 }
 
