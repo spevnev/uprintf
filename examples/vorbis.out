@@ -1,0 +1,199 @@
+Vorbis data: {
+    unsigned int sample_rate = 44100
+    int channels = 2
+    unsigned int setup_memory_required = 193864
+    unsigned int temp_memory_required = 4096
+    unsigned int setup_temp_memory_required = 7209
+    char *vendor = 0x504000000010 ("Xiph.Org libVorbis I 20120203 (Omnipresent)")
+    int comment_list_length = 3
+    char **comment_list = 0x503000000100
+    FILE *f = 0x515000000080 (<ignored>)
+    uint32 f_start = 0
+    int close_on_free = 1
+    uint8 *stream = NULL
+    uint8 *stream_start = NULL
+    uint8 *stream_end = NULL
+    uint32 stream_len = 1032948
+    uint8 push_mode = 0
+    uint32 first_audio_page_offset = 4465
+    ProbedPage p_first = {
+        uint32 page_start = 4465
+        uint32 page_end = 8913
+        uint32 last_decoded_sample = 22080
+    }
+    ProbedPage p_last = {
+        uint32 page_start = 0
+        uint32 page_end = 0
+        uint32 last_decoded_sample = 0
+    }
+    stb_vorbis_alloc alloc = {
+        char *alloc_buffer = NULL
+        int alloc_buffer_length_in_bytes = 0
+    }
+    int setup_offset = 0
+    int temp_offset = 0
+    int eof = 0
+    STBVorbisError error = VORBIS__no_error (0)
+    int[] blocksize = [256, 2048]
+    int blocksize_0 = 256
+    int blocksize_1 = 2048
+    int codebook_count = 42
+    Codebook *codebooks = 0x532000000800 ({
+        int dimensions = 1
+        int entries = 8
+        uint8 *codeword_lengths = 0x502000000030 ("\a\a")
+        float minimum_value = 0.000000
+        float delta_value = 0.000000
+        uint8 value_bits = 0
+        uint8 lookup_type = 0
+        uint8 sequence_p = 0
+        uint8 sparse = 0
+        uint32 lookup_values = 0
+        codetype *multiplicands = NULL
+        uint32 *codewords = 0x503000000190 (0)
+        int16[] fast_huffman = [0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 3, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 6, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 7, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 6, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 3, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 6, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 7, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 6, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 3, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 6, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 7, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 6, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 3, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 6, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 7, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 6, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 3, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 6, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 7, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 6, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 3, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 6, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 7, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 6, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 3, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 6, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 7, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 6, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 3, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 6, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 7, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 6, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4]
+        uint32 *sorted_codewords = NULL
+        int *sorted_values = NULL
+        int sorted_entries = 0
+    })
+    int floor_count = 2
+    uint16[] floor_types = [1, 1, 0 <repeats 62 times>]
+    Floor *floor_config = 0x51f000000080 (<union> {
+        Floor0 floor0 = {
+            uint8 order = 6
+            uint16 rate = 257
+            uint16 bark_map_size = 770
+            uint8 amplitude_bits = 3
+            uint8 amplitude_offset = 190
+            uint8 number_of_books = 190
+            uint8[] book_list = [190 <repeats 16 times>]
+        }
+        Floor1 floor1 = {
+            uint8 partitions = 6
+            uint8[] partition_class_list = [0, 1, 1, 2, 3, 3, 190 <repeats 26 times>]
+            uint8[] class_dimensions = [2, 3, 3, 3, 190 <repeats 12 times>]
+            uint8[] class_subclasses = [0, 1, 2, 2, 190 <repeats 12 times>]
+            uint8[] class_masterbooks = [190, 0, 1, 2, 190 <repeats 12 times>]
+            int16[][] subclass_books = [
+                [3, -16706 <repeats 7 times>],
+                [4, 5, -16706 <repeats 6 times>],
+                [-1, 6, 7, 8, -16706 <repeats 4 times>],
+                [-1, 9, 10, 11, -16706 <repeats 4 times>],
+                [-16706 <repeats 8 times>] <repeats 12 times>
+            ]
+            uint16[] Xlist = [0, 128, 12, 46, 4, 8, 16, 23, 33, 70, 2, 6, 10, 14, 19, 28, 39, 58, 90, 48830 <repeats 231 times>]
+            uint8[] sorted_order = [0, 10, 4, 11, 5, 12, 2, 13, 6, 14, 7, 15, 8, 16, 3, 17, 9, 18, 1, 190 <repeats 231 times>]
+            uint8[][] neighbors = [
+                [190, 190],
+                [190, 190],
+                [0, 1],
+                [2, 1],
+                [0, 2],
+                [4, 2],
+                [2, 3],
+                [6, 3],
+                [7, 3],
+                [3, 1],
+                [0, 4],
+                [4, 5],
+                [5, 2],
+                [2, 6],
+                [6, 7],
+                [7, 8],
+                [8, 3],
+                [3, 9],
+                [9, 1],
+                [190, 190] <repeats 231 times>
+            ]
+            uint8 floor1_multiplier = 2
+            uint8 rangebits = 7
+            int values = 19
+        }
+    })
+    int residue_count = 2
+    uint16[] residue_types = [2, 2, 0 <repeats 62 times>]
+    Residue *residue_config = 0x5060000005c0 ({
+        uint32 begin = 0
+        uint32 end = 240
+        uint32 part_size = 16
+        uint8 classifications = 10
+        uint8 classbook = 27
+        uint8 **classdata = 0x518000001080
+        int16[] *residue_books = 0x50e0000003c0 ([-1 <repeats 8 times>])
+    })
+    int mapping_count = 2
+    Mapping *mapping = 0x5080000004a0 ({
+        uint16 coupling_steps = 1
+        MappingChannel *chan = 0x502000001ab0 ({
+            uint8 magnitude = 0
+            uint8 angle = 1
+            uint8 mux = 0
+        })
+        uint8 submaps = 1
+        uint8[] submap_floor = [0 <repeats 15 times>]
+        uint8[] submap_residue = [0 <repeats 15 times>]
+    })
+    int mode_count = 2
+    Mode[] mode_config = [
+        {
+            uint8 blockflag = 0
+            uint8 mapping = 0
+            uint16 windowtype = 0
+            uint16 transformtype = 0
+        },
+        {
+            uint8 blockflag = 1
+            uint8 mapping = 1
+            uint16 windowtype = 0
+            uint16 transformtype = 0
+        },
+        {
+            uint8 blockflag = 0
+            uint8 mapping = 0
+            uint16 windowtype = 0
+            uint16 transformtype = 0
+        } <repeats 62 times>
+    ]
+    uint32 total_samples = 0
+    float[] channel_buffers = [0x525000000100 (-0.000001), 0x525000002900 (0.000001), NULL <repeats 14 times>]
+    float[] outputs = [NULL <repeats 16 times>]
+    float[] previous_window = [0x521000001500 (0.000001), 0x521000002900 (-0.000000), NULL <repeats 14 times>]
+    int previous_length = 128
+    int16[] finalY = [0x506000000620 (26), 0x506000000680 (26), NULL <repeats 14 times>]
+    uint32 current_loc = 0
+    int current_loc_valid = 1
+    float[] A = [0x515000001c00 (1.000000), 0x521000003d00 (1.000000)]
+    float[] B = [0x515000001e80 (0.499991), 0x521000005100 (0.500000)]
+    float[] C = [0x5110000020c0 (0.999699), 0x51d000001480 (0.999995)]
+    float[] window = [0x515000002100 (0.000059), 0x521000006500 (0.000001)]
+    uint16[] bit_reverse = [0x5060000006e0 (0), 0x515000002380 (0)]
+    uint32 serial = 0
+    int last_page = 2
+    int segment_count = 35
+    uint8[] segments = [22, 255, 25, 127, 72 ('H'), 93 (']'), 233, 255, 101 ('e'), 71 ('G'), 65 ('A'), 115 ('s'), 82 ('R'), 103 ('g'), 245, 255, 107 ('k'), 72 ('H'), 63 ('?'), 62 ('>'), 62 ('>'), 113 ('q'), 79 ('O'), 94 ('^'), 234, 255, 107 ('k'), 71 ('G'), 64 ('@'), 118 ('v'), 87 ('W'), 93 (']'), 218, 255, 113 ('q'), 0 <repeats 220 times>]
+    uint8 page_flag = 0
+    uint8 bytes_in_seg = 0
+    uint8 first_decode = 0
+    int next_seg = 1
+    int last_seg = 1
+    int last_seg_which = 0
+    uint32 acc = 0
+    int valid_bits = 3
+    int packet_bytes = 22
+    int end_seg_with_known_loc = 34
+    uint32 known_loc_for_packet = 22080
+    int discard_samples_deferred = 0
+    uint32 samples_output = 0
+    int page_crc_tests = -1
+    CRCscan[] scan = [
+        {
+            uint32 goal_crc = 0
+            int bytes_left = 0
+            uint32 crc_so_far = 0
+            int bytes_done = 0
+            uint32 sample_loc = 0
+        } <repeats 4 times>
+    ]
+    int channel_buffer_start = 0
+    int channel_buffer_end = 0
+}
