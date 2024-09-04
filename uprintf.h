@@ -3510,19 +3510,21 @@ __attribute__((noinline)) void _upf_uprintf(const char *file, int line, const ch
 #undef _UPF_OUT_OF_MEMORY
 #undef _UPF_UNREACHABLE
 #undef _UPF_INITIAL_VECTOR_CAPACITY
-#undef _UPF_VECTOR_NEW
 #undef _UPF_VECTOR_TYPEDEF
+#undef _UPF_VECTOR_NEW
+#undef _UPF_VECTOR_INIT
 #undef _UPF_VECTOR_PUSH
+#undef _UPF_VECTOR_COPY
 #undef _UPF_VECTOR_TOP
 #undef _UPF_VECTOR_POP
 #undef _UPF_MOD_CONST
 #undef _UPF_MOD_VOLATILE
 #undef _UPF_MOD_RESTRICT
 #undef _UPF_MOD_ATOMIC
-#undef _UPF_INITIAL_BUFFER_SIZE
 #undef _UPF_INITIAL_ARENA_SIZE
 #undef _upf_arena_concat
 #undef _upf_consume
+#undef _UPF_INITIAL_BUFFER_SIZE
 #undef _upf_bprintf
 
 #endif  // UPRINTF_IMPLEMENTATION
