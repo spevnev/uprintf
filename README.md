@@ -33,7 +33,7 @@ Adding uprintf to your project:
 0. Requirements: \
     Minimum C version is 99 \
     Compile with debug information, either `-g2` or `-g3` \
-    Have `elf.h` and `dwarf.h` in include path
+    Have `elf.h` in include path
 
 1. Pick a single file and define `UPRINTF_IMPLEMENTATION` before the include:
     ```c
