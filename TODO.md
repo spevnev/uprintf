@@ -84,3 +84,12 @@ A list of unimplemented features
     { int a = 2 }
 ]
 ```
+
+### Support rare data types
+```c
+_Complex double x;
+
+_Decimal32 a;
+_Decimal64 b;
+_Decimal128 c;
+```
