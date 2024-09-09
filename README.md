@@ -988,7 +988,8 @@ Compilers: \
     ```c
     uprintf(fmt, ...);
     ```
-    *fmt* - format string with `%S` format specifier (**printf specifiers are NOT supported**). Use `%%` to print `%`. \
+    `fmt` - a format string with placeholders(`%` followed by a letter). \
+     Unlike in `printf`, you can use anything, e.g. I use `%S`. Use `%%` to print `%`. \
     For each format specifier there must be a pointer to whatever should be printed in its place (except `void*`).
 
 ### Options

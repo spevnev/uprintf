@@ -3602,26 +3602,23 @@ __attribute__((noinline)) void _upf_uprintf(const char *file, int line, const ch
         if (*ch == '\0') break;
         ch++;  // Skip percent sign
 
-        switch (*ch) {
-            case '%':
-                _upf_bprintf("%%");
-                break;
-            case 'S': {
-                if (arg_idx >= args.length) _UPF_ERROR("There are more format specifiers than arguments provided at %s:%d.", file, line);
+        if (*ch == '%') {
+            _upf_bprintf("%%");
+        } else if (('a' <= *ch && *ch <= 'z') || ('A' <= *ch && *ch <= 'Z')) {
+            if (arg_idx >= args.length) _UPF_ERROR("There are more format specifiers than arguments provided at %s:%d.", file, line);
 
-                const void *ptr = va_arg(va_args, void *);
-                const _upf_type *type = _upf_get_arg_type(args.data[arg_idx++], pc);
-                seen.length = 0;
-                circular.length = 0;
-                _upf_collect_circular_structs(&seen, &circular, ptr, type, 0);
-                _upf_print_type(&circular, ptr, type, 0);
-            } break;
-            case '\0':
-            case '\n':
-                _UPF_ERROR("Unfinished format specifier at the end of the line at %s:%d.", file, line);
-            default:
-                _UPF_ERROR("Unknown format specifier \"%%%c\" at %s:%d.", *ch, file, line);
+            const void *ptr = va_arg(va_args, void *);
+            const _upf_type *type = _upf_get_arg_type(args.data[arg_idx++], pc);
+            seen.length = 0;
+            circular.length = 0;
+            _upf_collect_circular_structs(&seen, &circular, ptr, type, 0);
+            _upf_print_type(&circular, ptr, type, 0);
+        } else if (*ch == '\n' || *ch == '\0') {
+            _UPF_ERROR("Unfinished format specifier at the end of the line at %s:%d.", file, line);
+        } else {
+            _UPF_ERROR("Unknown format specifier \"%%%c\" at %s:%d.", *ch, file, line);
         }
+
         ch++;
     }
     va_end(va_args);
