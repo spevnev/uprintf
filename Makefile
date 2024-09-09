@@ -1,6 +1,5 @@
 CC     := gcc
-FLAGS  := -O2 -g2 -std=c99
-CFLAGS := -Wall -Wextra -pedantic -I . -fsanitize=undefined,address,leak -DUPRINTF_TEST
+CFLAGS := -O2 -g2 -std=c99 -Wall -Wextra -pedantic -I . -fsanitize=undefined,address,leak -DUPRINTF_TEST
 
 BUILD_DIR    := build
 LIB_DIR      := libs
@@ -38,7 +37,7 @@ examples: $(patsubst %, $(BUILD_DIR)/$(EXAMPLE_DIR)/%, $(EXAMPLES))
 
 $(BUILD_DIR)/$(EXAMPLE_DIR)/vorbis: $(EXAMPLE_DIR)/vorbis.c $(LIB_DIR)/stb_vorbis.c uprintf.h Makefile
 	@mkdir -p $(@D)
-	$(CC) $(FLAGS) $(CFLAGS) -I $(LIB_DIR) -o $@ $< -lm
+	$(CC) $(CFLAGS) -I $(LIB_DIR) -o $@ $< -lm
 
 $(LIB_DIR)/stb_vorbis.c:
 	@mkdir -p $(@D)
@@ -46,7 +45,7 @@ $(LIB_DIR)/stb_vorbis.c:
 
 $(BUILD_DIR)/$(EXAMPLE_DIR)/avl: $(EXAMPLE_DIR)/avl.c $(LIB_DIR)/avl uprintf.h Makefile
 	@mkdir -p $(@D)
-	$(CC) $(FLAGS) $(CFLAGS) -I $(LIB_DIR)/avl -o $@ $< $(LIB_DIR)/avl/avl.c
+	$(CC) $(CFLAGS) -I $(LIB_DIR)/avl -o $@ $< $(LIB_DIR)/avl/avl.c
 
 $(LIB_DIR)/avl:
 	@mkdir -p $(@D)
@@ -56,7 +55,7 @@ $(LIB_DIR)/avl:
 
 $(BUILD_DIR)/$(EXAMPLE_DIR)/sqlite: $(EXAMPLE_DIR)/sqlite.c $(LIB_DIR)/sqlite/sqlite3.c uprintf.h Makefile
 	@mkdir -p $(@D)
-	$(CC) $(FLAGS) $(CFLAGS) -I $(LIB_DIR)/sqlite -o $@ $<
+	$(CC) $(CFLAGS) -I $(LIB_DIR)/sqlite -o $@ $<
 
 $(LIB_DIR)/sqlite/sqlite3.c:
 	mkdir -p $(LIB_DIR)
@@ -91,7 +90,7 @@ $(foreach C,$(COMPILERS),                                 \
 define IMPL_TEMPLATE
 $(BUILD_DIR)/impl/$1.o: uprintf.h Makefile
 	@mkdir -p $$(@D)
-	$1 $(FLAGS) $(CFLAGS) -DUPRINTF_IMPLEMENTATION -x c -c $$< -o $$@
+	$1 $(CFLAGS) -DUPRINTF_IMPLEMENTATION -x c -c $$< -o $$@
 endef
 
 $(foreach C,$(COMPILERS),$(eval $(call IMPL_TEMPLATE,$C)))

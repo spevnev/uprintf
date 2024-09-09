@@ -121,6 +121,9 @@ ssize_t getline(char **lineptr, size_t *n, FILE *stream);
 // install, so this is a partial implementation used instead of the header for
 // consistency and convenience.
 
+// However, all the defines must be prefixed in case the original program does
+// include the real dwarf.h
+
 #define _UPF_DW_UT_compile 0x01
 
 #define _UPF_DW_TAG_array_type 0x01
@@ -1688,8 +1691,8 @@ static _upf_named_type _upf_get_var(const _upf_cu *cu, const uint8_t *die) {
     const _upf_abbrev *abbrev = _upf_get_abbrev(cu, code);
 
     _upf_named_type var = {
-        .name = NULL,
         .die = NULL,
+        .name = NULL,
     };
     for (size_t i = 0; i < abbrev->attrs.length; i++) {
         _upf_attr attr = abbrev->attrs.data[i];
@@ -1714,6 +1717,9 @@ static _upf_abbrev_vec _upf_parse_abbrevs(const uint8_t *abbrev_table) {
     _upf_abbrev_vec abbrevs = _UPF_VECTOR_NEW(&_upf_state.arena);
     while (true) {
         _upf_abbrev abbrev = {
+            .code = _UPF_INVALID,
+            .tag = _UPF_INVALID,
+            .has_children = false,
             .attrs = _UPF_VECTOR_NEW(&_upf_state.arena),
         };
         abbrev_table += _upf_uLEB_to_uint64(abbrev_table, &abbrev.code);
@@ -2800,16 +2806,15 @@ static size_t _upf_get_member_type(const _upf_cstr_vec *member_names, size_t idx
         return _upf_get_member_type(member_names, idx, return_type_idx);
     }
 
-    if (type->kind != _UPF_TK_STRUCT && type->kind != _UPF_TK_UNION) goto no_member_error;
-
-    _upf_member_vec members = type->as.cstruct.members;
-    for (size_t i = 0; i < members.length; i++) {
-        if (strcmp(members.data[i].name, member_names->data[idx]) == 0) {
-            return _upf_get_member_type(member_names, idx + 1, members.data[i].type);
+    if (type->kind == _UPF_TK_STRUCT || type->kind == _UPF_TK_UNION) {
+        _upf_member_vec members = type->as.cstruct.members;
+        for (size_t i = 0; i < members.length; i++) {
+            if (strcmp(members.data[i].name, member_names->data[idx]) == 0) {
+                return _upf_get_member_type(member_names, idx + 1, members.data[i].type);
+            }
         }
     }
 
-no_member_error:
     _UPF_ERROR("Unable to find member \"%s\" in \"%s\".", member_names->data[idx], type->name);
 }
 
