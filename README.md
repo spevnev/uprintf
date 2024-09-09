@@ -1,6 +1,6 @@
 # Universal printf
 
-uprintf is a single-header library for printing structures in C, created for debugging and prototyping purposes.
+uprintf is a single-header library that allows to print anything in C, intended for debugging and prototyping.
 
 ### What is a single header library?
 
@@ -988,8 +988,7 @@ Compilers: \
     ```c
     uprintf(fmt, ...);
     ```
-    `fmt` - a format string with placeholders(`%` followed by a letter). \
-     Unlike in `printf`, you can use anything, e.g. I use `%S`. Use `%%` to print `%`. \
+    `fmt` - a format string with placeholders(`%` followed by a letter). Unlike in `printf`, you can use anything, e.g. I use `%S`. Use `%%` to print `%`. \
     For each format specifier there must be a pointer to whatever should be printed in its place (except `void*`).
 
 ### Options
