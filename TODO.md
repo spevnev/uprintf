@@ -1,5 +1,9 @@
 A list of unimplemented features
 
+### Support Windows and MacOS
+
+Both are able to produce DWARF although not in ELF.
+
 ### Alignment options
 ```c
 // Unaligned
