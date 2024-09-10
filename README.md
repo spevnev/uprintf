@@ -1009,6 +1009,7 @@ macro |  description | default
 `UPRINTF_MAX_DEPTH` | How deep can nested structures be. Use a negative value to have no limit | 10
 `UPRINTF_IGNORE_STDIO_FILE` | Should `stdio.h`'s `FILE` be ignored | true
 `UPRINTF_ARRAY_COMPRESSION_THRESHOLD` | The minimum number of consecutive array values that get compressed(`VALUE <repeats X times>`). Use a non-positive value to disable it | 4
+`UPRINTF_MAX_STRING_LENGTH` | The max string length after which it will be truncated. Use a non-positive value to have no limit | 200
 
 ## How does it work?
 

@@ -25,6 +25,7 @@ function uses_shared_implementation {
     if   [ "$1" = "depth_option" ];       then echo false;
     elif [ "$1" = "indentation_option" ]; then echo false;
     elif [ "$1" = "stdio_file" ];         then echo false;
+    elif [ "$1" = "string_truncation" ];  then echo false;
     else echo true; fi
 }
 

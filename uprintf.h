@@ -86,6 +86,10 @@ extern int _upf_test_status;
 #define UPRINTF_ARRAY_COMPRESSION_THRESHOLD 4
 #endif
 
+#ifndef UPRINTF_MAX_STRING_LENGTH
+#define UPRINTF_MAX_STRING_LENGTH 200
+#endif
+
 // ===================== INCLUDES =========================
 
 #ifndef __USE_XOPEN_EXTENDED
@@ -3211,12 +3215,21 @@ __attribute__((no_sanitize_address)) static void _upf_print_char_ptr(const char 
         return;
     }
 
+    bool is_limited = UPRINTF_MAX_STRING_LENGTH > 0;
+    bool is_truncated = false;
+    const char *max_str = str + UPRINTF_MAX_STRING_LENGTH;
     _upf_bprintf("%p (\"", (void *) str);
     while (*str != '\0' && str < end) {
+        if (is_limited && str >= max_str) {
+            is_truncated = true;
+            break;
+        }
         _upf_bprintf("%s", _upf_escape_char(*str));
         str++;  // Increment inside of macro (_upf_bprintf) may be triggered twice
     }
-    _upf_bprintf("\")");
+    _upf_bprintf("\"");
+    if (is_truncated) _upf_bprintf("...");
+    _upf_bprintf(")");
 }
 
 static void _upf_collect_circular_structs(_upf_indexed_struct_vec *seen, _upf_indexed_struct_vec *circular, const uint8_t *data,
