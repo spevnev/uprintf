@@ -3223,7 +3223,7 @@ static void _upf_collect_circular_structs(_upf_indexed_struct_vec *seen, _upf_in
                                           const _upf_type *type, int depth) {
     _UPF_ASSERT(seen != NULL && circular != NULL && type != NULL);
 
-    if (UPRINTF_MAX_DEPTH != -1 && depth >= UPRINTF_MAX_DEPTH) return;
+    if (UPRINTF_MAX_DEPTH >= 0 && depth >= UPRINTF_MAX_DEPTH) return;
     if (data == NULL || _upf_get_memory_region_end(data) == NULL) return;
 
     if (type->kind == _UPF_TK_POINTER) {
@@ -3272,7 +3272,7 @@ static void _upf_collect_circular_structs(_upf_indexed_struct_vec *seen, _upf_in
 static void _upf_print_type(_upf_indexed_struct_vec *circular, const uint8_t *data, const _upf_type *type, int depth) {
     _UPF_ASSERT(type != NULL);
 
-    if (UPRINTF_MAX_DEPTH != -1 && depth >= UPRINTF_MAX_DEPTH) {
+    if (UPRINTF_MAX_DEPTH >= 0 && depth >= UPRINTF_MAX_DEPTH) {
         switch (type->kind) {
             case _UPF_TK_UNION:
             case _UPF_TK_STRUCT:
