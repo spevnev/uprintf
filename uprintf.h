@@ -3154,7 +3154,7 @@ static void _upf_print_modifiers(int modifiers) {
 static void _upf_print_typename(const _upf_type *type, bool print_trailing_whitespace) {
     _UPF_ASSERT(type != NULL);
     switch (type->kind) {
-        case _UPF_TK_POINTER:
+        case _UPF_TK_POINTER: {
             if (type->as.pointer.type == _UPF_INVALID) {
                 _upf_bprintf("void *");
                 _upf_print_modifiers(type->modifiers);
@@ -3170,7 +3170,7 @@ static void _upf_print_typename(const _upf_type *type, bool print_trailing_white
             _upf_print_typename(pointer_type, true);
             _upf_bprintf("*");
             _upf_print_modifiers(type->modifiers);
-            break;
+        } break;
         case _UPF_TK_FUNCTION:
             if (type->as.function.return_type == _UPF_INVALID) {
                 _upf_bprintf("void");
