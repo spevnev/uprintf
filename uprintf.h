@@ -2037,8 +2037,7 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *die, const uint
         die = _upf_skip_die(die, abbrev);
     }
 
-    _UPF_ASSERT(cu.scope.scopes.length > 0);
-    if (cu.scope.ranges.length == 1) {
+    if (cu.scope.scopes.length > 0 && cu.scope.ranges.length == 1) {
         _upf_range *range = &cu.scope.ranges.data[0];
 
         if (range->start == _UPF_INVALID) {
