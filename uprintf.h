@@ -2856,7 +2856,17 @@ static size_t _upf_find_function(_upf_parser_state *p, uint64_t pc) {
 
         for (size_t j = 0; j < cu->functions.length; j++) {
             if (strcmp(cu->functions.data[j].name, p->base) == 0) {
-                return _upf_parse_type(cu, cu->functions.data[j].die);
+                if (cu->functions.data[j].die == NULL) {
+                    _upf_type type = {
+                        .name = "void",
+                        .kind = _UPF_TK_VOID,
+                        .modifiers = 0,
+                        .size = _UPF_INVALID,
+                    };
+                    return _upf_add_type(NULL, type);
+                } else {
+                    return _upf_parse_type(cu, cu->functions.data[j].die);
+                }
             }
         }
     }
