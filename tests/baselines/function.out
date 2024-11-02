@@ -1,49 +1,53 @@
-&fun2: POINTER
-fun2(): POINTER
-fun2()(): POINTER
+&fun2: POINTER <Result *()() fun2()>
+fun2(): POINTER <Result *() fun1()>
+fun2()(): POINTER <Result *fun()>
 fun2()()(): {
     int num = 100
-    int *() f0 = POINTER
+    int *() f0 = POINTER <int *fun0()>
 }
 fun2()()().num: 100
-fun2()()().f0: POINTER
-&fun2()()().f0: POINTER
+fun2()()().f0: POINTER <int *fun0()>
+&fun2()()().f0: POINTER <int *fun0()>
 fun2()()().f0(): 200
-&var_fun: POINTER
+&var_fun: POINTER <Result *fun()>
 var_fun(): {
     int num = 100
-    int *() f0 = POINTER
+    int *() f0 = POINTER <int *fun0()>
 }
 var_fun().num: 100
-var_fun().f0: POINTER
-&var_fun().f0: POINTER
+var_fun().f0: POINTER <int *fun0()>
+&var_fun().f0: POINTER <int *fun0()>
 var_fun().f0(): 200
-ptr_fun: POINTER
+ptr_fun: POINTER <Result *fun()>
 (*ptr_fun)(): {
     int num = 100
-    int *() f0 = POINTER
+    int *() f0 = POINTER <int *fun0()>
 }
 (*ptr_fun)().num: 100
-(*ptr_fun)().f0: POINTER
-&(*ptr_fun)().f0: POINTER
+(*ptr_fun)().f0: POINTER <int *fun0()>
+&(*ptr_fun)().f0: POINTER <int *fun0()>
 (*ptr_fun)().f0(): 200
-&functions.f: POINTER
-functions.f(): POINTER
+&functions: {
+    Result *()() f = POINTER <Result *() fun1()>
+    Result *()() *fp = POINTER
+}
+&functions.f: POINTER <Result *() fun1()>
+functions.f(): POINTER <Result *fun()>
 functions.f()(): {
     int num = 100
-    int *() f0 = POINTER
+    int *() f0 = POINTER <int *fun0()>
 }
 functions.f()().num: 100
-functions.f()().f0: POINTER
-&functions.f()().f0: POINTER
+functions.f()().f0: POINTER <int *fun0()>
+&functions.f()().f0: POINTER <int *fun0()>
 functions.f()().f0()(): 200
-functions.fp: POINTER
-(*functions.fp)(): POINTER
+functions.fp: POINTER <Result *() fun1()>
+(*functions.fp)(): POINTER <Result *fun()>
 (*functions.fp)()(): {
     int num = 100
-    int *() f0 = POINTER
+    int *() f0 = POINTER <int *fun0()>
 }
 (*functions.fp)()().num: 100
-(*functions.fp)()().f0: POINTER
-&(*functions.fp)()().f0: POINTER
+(*functions.fp)()().f0: POINTER <int *fun0()>
+&(*functions.fp)()().f0: POINTER <int *fun0()>
 (*functions.fp)()().f0()(): 200

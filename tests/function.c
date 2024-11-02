@@ -18,18 +18,18 @@ typedef struct {
 
 static int num = 200;
 
-int *fun0(void) { return &num; }
+__attribute__((noinline)) int *fun0(void) { return &num; }
 
 static Result result = {
     .num = 100,
     .f0 = fun0,
 };
 
-Result *fun(void) { return &result; }
+__attribute__((noinline)) Result *fun(void) { return &result; }
 
-fun_t fun1(void) { return fun; }
+__attribute__((noinline)) fun_t fun1(void) { return fun; }
 
-fun1_t fun2(void) { return fun1; }
+__attribute__((noinline)) fun1_t fun2(void) { return fun1; }
 
 
 int main(void) {
@@ -66,6 +66,7 @@ int main(void) {
         .fp = &var_fun1,
     };
 
+    uprintf("&functions: %S\n", &functions);
     uprintf("&functions.f: %S\n", &functions.f);
     uprintf("functions.f(): %S\n", functions.f());
     uprintf("functions.f()(): %S\n", functions.f()());

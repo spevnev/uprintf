@@ -141,6 +141,7 @@ ssize_t getline(char **lineptr, size_t *n, FILE *stream);
 #define _UPF_DW_TAG_subroutine_type 0x15
 #define _UPF_DW_TAG_typedef 0x16
 #define _UPF_DW_TAG_union_type 0x17
+#define _UPF_DW_TAG_unspecified_parameters 0x18
 #define _UPF_DW_TAG_inlined_subroutine 0x1d
 #define _UPF_DW_TAG_subrange_type 0x21
 #define _UPF_DW_TAG_base_type 0x24
@@ -473,6 +474,16 @@ typedef struct {
 _UPF_VECTOR_TYPEDEF(_upf_named_type_vec, _upf_named_type);
 
 typedef struct {
+    const char *name;
+    const uint8_t *return_type;
+    _upf_named_type_vec args;
+    bool is_variadic;
+    uint64_t low_pc;
+} _upf_function;
+
+_UPF_VECTOR_TYPEDEF(_upf_function_vec, _upf_function);
+
+typedef struct {
     const void *data;
     const _upf_type *type;
     bool is_visited;
@@ -582,7 +593,7 @@ typedef struct {
 
     _upf_abbrev_vec abbrevs;
     _upf_named_type_vec types;
-    _upf_named_type_vec functions;
+    _upf_function_vec functions;
 
     uint64_t addr_base;
     uint64_t str_offsets_base;
@@ -1891,20 +1902,67 @@ static void _upf_parse_cu_type(_upf_cu *cu, const uint8_t *die) {
     _UPF_VECTOR_PUSH(&cu->types, type);
 }
 
+static bool _upf_parse_subprogram_args(_upf_cu *cu, const uint8_t *die, _upf_named_type_vec *args) {
+    _UPF_ASSERT(cu != NULL && die != NULL && args != NULL);
+
+    bool is_variadic = false;
+    while (true) {
+        uint64_t code;
+        die += _upf_uLEB_to_uint64(die, &code);
+        if (code == 0) break;
+
+        const _upf_abbrev *abbrev = _upf_get_abbrev(cu, code);
+        if (abbrev->tag == _UPF_DW_TAG_unspecified_parameters) is_variadic = true;
+        if (abbrev->tag != _UPF_DW_TAG_formal_parameter) break;
+
+        _upf_named_type arg = {
+            .die = NULL,
+            .name = NULL,
+        };
+        for (size_t i = 0; i < abbrev->attrs.length; i++) {
+            _upf_attr attr = abbrev->attrs.data[i];
+
+            if (attr.name == _UPF_DW_AT_name) arg.name = _upf_get_str(cu, die, attr.form);
+            else if (attr.name == _UPF_DW_AT_type) arg.die = cu->base + _upf_get_ref(die, attr.form);
+
+            die += _upf_get_attr_size(die, attr.form);
+        }
+        _UPF_ASSERT(die != NULL);
+
+        _UPF_VECTOR_PUSH(args, arg);
+    }
+
+    return is_variadic;
+}
+
 static const char *_upf_parse_cu_function(_upf_cu *cu, const uint8_t *die, const _upf_abbrev *abbrev) {
     _UPF_ASSERT(cu != NULL && die != NULL && abbrev != NULL);
 
-    _upf_named_type function = {
-        .die = NULL,
+    _upf_function function = {
         .name = NULL,
+        .return_type = NULL,
+        .args = _UPF_VECTOR_NEW(&_upf_state.arena),
+        .is_variadic = false,
+        .low_pc = _UPF_INVALID,
     };
     for (size_t i = 0; i < abbrev->attrs.length; i++) {
         _upf_attr attr = abbrev->attrs.data[i];
 
         if (attr.name == _UPF_DW_AT_name) function.name = _upf_get_str(cu, die, attr.form);
-        else if (attr.name == _UPF_DW_AT_type) function.die = cu->base + _upf_get_ref(die, attr.form);
+        else if (attr.name == _UPF_DW_AT_type) function.return_type = cu->base + _upf_get_ref(die, attr.form);
+        else if (attr.name == _UPF_DW_AT_low_pc) function.low_pc = _upf_get_addr(cu, die, attr.form);
+        else if (attr.name == _UPF_DW_AT_ranges) {
+            _upf_range_vec ranges = _upf_get_ranges(cu, die, attr.form);
+            _UPF_ASSERT(ranges.length > 0);
+            function.low_pc = ranges.data[0].start;
+        }
 
         die += _upf_get_attr_size(die, attr.form);
+    }
+    if (abbrev->has_children && function.low_pc != _UPF_INVALID) {
+        // Args only need to be parsed in case the function has low_pc, because
+        // they are only used for printing the signature of a function pointer.
+        function.is_variadic = _upf_parse_subprogram_args(cu, die, &function.args);
     }
     if (function.name != NULL) _UPF_VECTOR_PUSH(&cu->functions, function);
 
@@ -2856,7 +2914,7 @@ static size_t _upf_find_function(_upf_parser_state *p, uint64_t pc) {
 
         for (size_t j = 0; j < cu->functions.length; j++) {
             if (strcmp(cu->functions.data[j].name, p->base) == 0) {
-                if (cu->functions.data[j].die == NULL) {
+                if (cu->functions.data[j].return_type == NULL) {
                     _upf_type type = {
                         .name = "void",
                         .kind = _UPF_TK_VOID,
@@ -2865,7 +2923,7 @@ static size_t _upf_find_function(_upf_parser_state *p, uint64_t pc) {
                     };
                     return _upf_add_type(NULL, type);
                 } else {
-                    return _upf_parse_type(cu, cu->functions.data[j].die);
+                    return _upf_parse_type(cu, cu->functions.data[j].return_type);
                 }
             }
         }
@@ -3465,9 +3523,14 @@ static void _upf_print_type(_upf_indexed_struct_vec *circular, const uint8_t *da
             }
 
             const _upf_type *pointed_type = _upf_get_type(type->as.pointer.type);
-            if (pointed_type->kind == _UPF_TK_POINTER || pointed_type->kind == _UPF_TK_VOID || pointed_type->kind == _UPF_TK_FUNCTION) {
+            if (pointed_type->kind == _UPF_TK_POINTER || pointed_type->kind == _UPF_TK_VOID) {
                 _upf_bprintf("%p", ptr);
                 return;
+            }
+
+            if (pointed_type->kind == _UPF_TK_FUNCTION) {
+                _upf_print_type(circular, ptr, pointed_type, depth);
+                break;
             }
 
             if (pointed_type->kind == _UPF_TK_SCHAR || pointed_type->kind == _UPF_TK_UCHAR) {
@@ -3479,9 +3542,55 @@ static void _upf_print_type(_upf_indexed_struct_vec *circular, const uint8_t *da
             _upf_print_type(circular, ptr, pointed_type, depth);
             _upf_bprintf(")");
         } break;
-        case _UPF_TK_FUNCTION:
+        case _UPF_TK_FUNCTION: {
+            _upf_function *function = NULL;
+            _upf_cu *cu = NULL;
+            uint64_t function_pc = data - _upf_state.pc_base;
+            for (uint32_t i = 0; i < _upf_state.cus.length; i++) {
+                cu = &_upf_state.cus.data[i];
+                for (uint32_t j = 0; j < cu->functions.length; j++) {
+                    if (function_pc == cu->functions.data[j].low_pc) {
+                        function = &cu->functions.data[j];
+                        break;
+                    }
+                }
+                if (function) break;
+            }
+
             _upf_bprintf("%p", (void *) data);
-            break;
+            if (function != NULL) {
+                _UPF_ASSERT(cu != NULL);
+
+                _upf_bprintf(" <");
+
+                size_t return_type_idx;
+                if (function->return_type == NULL) {
+                    _upf_type type = {
+                        .name = "void",
+                        .kind = _UPF_TK_VOID,
+                        .modifiers = 0,
+                        .size = _UPF_INVALID,
+                    };
+                    return_type_idx = _upf_add_type(NULL, type);
+                } else {
+                    return_type_idx = _upf_parse_type(cu, function->return_type);
+                }
+                _upf_print_typename(_upf_get_type(return_type_idx), true);
+                _upf_bprintf("%s(", function->name);
+                for (uint32_t i = 0; i < function->args.length; i++) {
+                    if (i > 0) _upf_bprintf(", ");
+                    size_t arg_type_idx = _upf_parse_type(cu, function->args.data[i].die);
+                    bool has_name = function->args.data[i].name != NULL;
+                    _upf_print_typename(_upf_get_type(arg_type_idx), has_name);
+                    if (has_name) _upf_bprintf("%s", function->args.data[i].name);
+                }
+                if (function->is_variadic) {
+                    if (function->args.length > 0) _upf_bprintf(", ");
+                    _upf_bprintf("...");
+                }
+                _upf_bprintf(")>");
+            }
+        } break;
         case _UPF_TK_U1:
             _upf_bprintf("%hhu", *data);
             break;
@@ -3670,6 +3779,7 @@ __attribute__((noinline)) void _upf_uprintf(const char *file, int line, const ch
 #undef _UPF_DW_TAG_subroutine_type
 #undef _UPF_DW_TAG_typedef
 #undef _UPF_DW_TAG_union_type
+#undef _UPF_DW_TAG_unspecified_parameters
 #undef _UPF_DW_TAG_inlined_subroutine
 #undef _UPF_DW_TAG_subrange_type
 #undef _UPF_DW_TAG_base_type
