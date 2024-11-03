@@ -1935,7 +1935,7 @@ static bool _upf_parse_subprogram_args(_upf_cu *cu, const uint8_t *die, _upf_nam
     return is_variadic;
 }
 
-static const char *_upf_parse_cu_function(_upf_cu *cu, const uint8_t *die, const _upf_abbrev *abbrev) {
+static _upf_function _upf_parse_cu_function(_upf_cu *cu, const uint8_t *die, const _upf_abbrev *abbrev) {
     _UPF_ASSERT(cu != NULL && die != NULL && abbrev != NULL);
 
     _upf_function function = {
@@ -1955,18 +1955,23 @@ static const char *_upf_parse_cu_function(_upf_cu *cu, const uint8_t *die, const
             _upf_range_vec ranges = _upf_get_ranges(cu, die, attr.form);
             _UPF_ASSERT(ranges.length > 0);
             function.low_pc = ranges.data[0].start;
+        } else if (attr.name == _UPF_DW_AT_abstract_origin) {
+            uint64_t code;
+            const uint8_t *new_die = cu->base + _upf_get_ref(die, attr.form);
+            new_die += _upf_uLEB_to_uint64(new_die, &code);
+            _upf_function origin_function = _upf_parse_cu_function(cu, new_die, _upf_get_abbrev(cu, code));
+            origin_function.low_pc = function.low_pc;
+            function = origin_function;
         }
 
         die += _upf_get_attr_size(die, attr.form);
     }
-    if (abbrev->has_children && function.low_pc != _UPF_INVALID) {
-        // Args only need to be parsed in case the function has low_pc, because
-        // they are only used for printing the signature of a function pointer.
+
+    if (abbrev->has_children && function.low_pc != _UPF_INVALID && function.args.length == 0) {
         function.is_variadic = _upf_parse_subprogram_args(cu, die, &function.args);
     }
-    if (function.name != NULL) _UPF_VECTOR_PUSH(&cu->functions, function);
 
-    return function.name;
+    return function;
 }
 
 static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *die, const uint8_t *die_end, const uint8_t *abbrev_table) {
@@ -2053,18 +2058,20 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *die, const uint
         bool is_uprintf = false;
         switch (abbrev->tag) {
             case _UPF_DW_TAG_subprogram: {
-                const char *function_name = _upf_parse_cu_function(&cu, die, abbrev);
-                if (function_name != NULL && strcmp(function_name, "_upf_uprintf") == 0) is_uprintf = true;
+                _upf_function function = _upf_parse_cu_function(&cu, die, abbrev);
+                if (function.name != NULL) {
+                    _UPF_VECTOR_PUSH(&cu.functions, function);
+                    if (strcmp(function.name, "_upf_uprintf") == 0) is_uprintf = true;
+                }
                 __attribute__((fallthrough));
             }
             case _UPF_DW_TAG_lexical_block:
             case _UPF_DW_TAG_inlined_subroutine: {
-                bool scope = _upf_parse_cu_scope(&cu, &scope_stack, depth, die, abbrev);
-                if (is_uprintf && scope) {
+                bool is_scope = _upf_parse_cu_scope(&cu, &scope_stack, depth, die, abbrev);
+                if (is_uprintf && is_scope) {
                     _UPF_ASSERT(_upf_state.uprintf_ranges.length == 0);
                     _UPF_VECTOR_COPY(&_upf_state.uprintf_ranges, &_UPF_VECTOR_TOP(&scope_stack).scope->ranges);
                 }
-                is_uprintf = false;
             } break;
             case _UPF_DW_TAG_array_type:
             case _UPF_DW_TAG_enumeration_type:
