@@ -17,6 +17,9 @@ function get_similarity {
     # that point out-of-bounds causing uprintf to print garbage from the memory, thus the
     # primary goal of the test is to check that there are no errors, i.e. segfaults, leaks.
     elif [ "$1" = "stdio_file" ]; then echo 1;
+    # Clang doesn't produce DW_AT_subprogram for external functions, i.e. shared libraries
+    # or different CUs, so cross-CU retrieval of function signature/name doesn't work.
+    elif [ "$1" = "function" ]; then echo 80;
     else echo 100; fi
 }
 

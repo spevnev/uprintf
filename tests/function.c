@@ -1,3 +1,5 @@
+#include <stdio.h>
+#include <stdlib.h>
 #include "uprintf.h"
 
 typedef int *(*fun0_t)(void);
@@ -15,6 +17,11 @@ typedef struct {
     fun1_t *fp;
 } Functions;
 
+typedef struct {
+    void *(*alloc)(size_t);
+    void *(*realloc)(void *, size_t);
+    void (*free)(void *);
+} AllocatorMethods;
 
 static int num = 200;
 
@@ -31,8 +38,25 @@ fun_t fun1(void) { return fun; }
 
 fun1_t fun2(void) { return fun1; }
 
+void variadic(int count, ...) { (void) count; }
+
+void *custom_alloc(size_t size) {
+    (void) size;
+    return NULL;
+}
+
+void *custom_realloc(void *data, size_t new_size) {
+    (void) data;
+    (void) new_size;
+    return NULL;
+}
+
+void custom_free(void *data) { (void) data; }
+
 
 int main(void) {
+    uprintf("Variadic function: %S\n", &variadic);
+
     uprintf("&fun2: %S\n", &fun2);
     uprintf("fun2(): %S\n", fun2());
     uprintf("fun2()(): %S\n", fun2()());
@@ -41,7 +65,6 @@ int main(void) {
     uprintf("fun2()()().f0: %S\n", fun2()()()->f0);
     uprintf("&fun2()()().f0: %S\n", &fun2()()()->f0);
     uprintf("fun2()()().f0(): %S\n", fun2()()()->f0());
-
 
     fun_t var_fun = fun;
     fun1_t var_fun1 = fun1;
@@ -59,7 +82,6 @@ int main(void) {
     uprintf("(*ptr_fun)().f0: %S\n", (*ptr_fun)()->f0);
     uprintf("&(*ptr_fun)().f0: %S\n", &(*ptr_fun)()->f0);
     uprintf("(*ptr_fun)().f0(): %S\n", (*ptr_fun)()->f0());
-
 
     Functions functions = {
         .f = fun1,
@@ -81,6 +103,18 @@ int main(void) {
     uprintf("(*functions.fp)()().f0: %S\n", (*functions.fp)()()->f0);
     uprintf("&(*functions.fp)()().f0: %S\n", &(*functions.fp)()()->f0);
     uprintf("(*functions.fp)()().f0()(): %S\n", (*functions.fp)()()->f0());
+
+
+    AllocatorMethods libc = {malloc, realloc, free};
+    AllocatorMethods custom = {custom_alloc, custom_realloc, custom_free};
+    AllocatorMethods mixed1 = {custom_alloc, custom_realloc, free};
+    AllocatorMethods mixed2 = {malloc, realloc, custom_free};
+
+    uprintf("Allocator methods: %S\n%S\n%S\n%S\n", &libc, &custom, &mixed1, &mixed2);
+
+#ifndef __clang__
+    uprintf("libc functions: %S, %S, %S\n", &malloc, &printf, &fread);
+#endif
 
     return _upf_test_status;
 }
