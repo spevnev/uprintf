@@ -628,6 +628,7 @@ struct _upf_state {
     _upf_range_vec uprintf_ranges;
     bool init_pc;
     uint8_t *pc_base;
+    _upf_function_vec extern_functions;
 };
 
 static struct _upf_state _upf_state = {0};
@@ -1967,7 +1968,7 @@ static _upf_function _upf_parse_cu_function(_upf_cu *cu, const uint8_t *die, con
         die += _upf_get_attr_size(die, attr.form);
     }
 
-    if (abbrev->has_children && function.low_pc != _UPF_INVALID && function.args.length == 0) {
+    if (abbrev->has_children && function.args.length == 0) {
         function.is_variadic = _upf_parse_subprogram_args(cu, die, &function.args);
     }
 
@@ -3550,18 +3551,28 @@ static void _upf_print_type(_upf_indexed_struct_vec *circular, const uint8_t *da
             _upf_bprintf(")");
         } break;
         case _UPF_TK_FUNCTION: {
+            uint64_t absolute_function_pc = (uint64_t) data;
+            const char *function_name = NULL;
+            for (uint32_t i = 0; i < _upf_state.extern_functions.length; i++) {
+                if (absolute_function_pc == _upf_state.extern_functions.data[i].low_pc) {
+                    function_name = _upf_state.extern_functions.data[i].name;
+                    _UPF_ASSERT(function_name != NULL);
+                    break;
+                }
+            }
+
             _upf_function *function = NULL;
             _upf_cu *cu = NULL;
             uint64_t function_pc = data - _upf_state.pc_base;
-            for (uint32_t i = 0; i < _upf_state.cus.length; i++) {
+            for (uint32_t i = 0; i < _upf_state.cus.length && function == NULL; i++) {
                 cu = &_upf_state.cus.data[i];
                 for (uint32_t j = 0; j < cu->functions.length; j++) {
-                    if (function_pc == cu->functions.data[j].low_pc) {
+                    if (function_pc == cu->functions.data[j].low_pc
+                        || (function_name != NULL && strcmp(function_name, cu->functions.data[j].name) == 0)) {
                         function = &cu->functions.data[j];
                         break;
                     }
                 }
-                if (function) break;
             }
 
             _upf_bprintf("%p", (void *) data);
@@ -3670,6 +3681,8 @@ static void _upf_print_type(_upf_indexed_struct_vec *circular, const uint8_t *da
 
 // =================== ENTRY POINTS =======================
 
+extern Elf64_Dyn _DYNAMIC[];
+
 __attribute__((constructor)) void _upf_init(void) {
     if (setjmp(_upf_state.jmp_buf) != 0) return;
 
@@ -3679,11 +3692,60 @@ __attribute__((constructor)) void _upf_init(void) {
     _upf_arena_init(&_upf_state.arena);
     _UPF_VECTOR_INIT(&_upf_state.cus, &_upf_state.arena);
     _UPF_VECTOR_INIT(&_upf_state.type_map, &_upf_state.arena);
+    _UPF_VECTOR_INIT(&_upf_state.extern_functions, &_upf_state.arena);
 
     _upf_parse_elf();
     _upf_parse_dwarf();
 
     _upf_state.is_init = true;
+    const char *str_tab = NULL;
+    const Elf64_Sym *sym_tab = NULL;
+    const Elf64_Rela *rela_tab = NULL;
+    int rela_size = -1;
+    for (Elf64_Dyn *dyn = _DYNAMIC; dyn->d_tag != DT_NULL; dyn++) {
+        switch (dyn->d_tag) {
+            case DT_STRTAB:
+                str_tab = (char *) dyn->d_un.d_ptr;
+                break;
+            case DT_SYMTAB:
+                sym_tab = (Elf64_Sym *) dyn->d_un.d_ptr;
+                break;
+            case DT_RELA:
+                rela_tab = (Elf64_Rela *) dyn->d_un.d_ptr;
+                break;
+            case DT_RELASZ:
+                rela_size = dyn->d_un.d_val / sizeof(Elf64_Rela);
+                break;
+            case DT_RELAENT:
+                _UPF_ASSERT(dyn->d_un.d_val == sizeof(Elf64_Rela));
+                break;
+        }
+    }
+    _UPF_ASSERT(str_tab != NULL && sym_tab != NULL);
+
+    const uint8_t *base = _upf_get_this_file_address();
+    _UPF_ASSERT(rela_tab != NULL && rela_size != -1);
+    for (int i = 0; i < rela_size; i++) {
+        Elf64_Rela rela = rela_tab[i];
+
+        int symbol_idx = ELF64_R_SYM(rela.r_info);
+        if (symbol_idx == STN_UNDEF) continue;
+
+        Elf64_Sym symbol = sym_tab[symbol_idx];
+        const char *symbol_name = str_tab + symbol.st_name;
+
+        uint64_t address = *((uint64_t *) (base + rela.r_offset));
+
+        _upf_function function = {
+            .name = symbol_name,
+            .return_type = NULL,
+            .is_variadic = false,
+            .args = {0},
+            .low_pc = address,
+        };
+
+        _UPF_VECTOR_PUSH(&_upf_state.extern_functions, function);
+    }
 }
 
 __attribute__((destructor)) void _upf_fini(void) {
