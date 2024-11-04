@@ -265,7 +265,7 @@ int _upf_test_status = EXIT_SUCCESS;
 
 // ====================== ERRORS ==========================
 
-#define _UPF_INVALID -1UL
+#define _UPF_INVALID UINT64_MAX
 
 #define _UPF_LOG(type, ...)                       \
     do {                                          \
@@ -478,10 +478,17 @@ typedef struct {
     const uint8_t *return_type;
     _upf_named_type_vec args;
     bool is_variadic;
-    uint64_t low_pc;
+    uint64_t pc;
 } _upf_function;
 
 _UPF_VECTOR_TYPEDEF(_upf_function_vec, _upf_function);
+
+typedef struct {
+    const char *name;
+    uint64_t pc;
+} _upf_extern_function;
+
+_UPF_VECTOR_TYPEDEF(_upf_extern_function_vec, _upf_extern_function);
 
 typedef struct {
     const void *data;
@@ -615,6 +622,7 @@ struct _upf_state {
     _upf_range_vec addresses;
     _upf_type_map_vec type_map;
     _upf_cu_vec cus;
+    _upf_extern_function_vec extern_functions;
 
     jmp_buf jmp_buf;
     const char *file;
@@ -628,7 +636,6 @@ struct _upf_state {
     _upf_range_vec uprintf_ranges;
     bool init_pc;
     uint8_t *pc_base;
-    _upf_function_vec extern_functions;
 };
 
 static struct _upf_state _upf_state = {0};
@@ -1903,17 +1910,16 @@ static void _upf_parse_cu_type(_upf_cu *cu, const uint8_t *die) {
     _UPF_VECTOR_PUSH(&cu->types, type);
 }
 
-static bool _upf_parse_subprogram_args(_upf_cu *cu, const uint8_t *die, _upf_named_type_vec *args) {
-    _UPF_ASSERT(cu != NULL && die != NULL && args != NULL);
+static void _upf_parse_subprogram_parameters(_upf_cu *cu, const uint8_t *die, _upf_function *function) {
+    _UPF_ASSERT(cu != NULL && die != NULL && function != NULL);
 
-    bool is_variadic = false;
     while (true) {
         uint64_t code;
         die += _upf_uLEB_to_uint64(die, &code);
         if (code == 0) break;
 
         const _upf_abbrev *abbrev = _upf_get_abbrev(cu, code);
-        if (abbrev->tag == _UPF_DW_TAG_unspecified_parameters) is_variadic = true;
+        if (abbrev->tag == _UPF_DW_TAG_unspecified_parameters) function->is_variadic = true;
         if (abbrev->tag != _UPF_DW_TAG_formal_parameter) break;
 
         _upf_named_type arg = {
@@ -1930,13 +1936,11 @@ static bool _upf_parse_subprogram_args(_upf_cu *cu, const uint8_t *die, _upf_nam
         }
         _UPF_ASSERT(die != NULL);
 
-        _UPF_VECTOR_PUSH(args, arg);
+        _UPF_VECTOR_PUSH(&function->args, arg);
     }
-
-    return is_variadic;
 }
 
-static _upf_function _upf_parse_cu_function(_upf_cu *cu, const uint8_t *die, const _upf_abbrev *abbrev) {
+static _upf_function _upf_parse_cu_subprogram(_upf_cu *cu, const uint8_t *die, const _upf_abbrev *abbrev) {
     _UPF_ASSERT(cu != NULL && die != NULL && abbrev != NULL);
 
     _upf_function function = {
@@ -1944,24 +1948,27 @@ static _upf_function _upf_parse_cu_function(_upf_cu *cu, const uint8_t *die, con
         .return_type = NULL,
         .args = _UPF_VECTOR_NEW(&_upf_state.arena),
         .is_variadic = false,
-        .low_pc = _UPF_INVALID,
+        .pc = _UPF_INVALID,
     };
     for (size_t i = 0; i < abbrev->attrs.length; i++) {
         _upf_attr attr = abbrev->attrs.data[i];
 
-        if (attr.name == _UPF_DW_AT_name) function.name = _upf_get_str(cu, die, attr.form);
-        else if (attr.name == _UPF_DW_AT_type) function.return_type = cu->base + _upf_get_ref(die, attr.form);
-        else if (attr.name == _UPF_DW_AT_low_pc) function.low_pc = _upf_get_addr(cu, die, attr.form);
-        else if (attr.name == _UPF_DW_AT_ranges) {
+        if (attr.name == _UPF_DW_AT_name) {
+            function.name = _upf_get_str(cu, die, attr.form);
+        } else if (attr.name == _UPF_DW_AT_type) {
+            function.return_type = cu->base + _upf_get_ref(die, attr.form);
+        } else if (attr.name == _UPF_DW_AT_low_pc) {
+            function.pc = _upf_get_addr(cu, die, attr.form);
+        } else if (attr.name == _UPF_DW_AT_ranges) {
             _upf_range_vec ranges = _upf_get_ranges(cu, die, attr.form);
             _UPF_ASSERT(ranges.length > 0);
-            function.low_pc = ranges.data[0].start;
+            function.pc = ranges.data[0].start;
         } else if (attr.name == _UPF_DW_AT_abstract_origin) {
             uint64_t code;
             const uint8_t *new_die = cu->base + _upf_get_ref(die, attr.form);
             new_die += _upf_uLEB_to_uint64(new_die, &code);
-            _upf_function origin_function = _upf_parse_cu_function(cu, new_die, _upf_get_abbrev(cu, code));
-            origin_function.low_pc = function.low_pc;
+            _upf_function origin_function = _upf_parse_cu_subprogram(cu, new_die, _upf_get_abbrev(cu, code));
+            origin_function.pc = function.pc;
             function = origin_function;
         }
 
@@ -1969,7 +1976,7 @@ static _upf_function _upf_parse_cu_function(_upf_cu *cu, const uint8_t *die, con
     }
 
     if (abbrev->has_children && function.args.length == 0) {
-        function.is_variadic = _upf_parse_subprogram_args(cu, die, &function.args);
+        _upf_parse_subprogram_parameters(cu, die, &function);
     }
 
     return function;
@@ -2059,7 +2066,7 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *die, const uint
         bool is_uprintf = false;
         switch (abbrev->tag) {
             case _UPF_DW_TAG_subprogram: {
-                _upf_function function = _upf_parse_cu_function(&cu, die, abbrev);
+                _upf_function function = _upf_parse_cu_subprogram(&cu, die, abbrev);
                 if (function.name != NULL) {
                     _UPF_VECTOR_PUSH(&cu.functions, function);
                     if (strcmp(function.name, "_upf_uprintf") == 0) is_uprintf = true;
@@ -2071,7 +2078,7 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *die, const uint
                 bool is_scope = _upf_parse_cu_scope(&cu, &scope_stack, depth, die, abbrev);
                 if (is_uprintf && is_scope) {
                     _UPF_ASSERT(_upf_state.uprintf_ranges.length == 0);
-                    _UPF_VECTOR_COPY(&_upf_state.uprintf_ranges, &_UPF_VECTOR_TOP(&scope_stack).scope->ranges);
+                    _upf_state.uprintf_ranges = _UPF_VECTOR_TOP(&scope_stack).scope->ranges;
                 }
             } break;
             case _UPF_DW_TAG_array_type:
@@ -2171,6 +2178,9 @@ static void _upf_parse_dwarf(void) {
 }
 
 // ======================= ELF ============================
+
+// Linker-generated entry to dynamic section of ELF.
+extern Elf64_Dyn _DYNAMIC[];
 
 static void _upf_parse_elf(void) {
     struct stat file_info;
@@ -3552,23 +3562,26 @@ static void _upf_print_type(_upf_indexed_struct_vec *circular, const uint8_t *da
         } break;
         case _UPF_TK_FUNCTION: {
             uint64_t absolute_function_pc = (uint64_t) data;
+            uint64_t relative_function_pc = data - _upf_state.pc_base;
+
+            // Check pointer to function name mapping needed for external functions
             const char *function_name = NULL;
             for (uint32_t i = 0; i < _upf_state.extern_functions.length; i++) {
-                if (absolute_function_pc == _upf_state.extern_functions.data[i].low_pc) {
+                if (absolute_function_pc == _upf_state.extern_functions.data[i].pc) {
                     function_name = _upf_state.extern_functions.data[i].name;
                     _UPF_ASSERT(function_name != NULL);
                     break;
                 }
             }
 
+            // Find function (and cu) which matches either name(external) or PC(local)
             _upf_function *function = NULL;
             _upf_cu *cu = NULL;
-            uint64_t function_pc = data - _upf_state.pc_base;
             for (uint32_t i = 0; i < _upf_state.cus.length && function == NULL; i++) {
                 cu = &_upf_state.cus.data[i];
                 for (uint32_t j = 0; j < cu->functions.length; j++) {
-                    if (function_pc == cu->functions.data[j].low_pc
-                        || (function_name != NULL && strcmp(function_name, cu->functions.data[j].name) == 0)) {
+                    if (function_name == NULL ? (relative_function_pc == cu->functions.data[j].pc)
+                                              : (strcmp(function_name, cu->functions.data[j].name) == 0)) {
                         function = &cu->functions.data[j];
                         break;
                     }
@@ -3578,8 +3591,6 @@ static void _upf_print_type(_upf_indexed_struct_vec *circular, const uint8_t *da
             _upf_bprintf("%p", (void *) data);
             if (function != NULL) {
                 _UPF_ASSERT(cu != NULL);
-
-                _upf_bprintf(" <");
 
                 size_t return_type_idx;
                 if (function->return_type == NULL) {
@@ -3593,14 +3604,18 @@ static void _upf_print_type(_upf_indexed_struct_vec *circular, const uint8_t *da
                 } else {
                     return_type_idx = _upf_parse_type(cu, function->return_type);
                 }
+
+                _upf_bprintf(" <");
                 _upf_print_typename(_upf_get_type(return_type_idx), true);
                 _upf_bprintf("%s(", function->name);
                 for (uint32_t i = 0; i < function->args.length; i++) {
+                    _upf_named_type arg = function->args.data[i];
+                    size_t arg_type_idx = _upf_parse_type(cu, arg.die);
+                    bool has_name = arg.name != NULL;
+
                     if (i > 0) _upf_bprintf(", ");
-                    size_t arg_type_idx = _upf_parse_type(cu, function->args.data[i].die);
-                    bool has_name = function->args.data[i].name != NULL;
                     _upf_print_typename(_upf_get_type(arg_type_idx), has_name);
-                    if (has_name) _upf_bprintf("%s", function->args.data[i].name);
+                    if (has_name) _upf_bprintf("%s", arg.name);
                 }
                 if (function->is_variadic) {
                     if (function->args.length > 0) _upf_bprintf(", ");
@@ -3681,23 +3696,10 @@ static void _upf_print_type(_upf_indexed_struct_vec *circular, const uint8_t *da
 
 // =================== ENTRY POINTS =======================
 
-extern Elf64_Dyn _DYNAMIC[];
+// External function mapping: function pointer -> GOT -> RELA -> symbol -> name -> DIE
+static void _upf_parse_extern_functions(void) {
+    const uint8_t *base = _upf_get_this_file_address();
 
-__attribute__((constructor)) void _upf_init(void) {
-    if (setjmp(_upf_state.jmp_buf) != 0) return;
-
-    if (access("/proc/self/exe", R_OK) != 0) _UPF_ERROR("Expected \"/proc/self/exe\" to be a valid path.");
-    if (access("/proc/self/maps", R_OK) != 0) _UPF_ERROR("Expected \"/proc/self/maps\" to be a valid path.");
-
-    _upf_arena_init(&_upf_state.arena);
-    _UPF_VECTOR_INIT(&_upf_state.cus, &_upf_state.arena);
-    _UPF_VECTOR_INIT(&_upf_state.type_map, &_upf_state.arena);
-    _UPF_VECTOR_INIT(&_upf_state.extern_functions, &_upf_state.arena);
-
-    _upf_parse_elf();
-    _upf_parse_dwarf();
-
-    _upf_state.is_init = true;
     const char *str_tab = NULL;
     const Elf64_Sym *sym_tab = NULL;
     const Elf64_Rela *rela_tab = NULL;
@@ -3721,10 +3723,8 @@ __attribute__((constructor)) void _upf_init(void) {
                 break;
         }
     }
-    _UPF_ASSERT(str_tab != NULL && sym_tab != NULL);
+    _UPF_ASSERT(str_tab != NULL && sym_tab != NULL && rela_tab != NULL && rela_size != -1);
 
-    const uint8_t *base = _upf_get_this_file_address();
-    _UPF_ASSERT(rela_tab != NULL && rela_size != -1);
     for (int i = 0; i < rela_size; i++) {
         Elf64_Rela rela = rela_tab[i];
 
@@ -3733,19 +3733,33 @@ __attribute__((constructor)) void _upf_init(void) {
 
         Elf64_Sym symbol = sym_tab[symbol_idx];
         const char *symbol_name = str_tab + symbol.st_name;
+        uint64_t symbol_address = *((uint64_t *) (base + rela.r_offset));
 
-        uint64_t address = *((uint64_t *) (base + rela.r_offset));
-
-        _upf_function function = {
+        _upf_extern_function extern_function = {
             .name = symbol_name,
-            .return_type = NULL,
-            .is_variadic = false,
-            .args = {0},
-            .low_pc = address,
+            .pc = symbol_address,
         };
 
-        _UPF_VECTOR_PUSH(&_upf_state.extern_functions, function);
+        _UPF_VECTOR_PUSH(&_upf_state.extern_functions, extern_function);
     }
+}
+
+__attribute__((constructor)) void _upf_init(void) {
+    if (setjmp(_upf_state.jmp_buf) != 0) return;
+
+    if (access("/proc/self/exe", R_OK) != 0) _UPF_ERROR("Expected \"/proc/self/exe\" to be a valid path.");
+    if (access("/proc/self/maps", R_OK) != 0) _UPF_ERROR("Expected \"/proc/self/maps\" to be a valid path.");
+
+    _upf_arena_init(&_upf_state.arena);
+    _UPF_VECTOR_INIT(&_upf_state.cus, &_upf_state.arena);
+    _UPF_VECTOR_INIT(&_upf_state.type_map, &_upf_state.arena);
+    _UPF_VECTOR_INIT(&_upf_state.extern_functions, &_upf_state.arena);
+
+    _upf_parse_elf();
+    _upf_parse_extern_functions();
+    _upf_parse_dwarf();
+
+    _upf_state.is_init = true;
 }
 
 __attribute__((destructor)) void _upf_fini(void) {
