@@ -266,8 +266,6 @@ int _upf_test_status = EXIT_SUCCESS;
 
 // ====================== ERRORS ==========================
 
-#define _UPF_INVALID UINT64_MAX
-
 #define _UPF_LOG(type, ...)                       \
     do {                                          \
         fprintf(stderr, "(uprintf) [%s] ", type); \
@@ -808,7 +806,7 @@ static const _upf_abbrev *_upf_get_abbrev(const _upf_cu *cu, size_t code) {
 }
 
 static const _upf_type *_upf_get_type(size_t type_idx) {
-    _UPF_ASSERT(type_idx != _UPF_INVALID && type_idx < _upf_state.type_map.length);
+    _UPF_ASSERT(type_idx != UINT64_MAX && type_idx < _upf_state.type_map.length);
     return &_upf_state.type_map.data[type_idx].type;
 }
 
@@ -1000,7 +998,7 @@ static const char *_upf_get_str(const _upf_cu *cu, const uint8_t *die, uint64_t 
         case _UPF_DW_FORM_strx2:
         case _UPF_DW_FORM_strx3:
         case _UPF_DW_FORM_strx4: {
-            _UPF_ASSERT(_upf_state.str_offsets != NULL && cu->str_offsets_base != _UPF_INVALID);
+            _UPF_ASSERT(_upf_state.str_offsets != NULL && cu->str_offsets_base != UINT64_MAX);
             uint64_t offset = _upf_get_x_offset(die, form) * _upf_state.offset_size;
             return _upf_state.str + _upf_offset_cast(_upf_state.str_offsets + cu->str_offsets_base + offset);
         }
@@ -1238,14 +1236,14 @@ static size_t _upf_add_type(const uint8_t *type_die, _upf_type type) {
 }
 
 static size_t _upf_get_void_type(void) {
-    static size_t idx = _UPF_INVALID;
+    static size_t idx = UINT64_MAX;
 
-    if (idx == _UPF_INVALID) {
+    if (idx == UINT64_MAX) {
         _upf_type type = {
             .name = "void",
             .kind = _UPF_TK_VOID,
             .modifiers = 0,
-            .size = _UPF_INVALID,
+            .size = UINT64_MAX,
         };
         idx = _upf_add_type(NULL, type);
     }
@@ -1267,8 +1265,8 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
     const _upf_abbrev *abbrev = _upf_get_abbrev(cu, code);
 
     const char *name = NULL;
-    uint64_t subtype_offset = _UPF_INVALID;
-    size_t size = _UPF_INVALID;
+    uint64_t subtype_offset = UINT64_MAX;
+    size_t size = UINT64_MAX;
     int64_t encoding = 0;
     for (uint32_t i = 0; i < abbrev->attrs.length; i++) {
         _upf_attr attr = abbrev->attrs.data[i];
@@ -1291,7 +1289,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
 
     switch (abbrev->tag) {
         case _UPF_DW_TAG_array_type: {
-            _UPF_ASSERT(subtype_offset != _UPF_INVALID);
+            _UPF_ASSERT(subtype_offset != UINT64_MAX);
 
             _upf_type type = {
                 .name = name,
@@ -1323,7 +1321,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                 }
                 _UPF_ASSERT(abbrev->tag == _UPF_DW_TAG_subrange_type);
 
-                size_t length = _UPF_INVALID;
+                size_t length = UINT64_MAX;
                 for (uint32_t i = 0; i < abbrev->attrs.length; i++) {
                     _upf_attr attr = abbrev->attrs.data[i];
 
@@ -1339,9 +1337,9 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                     die += _upf_get_attr_size(die, attr.form);
                 }
 
-                if (length == _UPF_INVALID) {
+                if (length == UINT64_MAX) {
                     is_static = false;
-                    array_size = _UPF_INVALID;
+                    array_size = UINT64_MAX;
                     type.as.array.lengths.length = 0;
                 }
 
@@ -1353,14 +1351,14 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                 if (generate_name) type.name = _upf_arena_concat(&_upf_state.arena, type.name, "[]");
             }
 
-            if (element_type->size != _UPF_INVALID && type.size == _UPF_INVALID) {
+            if (element_type->size != UINT64_MAX && type.size == UINT64_MAX) {
                 type.size = array_size;
             }
 
             return _upf_add_type(base, type);
         }
         case _UPF_DW_TAG_enumeration_type: {
-            _UPF_ASSERT(subtype_offset != _UPF_INVALID);
+            _UPF_ASSERT(subtype_offset != UINT64_MAX);
 
             _upf_type type = {
                 .name = name ? name : "enum",
@@ -1373,7 +1371,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                 },
             };
 
-            if (type.size == _UPF_INVALID) type.size = _upf_get_type(type.as.cenum.underlying_type)->size;
+            if (type.size == UINT64_MAX) type.size = _upf_get_type(type.as.cenum.underlying_type)->size;
 
             if (!abbrev->has_children) return _upf_add_type(base, type);
             while (true) {
@@ -1413,7 +1411,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
             return _upf_add_type(base, type);
         }
         case _UPF_DW_TAG_pointer_type: {
-            _UPF_ASSERT(size == _UPF_INVALID || size == sizeof(void *));
+            _UPF_ASSERT(size == UINT64_MAX || size == sizeof(void *));
 
             _upf_type type = {
                 .name = name,
@@ -1421,7 +1419,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                 .modifiers = 0,
                 .size = sizeof(void*),
                 .as.pointer = {
-                    .type = _UPF_INVALID,
+                    .type = UINT64_MAX,
                 },
             };
 
@@ -1430,7 +1428,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
             // stuck in an infinite loop.
             size_t type_idx = _upf_add_type(base, type);
 
-            if (subtype_offset != _UPF_INVALID) {
+            if (subtype_offset != UINT64_MAX) {
                 // `void*`s have invalid offset (since they don't point to any type), thus
                 // pointer with invalid type represents a `void*`
 
@@ -1469,8 +1467,8 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
 
                 _upf_member member = {
                     .name = NULL,
-                    .type = _UPF_INVALID,
-                    .offset = is_struct ? _UPF_INVALID : 0,
+                    .type = UINT64_MAX,
+                    .offset = is_struct ? UINT64_MAX : 0,
                     .bit_size = 0,
                 };
                 bool skip_member = false;
@@ -1507,7 +1505,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                 }
                 if (skip_member) continue;
 
-                _UPF_ASSERT(member.name != NULL && member.type != _UPF_INVALID && member.offset != _UPF_INVALID);
+                _UPF_ASSERT(member.name != NULL && member.type != UINT64_MAX && member.offset != UINT64_MAX);
                 _UPF_VECTOR_PUSH(&type.as.cstruct.members, member);
             }
 
@@ -1520,12 +1518,12 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                 .modifiers = 0,
                 .size = size,
                 .as.function = {
-                    .return_type = _UPF_INVALID,
+                    .return_type = UINT64_MAX,
                     .arg_types = _UPF_VECTOR_NEW(&_upf_state.arena),
                 },
             };
 
-            if (subtype_offset != _UPF_INVALID) {
+            if (subtype_offset != UINT64_MAX) {
                 type.as.function.return_type = _upf_parse_type(cu, cu->base + subtype_offset);
             }
 
@@ -1558,14 +1556,14 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
         case _UPF_DW_TAG_typedef: {
             _UPF_ASSERT(name != NULL);
 
-            if (subtype_offset == _UPF_INVALID) {
+            if (subtype_offset == UINT64_MAX) {
                 // void type is represented by absence of type attribute, e.g. typedef void NAME
 
                 _upf_type type = {
                     .name = name,
                     .kind = _UPF_TK_VOID,
                     .modifiers = 0,
-                    .size = _UPF_INVALID,
+                    .size = UINT64_MAX,
                 };
                 return _upf_add_type(base, type);
             }
@@ -1580,7 +1578,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
             return _upf_add_type(base, type);
         }
         case _UPF_DW_TAG_base_type: {
-            _UPF_ASSERT(name != NULL && size != _UPF_INVALID && encoding != 0);
+            _UPF_ASSERT(name != NULL && size != UINT64_MAX && encoding != 0);
 
             _upf_type type = {
                 .name = name,
@@ -1595,7 +1593,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
         case _UPF_DW_TAG_volatile_type:
         case _UPF_DW_TAG_restrict_type:
         case _UPF_DW_TAG_atomic_type: {
-            if (subtype_offset == _UPF_INVALID) {
+            if (subtype_offset == UINT64_MAX) {
                 return _upf_get_void_type();
             } else {
                 size_t type_idx = _upf_parse_type(cu, cu->base + subtype_offset);
@@ -1628,7 +1626,7 @@ static _upf_range_vec _upf_get_ranges(const _upf_cu *cu, const uint8_t *die, uin
     if (form == _UPF_DW_FORM_sec_offset) {
         rnglist = _upf_state.rnglists + _upf_offset_cast(die);
     } else {
-        _UPF_ASSERT(cu->rnglists_base != _UPF_INVALID);
+        _UPF_ASSERT(cu->rnglists_base != UINT64_MAX);
         uint64_t index;
         _upf_uLEB_to_uint64(die, &index);
         uint64_t rnglist_offset = _upf_offset_cast(_upf_state.rnglists + cu->rnglists_base + index * _upf_state.offset_size);
@@ -1762,8 +1760,8 @@ static _upf_abbrev_vec _upf_parse_abbrevs(const uint8_t *abbrev_table) {
     _upf_abbrev_vec abbrevs = _UPF_VECTOR_NEW(&_upf_state.arena);
     while (true) {
         _upf_abbrev abbrev = {
-            .code = _UPF_INVALID,
-            .tag = _UPF_INVALID,
+            .code = UINT64_MAX,
+            .tag = UINT64_MAX,
             .has_children = false,
             .attrs = _UPF_VECTOR_NEW(&_upf_state.arena),
         };
@@ -1810,8 +1808,8 @@ static _upf_range_vec _upf_get_cu_ranges(const _upf_cu *cu, const uint8_t *low_p
 
     _upf_range_vec ranges = _UPF_VECTOR_NEW(&_upf_state.arena);
     _upf_range range = {
-        .start = _UPF_INVALID,
-        .end = _UPF_INVALID,
+        .start = UINT64_MAX,
+        .end = UINT64_MAX,
     };
 
     if (low_pc_die == NULL) {
@@ -1845,7 +1843,7 @@ static bool _upf_parse_cu_scope(const _upf_cu *cu, _upf_scope_stack *scope_stack
         .scopes = _UPF_VECTOR_NEW(&_upf_state.arena),
     };
 
-    uint64_t low_pc = _UPF_INVALID;
+    uint64_t low_pc = UINT64_MAX;
     const uint8_t *high_pc_die = NULL;
     _upf_attr high_pc_attr = {0};
     for (uint32_t i = 0; i < abbrev->attrs.length; i++) {
@@ -1863,12 +1861,12 @@ static bool _upf_parse_cu_scope(const _upf_cu *cu, _upf_scope_stack *scope_stack
         die += _upf_get_attr_size(die, attr.form);
     }
 
-    if (low_pc != _UPF_INVALID) {
+    if (low_pc != UINT64_MAX) {
         if (high_pc_die == NULL) _UPF_ERROR("Expected CU to have both low and high PC.");
 
         _upf_range range = {
             .start = low_pc,
-            .end = _UPF_INVALID,
+            .end = UINT64_MAX,
         };
 
         if (_upf_is_addr(high_pc_attr.form)) {
@@ -1971,7 +1969,7 @@ static _upf_function _upf_parse_cu_subprogram(const _upf_cu *cu, const uint8_t *
         .return_type_die = NULL,
         .args = _UPF_VECTOR_NEW(&_upf_state.arena),
         .is_variadic = false,
-        .pc = _UPF_INVALID,
+        .pc = UINT64_MAX,
     };
     for (uint32_t i = 0; i < abbrev->attrs.length; i++) {
         _upf_attr attr = abbrev->attrs.data[i];
@@ -2014,8 +2012,8 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *die, const uint
             .scopes = _UPF_VECTOR_NEW(&_upf_state.arena),
         },
         .addr_base = 0,
-        .str_offsets_base = _UPF_INVALID,
-        .rnglists_base = _UPF_INVALID,
+        .str_offsets_base = UINT64_MAX,
+        .rnglists_base = UINT64_MAX,
         .abbrevs = _upf_parse_abbrevs(abbrev_table),
         .types = _UPF_VECTOR_NEW(&_upf_state.arena),
         .int_types = _UPF_VECTOR_NEW(&_upf_state.arena),
@@ -2135,7 +2133,7 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *die, const uint
     if (cu.scope.scopes.length > 0 && cu.scope.ranges.length == 1) {
         _upf_range *range = &cu.scope.ranges.data[0];
 
-        if (range->start == _UPF_INVALID) {
+        if (range->start == UINT64_MAX) {
             if (cu.scope.scopes.data[0].ranges.length == 0) {
                 range->start = 0;
             } else {
@@ -2143,7 +2141,7 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *die, const uint
             }
         }
 
-        if (range->end == _UPF_INVALID) {
+        if (range->end == UINT64_MAX) {
             if (_UPF_VECTOR_TOP(&cu.scope.scopes).ranges.length == 0) {
                 range->end = UINT64_MAX;
             } else {
@@ -2885,7 +2883,7 @@ static size_t _upf_get_return_type(size_t type_idx, int count) {
 }
 
 static size_t _upf_get_member_type(const _upf_cstr_vec *member_names, size_t idx, size_t type_idx) {
-    _UPF_ASSERT(member_names != NULL && type_idx != _UPF_INVALID);
+    _UPF_ASSERT(member_names != NULL && type_idx != UINT64_MAX);
 
     if (idx == member_names->length) return type_idx;
 
@@ -2933,17 +2931,17 @@ static size_t _upf_get_type_by_name(_upf_parser_state *p) {
         }
     }
 
-    return _UPF_INVALID;
+    return UINT64_MAX;
 }
 
 static size_t _upf_get_variable_type(const _upf_cu *cu, const _upf_scope *scope, uint64_t pc, const char *var_name) {
     _UPF_ASSERT(cu != NULL && scope != NULL && var_name != NULL);
 
-    if (!_upf_is_in_range(pc, scope->ranges)) return _UPF_INVALID;
+    if (!_upf_is_in_range(pc, scope->ranges)) return UINT64_MAX;
 
     for (uint32_t i = 0; i < scope->scopes.length; i++) {
         size_t result = _upf_get_variable_type(cu, &scope->scopes.data[i], pc, var_name);
-        if (result != _UPF_INVALID) return result;
+        if (result != UINT64_MAX) return result;
     }
 
     for (uint32_t i = 0; i < scope->vars.length; i++) {
@@ -2953,7 +2951,7 @@ static size_t _upf_get_variable_type(const _upf_cu *cu, const _upf_scope *scope,
         }
     }
 
-    return _UPF_INVALID;
+    return UINT64_MAX;
 }
 
 static size_t _upf_get_function_return_type(_upf_parser_state *p) {
@@ -2967,18 +2965,18 @@ static size_t _upf_get_function_return_type(_upf_parser_state *p) {
         }
     }
 
-    return _UPF_INVALID;
+    return UINT64_MAX;
 }
 
 static size_t _upf_get_base_type(_upf_parser_state *p, uint64_t pc, const char *arg) {
     _UPF_ASSERT(p != NULL && arg != NULL);
 
-    size_t type_idx = _UPF_INVALID;
+    size_t type_idx = UINT64_MAX;
     switch (p->base_type) {
         case _UPF_BT_TYPENAME:
             type_idx = _upf_get_type_by_name(p);
 
-            if (type_idx == _UPF_INVALID) {
+            if (type_idx == UINT64_MAX) {
                 _UPF_ERROR(
                     "Unable to find type \"%s\" in \"%s\" at %s:%d. "
                     "Ensure that the executable contains debugging information of at least 2nd level (-g2 or -g3).",
@@ -2987,9 +2985,9 @@ static size_t _upf_get_base_type(_upf_parser_state *p, uint64_t pc, const char *
             break;
         case _UPF_BT_VARIABLE:
             type_idx = _upf_get_variable_type(p->cu, &p->cu->scope, pc, p->base);
-            if (type_idx != _UPF_INVALID) break;
+            if (type_idx != UINT64_MAX) break;
 
-            if (_upf_get_function_return_type(p) != _UPF_INVALID) {
+            if (_upf_get_function_return_type(p) != UINT64_MAX) {
                 _upf_type type = {
                     .name = NULL,
                     .kind = _UPF_TK_FUNCTION,
@@ -2999,7 +2997,7 @@ static size_t _upf_get_base_type(_upf_parser_state *p, uint64_t pc, const char *
                 type_idx = _upf_add_type(NULL, type);
             }
 
-            if (type_idx == _UPF_INVALID) {
+            if (type_idx == UINT64_MAX) {
                 _UPF_ERROR(
                     "Unable to find type of \"%s\" in \"%s\" at %s:%d. "
                     "Ensure that the executable contains debugging information of at least 2nd level (-g2 or -g3).",
@@ -3009,7 +3007,7 @@ static size_t _upf_get_base_type(_upf_parser_state *p, uint64_t pc, const char *
         case _UPF_BT_FUNCTION:
             type_idx = _upf_get_variable_type(p->cu, &p->cu->scope, pc, p->base);
 
-            if (type_idx != _UPF_INVALID) {
+            if (type_idx != UINT64_MAX) {
                 const _upf_type *type = _upf_get_type(type_idx);
                 if (type->kind != _UPF_TK_POINTER) goto not_function_error;
 
@@ -3021,7 +3019,7 @@ static size_t _upf_get_base_type(_upf_parser_state *p, uint64_t pc, const char *
                 type_idx = _upf_get_function_return_type(p);
             }
 
-            if (type_idx == _UPF_INVALID) {
+            if (type_idx == UINT64_MAX) {
             not_function_error:
                 _UPF_ERROR(
                     "Unable to find type of function \"%s\" in \"%s\" at %s:%d. "
@@ -3033,7 +3031,7 @@ static size_t _upf_get_base_type(_upf_parser_state *p, uint64_t pc, const char *
             break;
     }
 
-    _UPF_ASSERT(type_idx != _UPF_INVALID);
+    _UPF_ASSERT(type_idx != UINT64_MAX);
     return type_idx;
 }
 
@@ -3083,7 +3081,7 @@ static size_t _upf_dereference_type(size_t type_idx, int dereference, const char
                        _upf_state.file_path, _upf_state.line);
         }
 
-        if (type_idx == _UPF_INVALID) {
+        if (type_idx == UINT64_MAX) {
             _UPF_ERROR(
                 "Unable to print void* because it can point to arbitrary data of any length. "
                 "To print the pointer itself, you must take pointer (&) of \"%s\" at %s:%d.",
@@ -3129,7 +3127,7 @@ static const _upf_type *_upf_get_arg_type(const char *arg, uint64_t pc) {
     if (p.suffix_calls > 0) member_type = _upf_get_return_type(member_type, p.suffix_calls);
     size_t type = _upf_dereference_type(member_type, p.dereference, arg);
 
-    _UPF_ASSERT(type != _UPF_INVALID);
+    _UPF_ASSERT(type != UINT64_MAX);
     return _upf_get_type(type);
 }
 
@@ -3151,7 +3149,7 @@ static void *_upf_get_this_file_address(void) {
     FILE *file = fopen("/proc/self/maps", "r");
     if (file == NULL) _UPF_ERROR("Unable to open \"/proc/self/maps\": %s.", strerror(errno));
 
-    uint64_t address = _UPF_INVALID;
+    uint64_t address = UINT64_MAX;
     size_t length = 0;
     char *line = NULL;
     while ((read = getline(&line, &length, file)) != -1) {
@@ -3168,7 +3166,7 @@ static void *_upf_get_this_file_address(void) {
     if (line) free(line);
     fclose(file);
 
-    _UPF_ASSERT(address != _UPF_INVALID);
+    _UPF_ASSERT(address != UINT64_MAX);
     return (void *) address;
 }
 
@@ -3184,8 +3182,8 @@ static _upf_range_vec _upf_get_address_ranges(void) {
 
     _upf_range_vec ranges = _UPF_VECTOR_NEW(&_upf_state.arena);
     _upf_range range = {
-        .start = _UPF_INVALID,
-        .end = _UPF_INVALID,
+        .start = UINT64_MAX,
+        .end = UINT64_MAX,
     };
     size_t length = 0;
     char *line = NULL;
@@ -3273,7 +3271,7 @@ static void _upf_print_typename(const _upf_type *type, bool print_trailing_white
 
     switch (type->kind) {
         case _UPF_TK_POINTER: {
-            if (type->as.pointer.type == _UPF_INVALID) {
+            if (type->as.pointer.type == UINT64_MAX) {
                 _upf_bprintf("void *");
                 _upf_print_modifiers(type->modifiers);
                 break;
@@ -3290,7 +3288,7 @@ static void _upf_print_typename(const _upf_type *type, bool print_trailing_white
             _upf_print_modifiers(type->modifiers);
         } break;
         case _UPF_TK_FUNCTION:
-            if (type->as.function.return_type == _UPF_INVALID) {
+            if (type->as.function.return_type == UINT64_MAX) {
                 _upf_bprintf("void");
             } else {
                 _upf_print_typename(_upf_get_type(type->as.function.return_type), false);
@@ -3364,7 +3362,7 @@ static void _upf_collect_circular_structs(_upf_indexed_struct_vec *seen, _upf_in
     if (type->kind == _UPF_TK_POINTER) {
         void *ptr;
         memcpy(&ptr, data, sizeof(ptr));
-        if (ptr == NULL || type->as.pointer.type == _UPF_INVALID) return;
+        if (ptr == NULL || type->as.pointer.type == UINT64_MAX) return;
 
         const _upf_type *pointed_type = _upf_get_type(type->as.pointer.type);
 
@@ -3515,7 +3513,7 @@ static void _upf_print_type(_upf_indexed_struct_vec *circular, const uint8_t *da
             const _upf_type *element_type = _upf_get_type(type->as.array.element_type);
             size_t element_size = element_type->size;
 
-            if (element_size == _UPF_INVALID) {
+            if (element_size == UINT64_MAX) {
                 _upf_bprintf("<unknown>");
                 return;
             }
@@ -3570,7 +3568,7 @@ static void _upf_print_type(_upf_indexed_struct_vec *circular, const uint8_t *da
                 return;
             }
 
-            if (type->as.pointer.type == _UPF_INVALID) {
+            if (type->as.pointer.type == UINT64_MAX) {
                 _upf_bprintf("%p", ptr);
                 return;
             }
@@ -3999,7 +3997,6 @@ __attribute__((noinline)) void _upf_uprintf(const char *file_path, int line, con
 #undef _UPF_DW_LANG_C11
 #undef _UPF_DW_LANG_C17
 #undef _UPF_SET_TEST_STATUS
-#undef _UPF_INVALID
 #undef _UPF_LOG
 #undef _UPF_ERROR
 #undef _UPF_WARN
