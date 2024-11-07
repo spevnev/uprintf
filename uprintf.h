@@ -416,7 +416,7 @@ typedef struct {
     const char *name;
     size_t type;
     size_t offset;
-    int bit_size;
+    int bit_size;  // non-zero means bit field
 } _upf_member;
 
 _UPF_VECTOR_TYPEDEF(_upf_member_vec, _upf_member);
@@ -1887,8 +1887,9 @@ static bool _upf_parse_cu_scope(const _upf_cu *cu, _upf_scope_stack *scope_stack
 
     if (new_scope.ranges.length > 0) {
         _upf_scope *scope = NULL;
-        for (uint32_t i = 0; i < scope_stack->length && scope == NULL; i++) {
+        for (uint32_t i = 0; i < scope_stack->length; i++) {
             scope = scope_stack->data[scope_stack->length - 1 - i].scope;
+            if (scope != NULL) break;
         }
         _UPF_ASSERT(scope != NULL);
 
@@ -1932,7 +1933,7 @@ static void _upf_parse_cu_type(_upf_cu *cu, const uint8_t *die) {
     _UPF_VECTOR_PUSH(&cu->types, type);
 }
 
-static void _upf_parse_subprogram_parameters(_upf_cu *cu, const uint8_t *die, _upf_function *function) {
+static void _upf_parse_subprogram_parameters(const _upf_cu *cu, const uint8_t *die, _upf_function *function) {
     _UPF_ASSERT(cu != NULL && die != NULL && function != NULL);
 
     while (true) {
@@ -1967,7 +1968,7 @@ static _upf_function _upf_parse_cu_subprogram(const _upf_cu *cu, const uint8_t *
 
     _upf_function function = {
         .name = NULL,
-        .return_type = NULL,
+        .return_type_die = NULL,
         .args = _UPF_VECTOR_NEW(&_upf_state.arena),
         .is_variadic = false,
         .pc = _UPF_INVALID,
@@ -1978,7 +1979,7 @@ static _upf_function _upf_parse_cu_subprogram(const _upf_cu *cu, const uint8_t *
         if (attr.name == _UPF_DW_AT_name) {
             function.name = _upf_get_str(cu, die, attr.form);
         } else if (attr.name == _UPF_DW_AT_type) {
-            function.return_type = cu->base + _upf_get_ref(die, attr.form);
+            function.return_type_die = cu->base + _upf_get_ref(die, attr.form);
         } else if (attr.name == _UPF_DW_AT_low_pc) {
             function.pc = _upf_get_addr(cu, die, attr.form);
         } else if (attr.name == _UPF_DW_AT_ranges) {
@@ -2220,8 +2221,12 @@ static void _upf_parse_elf(void) {
 
     const Elf64_Ehdr *header = (Elf64_Ehdr *) file;
 
-    if (memcmp(header->e_ident, ELFMAG, SELFMAG) != 0 || header->e_ident[EI_CLASS] != ELFCLASS64 || header->e_ident[EI_VERSION] != 1
-        || header->e_machine != EM_X86_64 || header->e_version != 1 || header->e_shentsize != sizeof(Elf64_Shdr)) {
+    if (memcmp(header->e_ident, ELFMAG, SELFMAG) != 0 ||  //
+        header->e_ident[EI_CLASS] != ELFCLASS64 ||        //
+        header->e_ident[EI_VERSION] != 1 ||               //
+        header->e_machine != EM_X86_64 ||                 //
+        header->e_version != 1 ||                         //
+        header->e_shentsize != sizeof(Elf64_Shdr)) {
         _UPF_ERROR("Unsupported or invalid ELF file.");
     }
 
@@ -2352,14 +2357,14 @@ static void _upf_tokenize(_upf_tokenizer *t, const char *string) {
             enum _upf_token_kind kind = _UPF_TOK_ID;
 
             for (size_t i = 0; i < sizeof(type_qualifiers) / sizeof(*type_qualifiers); i++) {
-                if (strcmp(string, type_qualifiers[i]) == 0) {
+                if (strcmp(type_qualifiers[i], string) == 0) {
                     kind = _UPF_TOK_TYPE_QUALIFIER;
                     break;
                 }
             }
 
             for (size_t i = 0; i < sizeof(type_specifiers) / sizeof(*type_specifiers); i++) {
-                if (strcmp(string, type_specifiers[i]) == 0) {
+                if (strcmp(type_specifiers[i], string) == 0) {
                     kind = _UPF_TOK_TYPE_SPECIFIER;
                     break;
                 }
@@ -2958,7 +2963,7 @@ static size_t _upf_get_function_return_type(_upf_parser_state *p) {
         _upf_function function = p->cu->functions.data[i];
 
         if (strcmp(function.name, p->base) == 0) {
-            return function.return_type == NULL ? _upf_get_void_type() : _upf_parse_type(p->cu, function.return_type);
+            return function.return_type_die == NULL ? _upf_get_void_type() : _upf_parse_type(p->cu, function.return_type_die);
         }
     }
 
@@ -2981,7 +2986,7 @@ static size_t _upf_get_base_type(_upf_parser_state *p, uint64_t pc, const char *
             }
             break;
         case _UPF_BT_VARIABLE:
-            type_idx = _upf_get_variable_type(pc, p->cu, p->base, &p->cu->scope);
+            type_idx = _upf_get_variable_type(p->cu, &p->cu->scope, pc, p->base);
             if (type_idx != _UPF_INVALID) break;
 
             if (_upf_get_function_return_type(p) != _UPF_INVALID) {
@@ -3002,7 +3007,7 @@ static size_t _upf_get_base_type(_upf_parser_state *p, uint64_t pc, const char *
             }
             break;
         case _UPF_BT_FUNCTION:
-            type_idx = _upf_get_variable_type(pc, p->cu, p->base, &p->cu->scope);
+            type_idx = _upf_get_variable_type(p->cu, &p->cu->scope, pc, p->base);
 
             if (type_idx != _UPF_INVALID) {
                 const _upf_type *type = _upf_get_type(type_idx);
@@ -3204,9 +3209,7 @@ static _upf_range_vec _upf_get_address_ranges(void) {
 static const void *_upf_get_memory_region_end(const void *ptr) {
     for (uint32_t i = 0; i < _upf_state.addresses.length; i++) {
         _upf_range range = _upf_state.addresses.data[i];
-        if ((void *) range.start <= ptr && ptr <= (void *) range.end) {
-            return (void *) range.end;
-        }
+        if ((void *) range.start <= ptr && ptr <= (void *) range.end) return (void *) range.end;
     }
     return NULL;
 }
@@ -3372,13 +3375,11 @@ static void _upf_collect_circular_structs(_upf_indexed_struct_vec *seen, _upf_in
     if (type->kind != _UPF_TK_STRUCT && type->kind != _UPF_TK_UNION) return;
 
     for (uint32_t i = 0; i < circular->length; i++) {
-        if (data == circular->data[i].data && type == circular->data[i].type) {
-            return;
-        }
+        if (circular->data[i].data == data && circular->data[i].type == type) return;
     }
 
     for (uint32_t i = 0; i < seen->length; i++) {
-        if (data == seen->data[i].data && type == seen->data[i].type) {
+        if (seen->data[i].data == data && seen->data[i].type == type) {
             _UPF_VECTOR_PUSH(circular, seen->data[i]);
             return;
         }
@@ -3395,9 +3396,9 @@ static void _upf_collect_circular_structs(_upf_indexed_struct_vec *seen, _upf_in
     _upf_member_vec members = type->as.cstruct.members;
     for (uint32_t i = 0; i < members.length; i++) {
         const _upf_member *member = &members.data[i];
-        if (member->bit_size != 0) continue;
-
-        _upf_collect_circular_structs(seen, circular, data + member->offset, _upf_get_type(member->type), depth + 1);
+        if (member->bit_size == 0) {  // non-zero bit_size means bit field
+            _upf_collect_circular_structs(seen, circular, data + member->offset, _upf_get_type(member->type), depth + 1);
+        }
     }
 }
 
@@ -3450,7 +3451,7 @@ static void _upf_print_type(_upf_indexed_struct_vec *circular, const uint8_t *da
             }
 
             for (uint32_t i = 0; i < circular->length; i++) {
-                if (data == circular->data[i].data && type == circular->data[i].type) {
+                if (circular->data[i].data == data && circular->data[i].type == type) {
                     if (circular->data[i].is_visited) {
                         _upf_bprintf("<points to #%d>", circular->data[i].id);
                         return;
@@ -3500,7 +3501,7 @@ static void _upf_print_type(_upf_indexed_struct_vec *circular, const uint8_t *da
 
             const char *name = NULL;
             for (uint32_t i = 0; i < enums.length; i++) {
-                if (enum_value == enums.data[i].value) {
+                if (enums.data[i].value == enum_value) {
                     name = enums.data[i].name;
                     break;
                 }
@@ -3601,7 +3602,7 @@ static void _upf_print_type(_upf_indexed_struct_vec *circular, const uint8_t *da
             // Check pointer to function name mapping needed for extern functions
             const char *function_name = NULL;
             for (uint32_t i = 0; i < _upf_state.extern_functions.length; i++) {
-                if (absolute_function_pc == _upf_state.extern_functions.data[i].pc) {
+                if (_upf_state.extern_functions.data[i].pc == absolute_function_pc) {
                     function_name = _upf_state.extern_functions.data[i].name;
                     _UPF_ASSERT(function_name != NULL);
                     break;
@@ -3611,15 +3612,17 @@ static void _upf_print_type(_upf_indexed_struct_vec *circular, const uint8_t *da
             // Find function (and cu) which matches either name(extern) or PC(local)
             _upf_function *function = NULL;
             _upf_cu *cu = NULL;
-            for (uint32_t i = 0; i < _upf_state.cus.length && function == NULL; i++) {
+            for (uint32_t i = 0; i < _upf_state.cus.length; i++) {
                 cu = &_upf_state.cus.data[i];
+
                 for (uint32_t j = 0; j < cu->functions.length; j++) {
-                    if (function_name == NULL ? (relative_function_pc == cu->functions.data[j].pc)
-                                              : (strcmp(function_name, cu->functions.data[j].name) == 0)) {
+                    if (function_name == NULL ? (cu->functions.data[j].pc == relative_function_pc)
+                                              : (strcmp(cu->functions.data[j].name, function_name) == 0)) {
                         function = &cu->functions.data[j];
                         break;
                     }
                 }
+                if (function != NULL) break;
             }
 
             _upf_bprintf("%p", (void *) data);
@@ -3627,7 +3630,8 @@ static void _upf_print_type(_upf_indexed_struct_vec *circular, const uint8_t *da
                 _UPF_ASSERT(cu != NULL);
 
                 _upf_bprintf(" <");
-                size_t return_type_idx = function->return_type == NULL ? _upf_get_void_type() : _upf_parse_type(cu, function->return_type);
+                size_t return_type_idx
+                    = function->return_type_die == NULL ? _upf_get_void_type() : _upf_parse_type(cu, function->return_type_die);
                 _upf_print_typename(_upf_get_type(return_type_idx), true);
                 _upf_bprintf("%s(", function->name);
                 for (uint32_t i = 0; i < function->args.length; i++) {
