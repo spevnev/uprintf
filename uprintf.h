@@ -211,6 +211,7 @@ ssize_t getline(char **lineptr, size_t *n, FILE *stream);
 #define _UPF_DW_AT_abstract_origin 0x31
 #define _UPF_DW_AT_count 0x37
 #define _UPF_DW_AT_data_member_location 0x38
+#define _UPF_DW_AT_decl_line 0x3b
 #define _UPF_DW_AT_encoding 0x3e
 #define _UPF_DW_AT_type 0x49
 #define _UPF_DW_AT_ranges 0x55
@@ -474,6 +475,14 @@ typedef struct {
 _UPF_VECTOR_TYPEDEF(_upf_named_type_vec, _upf_named_type);
 
 typedef struct {
+    const uint8_t *die;
+    const char *name;
+    int64_t line;
+} _upf_variable;
+
+_UPF_VECTOR_TYPEDEF(_upf_variable_vec, _upf_variable);
+
+typedef struct {
     const char *name;
     const uint8_t *return_type;
     _upf_named_type_vec args;
@@ -504,7 +513,7 @@ _UPF_VECTOR_TYPEDEF(_upf_scope_vec, struct _upf_scope);
 
 typedef struct _upf_scope {
     _upf_range_vec ranges;
-    _upf_named_type_vec vars;
+    _upf_variable_vec vars;
     _upf_scope_vec scopes;
 } _upf_scope;
 
@@ -1706,16 +1715,17 @@ static _upf_range_vec _upf_get_ranges(const _upf_cu *cu, const uint8_t *die, uin
     return ranges;
 }
 
-static _upf_named_type _upf_get_var(const _upf_cu *cu, const uint8_t *die) {
+static _upf_variable _upf_get_var(const _upf_cu *cu, const uint8_t *die) {
     _UPF_ASSERT(cu != NULL && die != NULL);
 
     uint64_t code;
     die += _upf_uLEB_to_uint64(die, &code);
     const _upf_abbrev *abbrev = _upf_get_abbrev(cu, code);
 
-    _upf_named_type var = {
+    _upf_variable var = {
         .die = NULL,
         .name = NULL,
+        .line = -1,
     };
     for (size_t i = 0; i < abbrev->attrs.length; i++) {
         _upf_attr attr = abbrev->attrs.data[i];
@@ -1726,6 +1736,8 @@ static _upf_named_type _upf_get_var(const _upf_cu *cu, const uint8_t *die) {
             var.die = cu->base + _upf_get_ref(die, attr.form);
         } else if (attr.name == _UPF_DW_AT_abstract_origin) {
             return _upf_get_var(cu, cu->base + _upf_get_ref(die, attr.form));
+        } else if (attr.name == _UPF_DW_AT_decl_line) {
+            var.line = _upf_get_data(die, attr);
         }
 
         die += _upf_get_attr_size(die, attr.form);
@@ -2095,7 +2107,7 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *die, const uint
                 _upf_scope *scope = _UPF_VECTOR_TOP(&scope_stack).scope;
                 if (scope == NULL) break;
 
-                _upf_named_type var = _upf_get_var(&cu, die_base);
+                _upf_variable var = _upf_get_var(&cu, die_base);
                 if (var.name == NULL) break;
                 if (var.die == NULL) {
                     _UPF_ERROR(
@@ -2845,19 +2857,20 @@ static size_t _upf_get_return_type(size_t type_idx, int count) {
     return type_idx;
 }
 
-static const uint8_t *_upf_find_var_type(uint64_t pc, const char *var, const _upf_scope *scope) {
-    _UPF_ASSERT(var != NULL && scope != NULL);
+static const uint8_t *_upf_find_var_type(uint64_t pc, const char *var_name, const _upf_scope *scope) {
+    _UPF_ASSERT(var_name != NULL && scope != NULL);
 
     if (!_upf_is_in_range(pc, scope->ranges)) return NULL;
 
     for (size_t i = 0; i < scope->scopes.length; i++) {
-        const uint8_t *result = _upf_find_var_type(pc, var, &scope->scopes.data[i]);
+        const uint8_t *result = _upf_find_var_type(pc, var_name, &scope->scopes.data[i]);
         if (result != NULL) return result;
     }
 
     for (size_t i = 0; i < scope->vars.length; i++) {
-        if (strcmp(scope->vars.data[i].name, var) == 0) {
-            return scope->vars.data[i].die;
+        _upf_variable var = scope->vars.data[i];
+        if (var.line <= _upf_state.line && strcmp(var.name, var_name) == 0) {
+            return var.die;
         }
     }
 
@@ -3930,6 +3943,7 @@ __attribute__((noinline)) void _upf_uprintf(const char *file, int line, const ch
 #undef _UPF_DW_AT_abstract_origin
 #undef _UPF_DW_AT_count
 #undef _UPF_DW_AT_data_member_location
+#undef _UPF_DW_AT_decl_line
 #undef _UPF_DW_AT_encoding
 #undef _UPF_DW_AT_type
 #undef _UPF_DW_AT_ranges

@@ -1,3 +1,4 @@
+char = 118 ('v')
 int = 1
 double = 1.234000
 string = POINTER ("string variable")
@@ -10,3 +11,5 @@ bool false
 int 333
 float 0.123000
 c_str POINTER ("var")
+int = 4
+char = 99 ('c')
