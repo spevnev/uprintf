@@ -565,20 +565,6 @@ typedef struct {
     size_t idx;
 } _upf_tokenizer;
 
-enum _upf_base_type {
-    _UPF_BT_TYPENAME,
-    _UPF_BT_VARIABLE,
-    _UPF_BT_FUNCTION,
-};
-
-typedef struct {
-    int dereference;
-    int suffix_calls;
-    const char *base;
-    enum _upf_base_type base_type;
-    _upf_cstr_vec members;
-} _upf_parser_state;
-
 typedef struct {
     uint8_t *file;
     off_t file_size;
@@ -619,6 +605,21 @@ typedef struct {
 } _upf_cu;
 
 _UPF_VECTOR_TYPEDEF(_upf_cu_vec, _upf_cu);
+
+enum _upf_base_type {
+    _UPF_BT_TYPENAME,
+    _UPF_BT_VARIABLE,
+    _UPF_BT_FUNCTION,
+};
+
+typedef struct {
+    _upf_cu *cu;
+    int dereference;
+    int suffix_calls;
+    const char *base;
+    enum _upf_base_type base_type;
+    _upf_cstr_vec members;
+} _upf_parser_state;
 
 // =================== GLOBAL STATE =======================
 
@@ -2910,15 +2911,11 @@ static size_t _upf_get_member_type(const _upf_cstr_vec *member_names, size_t idx
     _UPF_ERROR("Unable to find member \"%s\" in \"%s\".", member_names->data[idx], type->name);
 }
 
-static size_t _upf_find_typename(_upf_parser_state *p, uint64_t pc) {
-    for (size_t i = 0; i < _upf_state.cus.length; i++) {
-        const _upf_cu *cu = &_upf_state.cus.data[i];
-        if (!_upf_is_in_range(pc, cu->scope.ranges)) continue;
+static size_t _upf_find_typename(_upf_parser_state *p) {
 
-        for (size_t j = 0; j < cu->types.length; j++) {
-            if (strcmp(cu->types.data[j].name, p->base) == 0) {
-                return _upf_parse_type(cu, cu->types.data[j].die);
-            }
+    for (size_t i = 0; i < p->cu->types.length; i++) {
+        if (strcmp(p->cu->types.data[i].name, p->base) == 0) {
+            return _upf_parse_type(p->cu, p->cu->types.data[i].die);
         }
     }
 
@@ -2926,36 +2923,27 @@ static size_t _upf_find_typename(_upf_parser_state *p, uint64_t pc) {
 }
 
 static size_t _upf_find_variable(_upf_parser_state *p, uint64_t pc) {
-    for (size_t i = 0; i < _upf_state.cus.length; i++) {
-        const _upf_cu *cu = &_upf_state.cus.data[i];
+    const uint8_t *type_die = _upf_find_var_type(pc, p->base, &p->cu->scope);
+    if (type_die == NULL) return _UPF_INVALID;
 
-        const uint8_t *type_die = _upf_find_var_type(pc, p->base, &cu->scope);
-        if (type_die == NULL) continue;
-
-        return _upf_parse_type(cu, type_die);
-    }
-
-    return _UPF_INVALID;
+    return _upf_parse_type(p->cu, type_die);
 }
 
-static size_t _upf_find_function(_upf_parser_state *p, uint64_t pc) {
-    for (size_t i = 0; i < _upf_state.cus.length; i++) {
-        const _upf_cu *cu = &_upf_state.cus.data[i];
-        if (!_upf_is_in_range(pc, cu->scope.ranges)) continue;
+static size_t _upf_find_function(_upf_parser_state *p) {
+    for (size_t i = 0; i < p->cu->functions.length; i++) {
+        _upf_function function = p->cu->functions.data[i];
 
-        for (size_t j = 0; j < cu->functions.length; j++) {
-            if (strcmp(cu->functions.data[j].name, p->base) == 0) {
-                if (cu->functions.data[j].return_type == NULL) {
-                    _upf_type type = {
-                        .name = "void",
-                        .kind = _UPF_TK_VOID,
-                        .modifiers = 0,
-                        .size = _UPF_INVALID,
-                    };
-                    return _upf_add_type(NULL, type);
-                } else {
-                    return _upf_parse_type(cu, cu->functions.data[j].return_type);
-                }
+        if (strcmp(function.name, p->base) == 0) {
+            if (function.return_type == NULL) {
+                _upf_type type = {
+                    .name = "void",
+                    .kind = _UPF_TK_VOID,
+                    .modifiers = 0,
+                    .size = _UPF_INVALID,
+                };
+                return _upf_add_type(NULL, type);
+            } else {
+                return _upf_parse_type(p->cu, function.return_type);
             }
         }
     }
@@ -2967,7 +2955,7 @@ static size_t _upf_get_base_type(_upf_parser_state *p, uint64_t pc, const char *
     size_t type_idx = _UPF_INVALID;
     switch (p->base_type) {
         case _UPF_BT_TYPENAME:
-            type_idx = _upf_find_typename(p, pc);
+            type_idx = _upf_find_typename(p);
 
             if (type_idx == _UPF_INVALID) {
                 _UPF_ERROR(
@@ -2980,7 +2968,7 @@ static size_t _upf_get_base_type(_upf_parser_state *p, uint64_t pc, const char *
             type_idx = _upf_find_variable(p, pc);
             if (type_idx != _UPF_INVALID) break;
 
-            if (_upf_find_function(p, pc) != _UPF_INVALID) {
+            if (_upf_find_function(p) != _UPF_INVALID) {
                 _upf_type type = {
                     .name = NULL,
                     .kind = _UPF_TK_FUNCTION,
@@ -3009,7 +2997,7 @@ static size_t _upf_get_base_type(_upf_parser_state *p, uint64_t pc, const char *
 
                 type_idx = type->as.function.return_type;
             } else {
-                type_idx = _upf_find_function(p, pc);
+                type_idx = _upf_find_function(p);
             }
 
             if (type_idx == _UPF_INVALID) {
@@ -3092,7 +3080,17 @@ static const _upf_type *_upf_get_arg_type(const char *arg, uint64_t pc) {
     };
     _upf_tokenize(&t, arg);
 
+    _upf_cu *cu = NULL;
+    for (uint32_t i = 0; i < _upf_state.cus.length; i++) {
+        if (_upf_is_in_range(pc, _upf_state.cus.data[i].scope.ranges)) {
+            cu = &_upf_state.cus.data[i];
+            break;
+        }
+    }
+    _UPF_ASSERT(cu != NULL);
+
     _upf_parser_state p = {
+        .cu = cu,
         .dereference = 0,
         .suffix_calls = 0,
         .base = NULL,
