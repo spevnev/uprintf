@@ -595,6 +595,7 @@ typedef struct {
 
     _upf_abbrev_vec abbrevs;
     _upf_named_type_vec types;
+    _upf_size_t_vec int_types;
     _upf_function_vec functions;
 
     uint64_t addr_base;
@@ -2002,6 +2003,7 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *die, const uint
         .base = cu_base,
         .abbrevs = _upf_parse_abbrevs(abbrev_table),
         .types = _UPF_VECTOR_NEW(&_upf_state.arena),
+        .int_types = _UPF_VECTOR_NEW(&_upf_state.arena),
         .functions = _UPF_VECTOR_NEW(&_upf_state.arena),
         .addr_base = 0,
         .str_offsets_base = _UPF_INVALID,
@@ -2455,7 +2457,7 @@ static _upf_token _upf_consume2(_upf_tokenizer *t, ...) {
 static bool _upf_parse_unary_expr(_upf_tokenizer *t, _upf_parser_state *p);
 static bool _upf_parse_expr(_upf_tokenizer *t, _upf_parser_state *p);
 
-static const char *_upf_modifier_typename_to_stdint(int type, bool is_signed, int longness) {
+static const char *_upf_modifier_typename_to_stdint(_upf_cu *cu, int type, bool is_signed, int longness) {
     if (type == _UPF_DW_ATE_signed_char) {
         return is_signed ? "char" : "unsigned char";
     } else if (type == _UPF_DW_ATE_float) {
@@ -2494,12 +2496,22 @@ static const char *_upf_modifier_typename_to_stdint(int type, bool is_signed, in
         }
 
         if (snprintf(name + offset, 5, "%d_t", size * 8) < 3) _UPF_ERROR("Error in snprintf: %s.", strerror(errno));
+
+        _upf_type type = {
+            .name = name,
+            .kind = _upf_get_type_kind(is_signed ? _UPF_DW_ATE_signed : _UPF_DW_ATE_unsigned, size),
+            .modifiers = 0,
+            .size = size,
+        };
+        size_t idx = _upf_add_type(NULL, type);
+        _UPF_VECTOR_PUSH(&cu->int_types, idx);
+
         return name;
     }
     _UPF_UNREACHABLE();
 }
 
-static bool _upf_parse_typename(_upf_tokenizer *t, const char **typename, int *dereference) {
+static bool _upf_parse_typename(_upf_tokenizer *t, _upf_cu *cu, const char **typename, int *dereference) {
     _UPF_ASSERT(t != NULL);
     // pointer
     // 	: '*' type_qualifier[] pointer
@@ -2511,7 +2523,7 @@ static bool _upf_parse_typename(_upf_tokenizer *t, const char **typename, int *d
     // 	| specifier_qualifier[]
 
     bool is_type = false;
-    const char *ids[4];
+    const char *ids[4];  // max is "unsigned long long int"
     int ids_length = 0;
     while (true) {
         _upf_token token = _upf_consume(t, _UPF_TOK_TYPE_SPECIFIER, _UPF_TOK_TYPE_QUALIFIER, _UPF_TOK_ID);
@@ -2539,13 +2551,16 @@ static bool _upf_parse_typename(_upf_tokenizer *t, const char **typename, int *d
     for (int i = 0; i < ids_length; i++) {
         if (strcmp(ids[i], "long") == 0) longness++;
         else if (strcmp(ids[i], "short") == 0) longness--;
+        else if (strcmp(ids[i], "int") == 0) continue;
         else if (strcmp(ids[i], "unsigned") == 0) is_signed = false;
+        else if (strcmp(ids[i], "signed") == 0) is_signed = true;
         else if (strcmp(ids[i], "char") == 0) type = _UPF_DW_ATE_signed_char;
         else if (strcmp(ids[i], "double") == 0) type = _UPF_DW_ATE_float;
         else is_base_type = false;
     }
     if (is_base_type) {
-        *typename = _upf_modifier_typename_to_stdint(type, is_signed, longness);
+        // TODO: not stdint
+        *typename = _upf_modifier_typename_to_stdint(cu, type, is_signed, longness);
     } else {
         _UPF_ASSERT(ids_length == 1);
         *typename = ids[0];
@@ -2564,7 +2579,7 @@ static bool _upf_parse_cast_expr(_upf_tokenizer *t, _upf_parser_state *p) {
     int dereference;
     size_t save = t->idx;
     if (_upf_consume(t, _UPF_TOK_OPEN_PAREN).kind != _UPF_TOK_NONE &&   //
-        _upf_parse_typename(t, &typename, &dereference) &&              //
+        _upf_parse_typename(t, p->cu, &typename, &dereference) &&       //
         _upf_consume(t, _UPF_TOK_CLOSE_PAREN).kind != _UPF_TOK_NONE &&  //
         _upf_parse_cast_expr(t, NULL)) {
         if (p) {
@@ -2795,7 +2810,7 @@ static bool _upf_parse_unary_expr(_upf_tokenizer *t, _upf_parser_state *p) {
     if (token.kind == _UPF_TOK_ID) {
         if (strcmp(token.string, "sizeof") == 0) {
             size_t save2 = t->idx;
-            if (_upf_consume(t, _UPF_TOK_OPEN_PAREN).kind != _UPF_TOK_NONE && _upf_parse_typename(t, NULL, NULL)
+            if (_upf_consume(t, _UPF_TOK_OPEN_PAREN).kind != _UPF_TOK_NONE && _upf_parse_typename(t, p->cu, NULL, NULL)
                 && _upf_consume(t, _UPF_TOK_CLOSE_PAREN).kind != _UPF_TOK_NONE) {
                 return true;
             }
@@ -2809,7 +2824,7 @@ static bool _upf_parse_unary_expr(_upf_tokenizer *t, _upf_parser_state *p) {
         }
 
         if (strcmp(token.string, "_Alignof") == 0 || strcmp(token.string, "alignof") == 0) {
-            if (_upf_consume(t, _UPF_TOK_OPEN_PAREN).kind == _UPF_TOK_NONE || !_upf_parse_typename(t, NULL, NULL)
+            if (_upf_consume(t, _UPF_TOK_OPEN_PAREN).kind == _UPF_TOK_NONE || !_upf_parse_typename(t, p->cu, NULL, NULL)
                 || _upf_consume(t, _UPF_TOK_CLOSE_PAREN).kind == _UPF_TOK_NONE) {
                 t->idx = save;
                 return false;
@@ -2912,6 +2927,12 @@ static size_t _upf_get_member_type(const _upf_cstr_vec *member_names, size_t idx
 }
 
 static size_t _upf_find_typename(_upf_parser_state *p) {
+    for (size_t i = 0; i < p->cu->int_types.length; i++) {
+        const _upf_type *type = _upf_get_type(p->cu->int_types.data[i]);
+        if (strcmp(type->name, p->base) == 0) {
+            return p->cu->int_types.data[i];
+        }
+    }
 
     for (size_t i = 0; i < p->cu->types.length; i++) {
         if (strcmp(p->cu->types.data[i].name, p->base) == 0) {
