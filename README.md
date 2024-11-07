@@ -959,13 +959,49 @@ This way you should be able to include it without copying the header to every pr
 
 ### Tested on:
 
-Architectures: \
-`x86_64`, `amd64`
+Architectures: `x86_64/amd64`
 
 Compilers: \
 `gcc-14.2`, `gcc-13.3`, `gcc-12.4` \
 `clang-18`, `clang-17`, `clang-14`
 
+### Limitations
+
+1. Casting to function pointer, e.g.:
+    ```c
+    uprintf("%S\n", (void (*)(void)) whatever);
+    ```
+2. Variable shadowing on the same line, e.g.:
+    ```c
+    char var = 'c';
+
+    // Valid:
+    {
+        uprintf("%S\n", &var); // prints char
+        int var = 1;
+        uprintf("%S\n", &var); // prints int
+    }
+    {
+        uprintf("%S\n", &var); // prints char
+        int var = 1; uprintf("%S\n", &var); // prints int
+    }
+
+    // Invalid:
+    {
+        uprintf("%S\n", &var); int var = 1; // prints char as int
+        uprintf("%S\n", &var);
+    }
+    {
+        uprintf("%S\n", &var); int var = 1; uprintf("%S\n", &var); // prints char as int
+    }
+    ```
+
+3. Printing information about function from shared library with clang:
+    ```c
+    uprintf("%S\n", printf);
+    // gcc  : 0x12345678 <void printf(const char *, ...)>
+    // clang: 0x12345678
+    ```
 
 ## Usage
 
