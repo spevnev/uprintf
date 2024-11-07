@@ -1989,9 +1989,7 @@ static _upf_function _upf_parse_cu_subprogram(_upf_cu *cu, const uint8_t *die, c
         die += _upf_get_attr_size(die, attr.form);
     }
 
-    if (abbrev->has_children && function.args.length == 0) {
-        _upf_parse_subprogram_parameters(cu, die, &function);
-    }
+    if (abbrev->has_children && function.args.length == 0) _upf_parse_subprogram_parameters(cu, die, &function);
 
     return function;
 }
@@ -2559,7 +2557,6 @@ static bool _upf_parse_typename(_upf_tokenizer *t, _upf_cu *cu, const char **typ
         else is_base_type = false;
     }
     if (is_base_type) {
-        // TODO: not stdint
         *typename = _upf_modifier_typename_to_stdint(cu, type, is_signed, longness);
     } else {
         _UPF_ASSERT(ids_length == 1);
@@ -3718,7 +3715,7 @@ static void _upf_print_type(_upf_indexed_struct_vec *circular, const uint8_t *da
             if (_upf_is_printable(ch)) _upf_bprintf(" ('%s')", _upf_escape_char(ch));
         } break;
         case _UPF_TK_VOID:
-            _UPF_WARN("void must be a pointer. Ignoring this type.");
+            _UPF_WARN("Void must be a pointer. Ignoring this type.");
             break;
         case _UPF_TK_UNKNOWN:
             _upf_bprintf("<unknown>");
@@ -3755,7 +3752,10 @@ static void _upf_parse_extern_functions(void) {
                 break;
         }
     }
-    _UPF_ASSERT(str_tab != NULL && sym_tab != NULL && rela_tab != NULL && rela_size != -1);
+    if (str_tab == NULL || sym_tab == NULL || rela_tab == NULL || rela_size == -1) {
+        _UPF_WARN("Unable to find one of the required ELF sections. Ignoring extern functions.");
+        return;
+    }
 
     for (int i = 0; i < rela_size; i++) {
         Elf64_Rela rela = rela_tab[i];
