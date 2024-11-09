@@ -92,13 +92,14 @@ extern int _upf_test_status;
 
 // ===================== INCLUDES =========================
 
-#ifndef __USE_XOPEN_EXTENDED
 #define __USE_XOPEN_EXTENDED
-#endif
+#define _GNU_SOURCE
 
+#include <dlfcn.h>
 #include <elf.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <link.h>
 #include <setjmp.h>
 #include <stdarg.h>
 #include <stdbool.h>
@@ -119,11 +120,20 @@ extern int _upf_test_status;
 ssize_t readlink(const char *path, char *buf, size_t bufsiz);
 ssize_t getline(char **lineptr, size_t *n, FILE *stream);
 
+// Part of dl_phdr_info used instead of it, since it may not be defined, but we
+// also cannot define it ourselves since it could cause redefinition error.
+typedef struct {
+    Elf64_Addr dlpi_addr;
+    const char *dlpi_name;
+} _upf_dl_phdr_info;
+
+struct dl_phdr_info;
+int dl_iterate_phdr(int (*callback)(struct dl_phdr_info *info, size_t size, void *data), void *data);
+
 // ===================== dwarf.h ==========================
 
 // dwarf.h's location is inconsistent and the package containing it may not be
-// install, so this is a partial implementation used instead of the header for
-// consistency and convenience.
+// install, so we include a partial implementation of the header.
 
 #define DW_UT_compile 0x01
 
@@ -1234,16 +1244,15 @@ static size_t _upf_add_type(const uint8_t *type_die, _upf_type type) {
 
 static size_t _upf_get_void_type(void) {
     static size_t idx = UINT64_MAX;
+    if (idx != UINT64_MAX) return idx;
 
-    if (idx == UINT64_MAX) {
-        _upf_type type = {
-            .name = "void",
-            .kind = _UPF_TK_VOID,
-            .modifiers = 0,
-            .size = UINT64_MAX,
-        };
-        idx = _upf_add_type(NULL, type);
-    }
+    _upf_type type = {
+        .name = "void",
+        .kind = _UPF_TK_VOID,
+        .modifiers = 0,
+        .size = UINT64_MAX,
+    };
+    idx = _upf_add_type(NULL, type);
 
     return idx;
 }
@@ -2194,10 +2203,92 @@ static void _upf_parse_dwarf(void) {
     }
 }
 
+// ===================== GETTING PC =======================
+
+static int _upf_phdr_callback(struct dl_phdr_info *info_, size_t _size, void *data_) {
+    _upf_dl_phdr_info *info = (_upf_dl_phdr_info *) info_;
+    (void) _size;
+    void **data = data_;
+
+    // Empty name seems to indicate current executable
+    if (strcmp(info->dlpi_name, "") == 0) {
+        *data = (void *) info->dlpi_addr;
+        return 1;  // return non-zero value to exit early
+    }
+    return 0;
+}
+
+// Returns address at which the current executable is loaded in memory.
+static void *_upf_get_this_executable_address(void) {
+    static void *base = NULL;
+    if (base != NULL) return base;
+
+    dl_iterate_phdr(&_upf_phdr_callback, &base);
+    _UPF_ASSERT(base != NULL);
+    return base;
+}
+
+__attribute__((noinline)) static uint64_t _upf_get_pc(void) {
+    return (uint64_t) __builtin_extract_return_addr(__builtin_return_address(0));
+}
+
 // ======================= ELF ============================
 
 // Linker-generated entry to dynamic section of ELF.
 extern Elf64_Dyn _DYNAMIC[];
+
+// Extern function mapping: function pointer -> GOT -> RELA -> symbol -> name -> DIE
+static void _upf_parse_extern_functions(void) {
+    _UPF_ASSERT(_DYNAMIC != NULL);
+
+    const uint8_t *base = _upf_get_this_executable_address();
+
+    const char *string_table = NULL;
+    const Elf64_Sym *symbol_table = NULL;
+    const Elf64_Rela *rela_table = NULL;
+    int rela_size = -1;
+    for (Elf64_Dyn *dyn = _DYNAMIC; dyn->d_tag != DT_NULL; dyn++) {
+        switch (dyn->d_tag) {
+            case DT_STRTAB:
+                string_table = (char *) dyn->d_un.d_ptr;
+                break;
+            case DT_SYMTAB:
+                symbol_table = (Elf64_Sym *) dyn->d_un.d_ptr;
+                break;
+            case DT_RELA:
+                rela_table = (Elf64_Rela *) dyn->d_un.d_ptr;
+                break;
+            case DT_RELASZ:
+                rela_size = dyn->d_un.d_val / sizeof(Elf64_Rela);
+                break;
+            case DT_RELAENT:
+                _UPF_ASSERT(dyn->d_un.d_val == sizeof(Elf64_Rela));
+                break;
+        }
+    }
+    if (string_table == NULL || symbol_table == NULL || rela_table == NULL || rela_size == -1) {
+        _UPF_WARN("Unable to find one of the required ELF sections. Ignoring extern functions.");
+        return;
+    }
+
+    for (int i = 0; i < rela_size; i++) {
+        Elf64_Rela rela = rela_table[i];
+
+        int symbol_idx = ELF64_R_SYM(rela.r_info);
+        if (symbol_idx == STN_UNDEF) continue;
+
+        Elf64_Sym symbol = symbol_table[symbol_idx];
+        const char *symbol_name = string_table + symbol.st_name;
+        uint64_t symbol_address = *((uint64_t *) (base + rela.r_offset));
+
+        _upf_extern_function extern_function = {
+            .name = symbol_name,
+            .pc = symbol_address,
+        };
+
+        _UPF_VECTOR_PUSH(&_upf_state.extern_functions, extern_function);
+    }
+}
 
 static void _upf_parse_elf(void) {
     struct stat file_info;
@@ -3128,49 +3219,6 @@ static const _upf_type *_upf_get_arg_type(const char *arg, uint64_t pc) {
     return _upf_get_type(type);
 }
 
-// ===================== GETTING PC =======================
-
-// Function returns the address to which this executable is mapped to.
-// It is retrieved by reading `/proc/self/maps` (see `man proc_pid_maps`).
-// It is used to convert between DWARF addresses and runtime/real ones: DWARF
-// addresses are relative to the beginning of the file, thus real = base + dwarf.
-static void *_upf_get_this_file_address(void) {
-    static const ssize_t PATH_BUFFER_SIZE = 1024;
-
-    char this_path[PATH_BUFFER_SIZE];
-    ssize_t read = readlink("/proc/self/exe", this_path, PATH_BUFFER_SIZE);
-    if (read == -1) _UPF_ERROR("Unable to readlink \"/proc/self/exe\": %s.", strerror(errno));
-    if (read == PATH_BUFFER_SIZE) _UPF_ERROR("Unable to readlink \"/proc/self/exe\": path is too long.");
-    this_path[read] = '\0';
-
-    FILE *file = fopen("/proc/self/maps", "r");
-    if (file == NULL) _UPF_ERROR("Unable to open \"/proc/self/maps\": %s.", strerror(errno));
-
-    uint64_t address = UINT64_MAX;
-    size_t length = 0;
-    char *line = NULL;
-    while ((read = getline(&line, &length, file)) != -1) {
-        if (read == 0) continue;
-        if (line[read - 1] == '\n') line[read - 1] = '\0';
-
-        int path_offset;
-        if (sscanf(line, "%lx-%*x %*s %*x %*x:%*x %*u %n", &address, &path_offset) != 1) {
-            _UPF_ERROR("Unable to parse \"/proc/self/maps\": invalid format.");
-        }
-
-        if (strcmp(this_path, line + path_offset) == 0) break;
-    }
-    if (line) free(line);
-    fclose(file);
-
-    _UPF_ASSERT(address != UINT64_MAX);
-    return (void *) address;
-}
-
-__attribute__((noinline)) static uint64_t _upf_get_pc(void) {
-    return (uint64_t) __builtin_extract_return_addr(__builtin_return_address(0));
-}
-
 // ================== /proc/pid/maps ======================
 
 static _upf_range_vec _upf_get_address_ranges(void) {
@@ -3717,57 +3765,6 @@ static void _upf_print_type(_upf_indexed_struct_vec *circular, const uint8_t *da
 
 // =================== ENTRY POINTS =======================
 
-// Extern function mapping: function pointer -> GOT -> RELA -> symbol -> name -> DIE
-static void _upf_parse_extern_functions(void) {
-    const uint8_t *base = _upf_get_this_file_address();
-
-    const char *string_table = NULL;
-    const Elf64_Sym *symbol_table = NULL;
-    const Elf64_Rela *rela_table = NULL;
-    int rela_size = -1;
-    for (Elf64_Dyn *dyn = _DYNAMIC; dyn->d_tag != DT_NULL; dyn++) {
-        switch (dyn->d_tag) {
-            case DT_STRTAB:
-                string_table = (char *) dyn->d_un.d_ptr;
-                break;
-            case DT_SYMTAB:
-                symbol_table = (Elf64_Sym *) dyn->d_un.d_ptr;
-                break;
-            case DT_RELA:
-                rela_table = (Elf64_Rela *) dyn->d_un.d_ptr;
-                break;
-            case DT_RELASZ:
-                rela_size = dyn->d_un.d_val / sizeof(Elf64_Rela);
-                break;
-            case DT_RELAENT:
-                _UPF_ASSERT(dyn->d_un.d_val == sizeof(Elf64_Rela));
-                break;
-        }
-    }
-    if (string_table == NULL || symbol_table == NULL || rela_table == NULL || rela_size == -1) {
-        _UPF_WARN("Unable to find one of the required ELF sections. Ignoring extern functions.");
-        return;
-    }
-
-    for (int i = 0; i < rela_size; i++) {
-        Elf64_Rela rela = rela_table[i];
-
-        int symbol_idx = ELF64_R_SYM(rela.r_info);
-        if (symbol_idx == STN_UNDEF) continue;
-
-        Elf64_Sym symbol = symbol_table[symbol_idx];
-        const char *symbol_name = string_table + symbol.st_name;
-        uint64_t symbol_address = *((uint64_t *) (base + rela.r_offset));
-
-        _upf_extern_function extern_function = {
-            .name = symbol_name,
-            .pc = symbol_address,
-        };
-
-        _UPF_VECTOR_PUSH(&_upf_state.extern_functions, extern_function);
-    }
-}
-
 __attribute__((constructor)) void _upf_init(void) {
     if (setjmp(_upf_state.jmp_buf) != 0) return;
 
@@ -3820,7 +3817,7 @@ __attribute__((noinline)) void _upf_uprintf(const char *file_path, int line, con
         if (is_pc_absolute) {
             _upf_state.pc_base = NULL;
         } else {
-            _upf_state.pc_base = _upf_get_this_file_address();
+            _upf_state.pc_base = _upf_get_this_executable_address();
         }
     }
 
