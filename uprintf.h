@@ -299,7 +299,6 @@ int _upf_test_status = EXIT_SUCCESS;
     } while (0)
 
 #define _UPF_OUT_OF_MEMORY() _UPF_ERROR("Process ran out of memory.")
-#define _UPF_UNREACHABLE() _UPF_ERROR("Unreachable.");
 
 // ====================== VECTOR ==========================
 
@@ -850,7 +849,7 @@ static bool _upf_is_primitive(const _upf_type *type) {
         case _UPF_TK_UNKNOWN:
             return true;
     }
-    _UPF_UNREACHABLE();
+    _UPF_ERROR("Invalid type: %d.", type->kind);
 }
 
 // ====================== DWARF ===========================
@@ -955,7 +954,7 @@ static size_t _upf_get_attr_size(const uint8_t *die, uint64_t form) {
         case DW_FORM_implicit_const:
             return 0;
     }
-    _UPF_UNREACHABLE();
+    _UPF_ERROR("Invalid DWARF attribute type(form): %lu.", form);
 }
 
 static uint64_t _upf_get_x_offset(const uint8_t *die, uint64_t form) {
@@ -984,7 +983,7 @@ static uint64_t _upf_get_x_offset(const uint8_t *die, uint64_t form) {
             _upf_uLEB_to_uint64(die, &offset);
             return offset;
     }
-    _UPF_UNREACHABLE();
+    _UPF_ERROR("Invalid DWARF x-* type(form): %lu.", form);
 }
 
 static const char *_upf_get_str(const _upf_cu *cu, const uint8_t *die, uint64_t form) {
@@ -1008,7 +1007,7 @@ static const char *_upf_get_str(const _upf_cu *cu, const uint8_t *die, uint64_t 
             return _upf_state.str + _upf_offset_cast(_upf_state.str_offsets + cu->str_offsets_base + offset);
         }
     }
-    _UPF_UNREACHABLE();
+    _UPF_ERROR("Invalid DWARF string type(form): %lu.", form);
 }
 
 static uint64_t _upf_get_ref(const uint8_t *die, uint64_t form) {
@@ -1072,7 +1071,7 @@ static int64_t _upf_get_data(const uint8_t *die, _upf_attr attr) {
             return data;
         } break;
     }
-    _UPF_UNREACHABLE();
+    _UPF_ERROR("Invalid DWARF data type(form): %lu.", attr.form);
 }
 
 static bool _upf_is_addr(uint64_t form) {
@@ -1105,7 +1104,7 @@ static uint64_t _upf_get_addr(const _upf_cu *cu, const uint8_t *die, uint64_t fo
             return _upf_address_cast(_upf_state.addr + offset);
         }
     }
-    _UPF_UNREACHABLE();
+    _UPF_ERROR("Invalid DWARF address type(form): %lu.", form);
 }
 
 static const uint8_t *_upf_skip_die(const uint8_t *die, const _upf_abbrev *abbrev) {
@@ -1208,7 +1207,7 @@ static int _upf_get_type_modifier(uint64_t tag) {
         case DW_TAG_atomic_type:   return _UPF_MOD_ATOMIC;
     }
     // clang-format on
-    _UPF_UNREACHABLE();
+    _UPF_ERROR("Invalid DWARF type modifier: %lu.", tag);
 }
 
 static _upf_type _upf_get_subarray(const _upf_type *array, int count) {
@@ -1492,7 +1491,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                             skip_member = true;
                         }
                     } else if (attr.name == DW_AT_bit_offset) {
-                        _UPF_WARN("Bit offset uses old format. Skipping this field.");
+                        _UPF_WARN("DW_AT_bit_offset is deprecated in DWARF v5. Skipping this field.");
                         skip_member = true;
                     } else if (attr.name == DW_AT_data_bit_offset) {
                         member.offset = _upf_get_data(die, attr);
@@ -2303,7 +2302,7 @@ static void _upf_parse_elf(void) {
     }
 
     if (_upf_state.die == NULL || _upf_state.abbrev == NULL || _upf_state.str == NULL) {
-        _UPF_ERROR("Unable to find debugging information. Ensure that the executable contains it by using -g2 or -g3.");
+        _UPF_ERROR("Unable to find debugging information. Ensure that the executable contains it by compiling with `-g2` or `-g3`.");
     }
 }
 
@@ -2549,7 +2548,7 @@ static const char *_upf_modifier_typename_to_stdint(_upf_cu *cu, int type, bool 
                 size = sizeof(long long int);
                 break;
             default:
-                _UPF_UNREACHABLE();
+                goto error;
         }
 
         if (snprintf(name + offset, 5, "%d_t", size * 8) < 3) _UPF_ERROR("Error in snprintf: %s.", strerror(errno));
@@ -2565,7 +2564,9 @@ static const char *_upf_modifier_typename_to_stdint(_upf_cu *cu, int type, bool 
 
         return name;
     }
-    _UPF_UNREACHABLE();
+
+error:
+    _UPF_ERROR("Invalid integer type.");
 }
 
 static bool _upf_parse_typename(const char **typename, int *dereference, _upf_tokenizer *t, _upf_cu *cu) {
@@ -3124,14 +3125,14 @@ static size_t _upf_dereference_type(size_t type_idx, int dereference, const char
             dereference = 0;
         } else {
         not_pointer_error:
-            _UPF_ERROR("Arguments must be pointers to data that should be printed. You must take pointer (&) of \"%s\" at %s:%d.", arg,
+            _UPF_ERROR("Arguments must be pointers to data that should be printed. You must get pointer (&) of \"%s\" at %s:%d.", arg,
                        _upf_state.file_path, _upf_state.line);
         }
 
         if (type_idx == UINT64_MAX) {
             _UPF_ERROR(
-                "Unable to print void* because it can point to arbitrary data of any length. "
-                "To print the pointer itself, you must take pointer (&) of \"%s\" at %s:%d.",
+                "Unable to print `void*` because it can point to arbitrary data of any length. "
+                "To print the pointer itself, you must get pointer (&) of \"%s\" at %s:%d.",
                 arg, _upf_state.file_path, _upf_state.line);
         }
     }
@@ -3849,7 +3850,6 @@ __attribute__((noinline)) void _upf_uprintf(const char *file_path, int line, con
 #undef _UPF_WARN
 #undef _UPF_ASSERT
 #undef _UPF_OUT_OF_MEMORY
-#undef _UPF_UNREACHABLE
 #undef _UPF_INITIAL_VECTOR_CAPACITY
 #undef _UPF_VECTOR_TYPEDEF
 #undef _UPF_VECTOR_NEW
