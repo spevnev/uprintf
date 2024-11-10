@@ -2672,8 +2672,8 @@ static bool _upf_parse_cast_expr(_upf_tokenizer *t, _upf_parser_state *p) {
     // 	: unary_expr
     // 	| '(' typename ')' cast_expr
 
-    const char *typename;
-    int dereference;
+    const char *typename = NULL;
+    int dereference = 0;
     size_t save = t->idx;
     if (_upf_consume(t, _UPF_TOK_OPEN_PAREN).kind != _UPF_TOK_NONE &&   //
         _upf_parse_typename(&typename, &dereference, t, p->cu) &&       //
