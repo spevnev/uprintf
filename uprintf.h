@@ -545,7 +545,6 @@ typedef struct {
 
     _upf_abbrev_vec abbrevs;
     _upf_named_type_vec types;
-    _upf_size_t_vec int_types;
     _upf_function_vec functions;
 } _upf_cu;
 
@@ -593,7 +592,8 @@ typedef struct {
 } _upf_tokenizer;
 
 enum _upf_base_type {
-    _UPF_BT_TYPENAME,
+    _UPF_BT_INT_TYPE,
+    _UPF_BT_TYPE,
     _UPF_BT_VARIABLE,
     _UPF_BT_FUNCTION,
 };
@@ -602,7 +602,10 @@ typedef struct {
     _upf_cu *cu;
     int dereference;
     int suffix_calls;
-    const char *base;
+    union {
+        const char *name;
+        uint64_t idx;
+    } base;
     enum _upf_base_type base_type;
     _upf_cstr_vec members;
 } _upf_parser_state;
@@ -2019,7 +2022,6 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *die, const uint
         .rnglists_base = UINT64_MAX,
         .abbrevs = _upf_parse_abbrevs(abbrev_table),
         .types = _UPF_VECTOR_NEW(&_upf_state.arena),
-        .int_types = _UPF_VECTOR_NEW(&_upf_state.arena),
         .functions = _UPF_VECTOR_NEW(&_upf_state.arena),
     };
 
@@ -2513,63 +2515,7 @@ static _upf_token _upf_consume2(_upf_tokenizer *t, ...) {
 static bool _upf_parse_unary_expr(_upf_tokenizer *t, _upf_parser_state *p);
 static bool _upf_parse_expr(_upf_tokenizer *t, _upf_parser_state *p);
 
-static const char *_upf_modifier_typename_to_stdint(_upf_cu *cu, int type, bool is_signed, int longness) {
-    if (type == DW_ATE_signed_char) {
-        return is_signed ? "char" : "unsigned char";
-    } else if (type == DW_ATE_float) {
-        if (longness == 1 && sizeof(long double) > sizeof(double)) {
-            _UPF_WARN("Long doubles aren't supported. Ignoring this type.");
-            return NULL;
-        }
-        return "double";
-    } else if (type == DW_ATE_signed) {
-        int offset;
-        char *name = _upf_arena_alloc(&_upf_state.arena, 9);
-        if (is_signed) {
-            offset = 3;
-            memcpy(name, "int", offset);
-        } else {
-            offset = 4;
-            memcpy(name, "uint", offset);
-        }
-
-        int size;
-        switch (longness) {
-            case -1:
-                size = sizeof(short int);
-                break;
-            case 0:
-                size = sizeof(int);
-                break;
-            case 1:
-                size = sizeof(long int);
-                break;
-            case 2:
-                size = sizeof(long long int);
-                break;
-            default:
-                goto error;
-        }
-
-        if (snprintf(name + offset, 5, "%d_t", size * 8) < 3) _UPF_ERROR("Error in snprintf: %s.", strerror(errno));
-
-        _upf_type type = {
-            .name = name,
-            .kind = _upf_get_type_kind(is_signed ? DW_ATE_signed : DW_ATE_unsigned, size),
-            .modifiers = 0,
-            .size = size,
-        };
-        size_t idx = _upf_add_type(NULL, type);
-        _UPF_VECTOR_PUSH(&cu->int_types, idx);
-
-        return name;
-    }
-
-error:
-    _UPF_ERROR("Invalid integer type.");
-}
-
-static bool _upf_parse_typename(const char **typename, int *dereference, _upf_tokenizer *t, _upf_cu *cu) {
+static bool _upf_parse_typename(int *dereference, const char **typename, size_t *type_idx, _upf_tokenizer *t) {
     _UPF_ASSERT(t != NULL);
     // pointer
     // 	: '*' type_qualifier[] pointer
@@ -2600,29 +2546,90 @@ static bool _upf_parse_typename(const char **typename, int *dereference, _upf_to
         while (_upf_consume(t, _UPF_TOK_TYPE_QUALIFIER).kind != _UPF_TOK_NONE) continue;
     }
 
-    if (typename == NULL) return true;
+    if (typename == NULL && type_idx == NULL) return true;
 
-    bool is_base_type = true;
-    int type = DW_ATE_signed;
+    int kind = DW_ATE_signed;
     bool is_signed = true;
     int longness = 0;
     for (int i = 0; i < ids_length; i++) {
-        if (strcmp(ids[i], "long") == 0) longness++;
-        else if (strcmp(ids[i], "short") == 0) longness--;
-        else if (strcmp(ids[i], "int") == 0) continue;
-        else if (strcmp(ids[i], "unsigned") == 0) is_signed = false;
-        else if (strcmp(ids[i], "signed") == 0) is_signed = true;
-        else if (strcmp(ids[i], "char") == 0) type = DW_ATE_signed_char;
-        else if (strcmp(ids[i], "double") == 0) type = DW_ATE_float;
-        else is_base_type = false;
-    }
-    if (is_base_type) {
-        *typename = _upf_modifier_typename_to_stdint(cu, type, is_signed, longness);
-    } else {
-        _UPF_ASSERT(ids_length == 1);
-        *typename = ids[0];
+        if (strcmp(ids[i], "long") == 0) {
+            longness++;
+        } else if (strcmp(ids[i], "short") == 0) {
+            longness--;
+        } else if (strcmp(ids[i], "unsigned") == 0) {
+            is_signed = false;
+        } else if (strcmp(ids[i], "signed") == 0) {
+            is_signed = true;
+        } else if (strcmp(ids[i], "char") == 0) {
+            kind = DW_ATE_signed_char;
+        } else if (strcmp(ids[i], "int") == 0) {
+            kind = DW_ATE_signed;
+        } else if (strcmp(ids[i], "double") == 0) {
+            kind = DW_ATE_float;
+            longness++;
+        } else if (strcmp(ids[i], "float") == 0) {
+            kind = DW_ATE_float;
+        } else {
+            _UPF_ASSERT(ids_length == 1);
+            *typename = ids[0];
+            return true;
+        }
     }
 
+    _upf_type type = {
+        .name = NULL,
+        .kind = _UPF_TK_UNKNOWN,
+        .modifiers = 0,
+        .size = 0,
+    };
+    if (kind == DW_ATE_signed_char) {
+        type.kind = is_signed ? _UPF_TK_SCHAR : _UPF_TK_UCHAR;
+        type.size = sizeof(char);
+    } else if (kind == DW_ATE_float) {
+        switch (longness) {
+            case 0:
+                type.kind = _UPF_TK_F4;
+                type.size = sizeof(float);
+                break;
+            case 2:
+                if (sizeof(long double) != sizeof(double)) {
+                    _UPF_WARN("Long doubles aren't supported. Ignoring this type.");
+
+                    type.kind = _UPF_TK_UNKNOWN;
+                    type.size = sizeof(long double);
+                    break;
+                }
+                __attribute__((fallthrough));
+            case 1:
+                type.kind = _UPF_TK_F8;
+                type.size = sizeof(double);
+                break;
+            default:
+                _UPF_ERROR("Invalid floating-point number length.");
+        }
+    } else if (kind == DW_ATE_signed) {
+        switch (longness) {
+            case -1:
+                type.size = sizeof(short int);
+                break;
+            case 0:
+                type.size = sizeof(int);
+                break;
+            case 1:
+                type.size = sizeof(long int);
+                break;
+            case 2:
+                type.size = sizeof(long long int);
+                break;
+            default:
+                _UPF_ERROR("Invalid integer length.");
+        }
+        type.kind = _upf_get_type_kind(is_signed ? DW_ATE_signed : DW_ATE_unsigned, type.size);
+    } else {
+        _UPF_ERROR("Invalid integer type.");
+    }
+
+    *type_idx = _upf_add_type(NULL, type);
     return true;
 }
 
@@ -2632,17 +2639,24 @@ static bool _upf_parse_cast_expr(_upf_tokenizer *t, _upf_parser_state *p) {
     // 	: unary_expr
     // 	| '(' typename ')' cast_expr
 
-    const char *typename = NULL;
     int dereference = 0;
+    const char *typename = NULL;
+    size_t type_idx = UINT64_MAX;
     size_t save = t->idx;
     if (_upf_consume(t, _UPF_TOK_OPEN_PAREN).kind != _UPF_TOK_NONE &&   //
-        _upf_parse_typename(&typename, &dereference, t, p->cu) &&       //
+        _upf_parse_typename(&dereference, &typename, &type_idx, t) &&   //
         _upf_consume(t, _UPF_TOK_CLOSE_PAREN).kind != _UPF_TOK_NONE &&  //
         _upf_parse_cast_expr(t, NULL)) {
         if (p) {
             p->dereference = dereference;
-            p->base = typename;
-            p->base_type = _UPF_BT_TYPENAME;
+            if (typename == NULL) {
+                _UPF_ASSERT(type_idx != UINT64_MAX);
+                p->base.idx = type_idx;
+                p->base_type = _UPF_BT_INT_TYPE;
+            } else {
+                p->base.name = typename;
+                p->base_type = _UPF_BT_TYPE;
+            }
         }
         return true;
     }
@@ -2739,7 +2753,7 @@ static bool _upf_parse_postfix_expr(_upf_tokenizer *t, _upf_parser_state *p) {
     switch (token.kind) {
         case _UPF_TOK_ID:
             if (p) {
-                p->base = token.string;
+                p->base.name = token.string;
                 p->base_type = _UPF_BT_VARIABLE;
                 is_base = true;
             }
@@ -2867,7 +2881,7 @@ static bool _upf_parse_unary_expr(_upf_tokenizer *t, _upf_parser_state *p) {
     if (token.kind == _UPF_TOK_ID) {
         if (strcmp(token.string, "sizeof") == 0) {
             size_t save2 = t->idx;
-            if (_upf_consume(t, _UPF_TOK_OPEN_PAREN).kind != _UPF_TOK_NONE && _upf_parse_typename(NULL, NULL, t, p->cu)
+            if (_upf_consume(t, _UPF_TOK_OPEN_PAREN).kind != _UPF_TOK_NONE && _upf_parse_typename(NULL, NULL, NULL, t)
                 && _upf_consume(t, _UPF_TOK_CLOSE_PAREN).kind != _UPF_TOK_NONE) {
                 return true;
             }
@@ -2881,7 +2895,7 @@ static bool _upf_parse_unary_expr(_upf_tokenizer *t, _upf_parser_state *p) {
         }
 
         if (strcmp(token.string, "_Alignof") == 0 || strcmp(token.string, "alignof") == 0) {
-            if (_upf_consume(t, _UPF_TOK_OPEN_PAREN).kind == _UPF_TOK_NONE || !_upf_parse_typename(NULL, NULL, t, p->cu)
+            if (_upf_consume(t, _UPF_TOK_OPEN_PAREN).kind == _UPF_TOK_NONE || !_upf_parse_typename(NULL, NULL, NULL, t)
                 || _upf_consume(t, _UPF_TOK_CLOSE_PAREN).kind == _UPF_TOK_NONE) {
                 t->idx = save;
                 return false;
@@ -2966,15 +2980,8 @@ static size_t _upf_get_member_type(const _upf_cstr_vec *member_names, size_t idx
 static size_t _upf_get_type_by_name(_upf_parser_state *p) {
     _UPF_ASSERT(p != NULL);
 
-    for (uint32_t i = 0; i < p->cu->int_types.length; i++) {
-        const _upf_type *type = _upf_get_type(p->cu->int_types.data[i]);
-        if (strcmp(type->name, p->base) == 0) {
-            return p->cu->int_types.data[i];
-        }
-    }
-
     for (uint32_t i = 0; i < p->cu->types.length; i++) {
-        if (strcmp(p->cu->types.data[i].name, p->base) == 0) {
+        if (strcmp(p->cu->types.data[i].name, p->base.name) == 0) {
             return _upf_parse_type(p->cu, p->cu->types.data[i].die);
         }
     }
@@ -3008,7 +3015,7 @@ static size_t _upf_get_function_return_type(_upf_parser_state *p) {
     for (uint32_t i = 0; i < p->cu->functions.length; i++) {
         _upf_function function = p->cu->functions.data[i];
 
-        if (strcmp(function.name, p->base) == 0) {
+        if (strcmp(function.name, p->base.name) == 0) {
             return function.return_type_die == NULL ? _upf_get_void_type() : _upf_parse_type(p->cu, function.return_type_die);
         }
     }
@@ -3021,18 +3028,21 @@ static size_t _upf_get_base_type(_upf_parser_state *p, uint64_t pc, const char *
 
     size_t type_idx = UINT64_MAX;
     switch (p->base_type) {
-        case _UPF_BT_TYPENAME:
+        case _UPF_BT_INT_TYPE:
+            type_idx = p->base.idx;
+            break;
+        case _UPF_BT_TYPE:
             type_idx = _upf_get_type_by_name(p);
 
             if (type_idx == UINT64_MAX) {
                 _UPF_ERROR(
                     "Unable to find type \"%s\" in \"%s\" at %s:%d. "
                     "Ensure that the executable contains debugging information of at least 2nd level (-g2 or -g3).",
-                    p->base, arg, _upf_state.file_path, _upf_state.line);
+                    p->base.name, arg, _upf_state.file_path, _upf_state.line);
             }
             break;
         case _UPF_BT_VARIABLE:
-            type_idx = _upf_get_variable_type(p->cu, &p->cu->scope, pc, p->base);
+            type_idx = _upf_get_variable_type(p->cu, &p->cu->scope, pc, p->base.name);
             if (type_idx != UINT64_MAX) break;
 
             if (_upf_get_function_return_type(p) != UINT64_MAX) {
@@ -3049,11 +3059,11 @@ static size_t _upf_get_base_type(_upf_parser_state *p, uint64_t pc, const char *
                 _UPF_ERROR(
                     "Unable to find type of \"%s\" in \"%s\" at %s:%d. "
                     "Ensure that the executable contains debugging information of at least 2nd level (-g2 or -g3).",
-                    p->base, arg, _upf_state.file_path, _upf_state.line);
+                    p->base.name, arg, _upf_state.file_path, _upf_state.line);
             }
             break;
         case _UPF_BT_FUNCTION:
-            type_idx = _upf_get_variable_type(p->cu, &p->cu->scope, pc, p->base);
+            type_idx = _upf_get_variable_type(p->cu, &p->cu->scope, pc, p->base.name);
 
             if (type_idx != UINT64_MAX) {
                 const _upf_type *type = _upf_get_type(type_idx);
@@ -3072,7 +3082,7 @@ static size_t _upf_get_base_type(_upf_parser_state *p, uint64_t pc, const char *
                 _UPF_ERROR(
                     "Unable to find type of function \"%s\" in \"%s\" at %s:%d. "
                     "Ensure that the executable contains debugging information of at least 2nd level (-g2 or -g3).",
-                    p->base, arg, _upf_state.file_path, _upf_state.line);
+                    p->base.name, arg, _upf_state.file_path, _upf_state.line);
             }
 
             if (p->members.length == 0 && p->suffix_calls > 0) p->suffix_calls--;
@@ -3162,7 +3172,7 @@ static const _upf_type *_upf_get_arg_type(const char *arg, uint64_t pc) {
         .cu = cu,
         .dereference = 0,
         .suffix_calls = 0,
-        .base = NULL,
+        .base = {0},
         .base_type = 0,
         .members = _UPF_VECTOR_NEW(&_upf_state.arena),
     };
