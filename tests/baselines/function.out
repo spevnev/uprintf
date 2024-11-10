@@ -1,6 +1,6 @@
 Variadic function: POINTER (void variadic(int count, ...))
-&fun2: POINTER (Result *()() fun2())
-fun2(): POINTER (Result *() fun1())
+&fun2: POINTER (((Result *())()) fun2())
+fun2(): POINTER ((Result *()) fun1())
 fun2()(): POINTER (Result *fun())
 fun2()()(): {
     int num = 100
@@ -29,10 +29,10 @@ ptr_fun: POINTER (Result *fun())
 &(*ptr_fun)().f0: POINTER (int *fun0())
 (*ptr_fun)().f0(): 200
 &functions: {
-    Result *()() f = POINTER (Result *() fun1())
-    Result *()() *fp = POINTER
+    (Result *())() f = POINTER ((Result *()) fun1())
+    (Result *())() *fp = POINTER
 }
-&functions.f: POINTER (Result *() fun1())
+&functions.f: POINTER ((Result *()) fun1())
 functions.f(): POINTER (Result *fun())
 functions.f()(): {
     int num = 100
@@ -42,7 +42,7 @@ functions.f()().num: 100
 functions.f()().f0: POINTER (int *fun0())
 &functions.f()().f0: POINTER (int *fun0())
 functions.f()().f0()(): 200
-functions.fp: POINTER (Result *() fun1())
+functions.fp: POINTER ((Result *()) fun1())
 (*functions.fp)(): POINTER (Result *fun())
 (*functions.fp)()(): {
     int num = 100

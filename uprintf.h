@@ -3271,7 +3271,7 @@ static void _upf_print_modifiers(int modifiers) {
     if (modifiers & _UPF_MOD_ATOMIC) _upf_bprintf("atomic ");
 }
 
-static void _upf_print_typename(const _upf_type *type, bool print_trailing_whitespace) {
+static void _upf_print_typename(const _upf_type *type, bool print_trailing_whitespace, bool is_return_type) {
     _UPF_ASSERT(type != NULL);
 
     switch (type->kind) {
@@ -3284,27 +3284,30 @@ static void _upf_print_typename(const _upf_type *type, bool print_trailing_white
 
             const _upf_type *pointer_type = _upf_get_type(type->as.pointer.type);
             if (pointer_type->kind == _UPF_TK_FUNCTION) {
-                _upf_print_typename(pointer_type, print_trailing_whitespace);
+                _upf_print_typename(pointer_type, print_trailing_whitespace, is_return_type);
                 break;
             }
 
-            _upf_print_typename(pointer_type, true);
+            _upf_print_typename(pointer_type, true, is_return_type);
             _upf_bprintf("*");
             _upf_print_modifiers(type->modifiers);
         } break;
         case _UPF_TK_FUNCTION:
+            if (is_return_type) _upf_bprintf("(");
+
             if (type->as.function.return_type == UINT64_MAX) {
                 _upf_bprintf("void");
             } else {
-                _upf_print_typename(_upf_get_type(type->as.function.return_type), false);
+                _upf_print_typename(_upf_get_type(type->as.function.return_type), false, true);
             }
 
             _upf_bprintf("(");
             for (uint32_t i = 0; i < type->as.function.arg_types.length; i++) {
                 if (i > 0) _upf_bprintf(", ");
-                _upf_print_typename(_upf_get_type(type->as.function.arg_types.data[i]), false);
+                _upf_print_typename(_upf_get_type(type->as.function.arg_types.data[i]), false, false);
             }
             _upf_bprintf(")");
+            if (is_return_type) _upf_bprintf(")");
             if (print_trailing_whitespace) _upf_bprintf(" ");
             break;
         default:
@@ -3477,7 +3480,7 @@ static void _upf_print_type(_upf_indexed_struct_vec *circular, const uint8_t *da
                 const _upf_type *member_type = _upf_get_type(member->type);
 
                 _upf_bprintf("%*s", UPRINTF_INDENTATION_WIDTH * (depth + 1), "");
-                _upf_print_typename(member_type, true);
+                _upf_print_typename(member_type, true, false);
                 _upf_bprintf("%s = ", member->name);
                 if (member->bit_size == 0) {
                     _upf_print_type(circular, data + member->offset, member_type, depth + 1);
@@ -3640,7 +3643,7 @@ static void _upf_print_type(_upf_indexed_struct_vec *circular, const uint8_t *da
                 _upf_bprintf(" (");
                 size_t return_type_idx
                     = function->return_type_die == NULL ? _upf_get_void_type() : _upf_parse_type(cu, function->return_type_die);
-                _upf_print_typename(_upf_get_type(return_type_idx), true);
+                _upf_print_typename(_upf_get_type(return_type_idx), true, true);
                 _upf_bprintf("%s(", function->name);
                 for (uint32_t i = 0; i < function->args.length; i++) {
                     _upf_named_type arg = function->args.data[i];
@@ -3648,12 +3651,12 @@ static void _upf_print_type(_upf_indexed_struct_vec *circular, const uint8_t *da
                     bool has_name = arg.name != NULL;
 
                     if (i > 0) _upf_bprintf(", ");
-                    _upf_print_typename(_upf_get_type(arg_type_idx), has_name);
+                    _upf_print_typename(_upf_get_type(arg_type_idx), has_name, false);
                     if (has_name) _upf_bprintf("%s", arg.name);
                 }
                 if (function->is_variadic) {
-                    if (function->args.length > 0) _upf_bprintf(", ");
-                    _upf_bprintf("...");
+                    _UPF_ASSERT(function->args.length > 0);
+                    _upf_bprintf(", ...");
                 }
                 _upf_bprintf("))");
             }
