@@ -1,75 +1,75 @@
-Variadic function: POINTER <void variadic(int count, ...)>
-&fun2: POINTER <Result *()() fun2()>
-fun2(): POINTER <Result *() fun1()>
-fun2()(): POINTER <Result *fun()>
+Variadic function: POINTER (void variadic(int count, ...))
+&fun2: POINTER (Result *()() fun2())
+fun2(): POINTER (Result *() fun1())
+fun2()(): POINTER (Result *fun())
 fun2()()(): {
     int num = 100
-    int *() f0 = POINTER <int *fun0()>
+    int *() f0 = POINTER (int *fun0())
 }
 fun2()()().num: 100
-fun2()()().f0: POINTER <int *fun0()>
-&fun2()()().f0: POINTER <int *fun0()>
+fun2()()().f0: POINTER (int *fun0())
+&fun2()()().f0: POINTER (int *fun0())
 fun2()()().f0(): 200
-&var_fun: POINTER <Result *fun()>
+&var_fun: POINTER (Result *fun())
 var_fun(): {
     int num = 100
-    int *() f0 = POINTER <int *fun0()>
+    int *() f0 = POINTER (int *fun0())
 }
 var_fun().num: 100
-var_fun().f0: POINTER <int *fun0()>
-&var_fun().f0: POINTER <int *fun0()>
+var_fun().f0: POINTER (int *fun0())
+&var_fun().f0: POINTER (int *fun0())
 var_fun().f0(): 200
-ptr_fun: POINTER <Result *fun()>
+ptr_fun: POINTER (Result *fun())
 (*ptr_fun)(): {
     int num = 100
-    int *() f0 = POINTER <int *fun0()>
+    int *() f0 = POINTER (int *fun0())
 }
 (*ptr_fun)().num: 100
-(*ptr_fun)().f0: POINTER <int *fun0()>
-&(*ptr_fun)().f0: POINTER <int *fun0()>
+(*ptr_fun)().f0: POINTER (int *fun0())
+&(*ptr_fun)().f0: POINTER (int *fun0())
 (*ptr_fun)().f0(): 200
 &functions: {
-    Result *()() f = POINTER <Result *() fun1()>
+    Result *()() f = POINTER (Result *() fun1())
     Result *()() *fp = POINTER
 }
-&functions.f: POINTER <Result *() fun1()>
-functions.f(): POINTER <Result *fun()>
+&functions.f: POINTER (Result *() fun1())
+functions.f(): POINTER (Result *fun())
 functions.f()(): {
     int num = 100
-    int *() f0 = POINTER <int *fun0()>
+    int *() f0 = POINTER (int *fun0())
 }
 functions.f()().num: 100
-functions.f()().f0: POINTER <int *fun0()>
-&functions.f()().f0: POINTER <int *fun0()>
+functions.f()().f0: POINTER (int *fun0())
+&functions.f()().f0: POINTER (int *fun0())
 functions.f()().f0()(): 200
-functions.fp: POINTER <Result *() fun1()>
-(*functions.fp)(): POINTER <Result *fun()>
+functions.fp: POINTER (Result *() fun1())
+(*functions.fp)(): POINTER (Result *fun())
 (*functions.fp)()(): {
     int num = 100
-    int *() f0 = POINTER <int *fun0()>
+    int *() f0 = POINTER (int *fun0())
 }
 (*functions.fp)()().num: 100
-(*functions.fp)()().f0: POINTER <int *fun0()>
-&(*functions.fp)()().f0: POINTER <int *fun0()>
+(*functions.fp)()().f0: POINTER (int *fun0())
+&(*functions.fp)()().f0: POINTER (int *fun0())
 (*functions.fp)()().f0()(): 200
 Allocator methods: {
-    void *(size_t) alloc = POINTER <void *malloc(long unsigned int)>
-    void *(void *, size_t) realloc = POINTER <void *realloc(void *, long unsigned int)>
-    void(void *) free = POINTER <void free(void *)>
+    void *(size_t) alloc = POINTER (void *malloc(long unsigned int))
+    void *(void *, size_t) realloc = POINTER (void *realloc(void *, long unsigned int))
+    void(void *) free = POINTER (void free(void *))
 }
 {
-    void *(size_t) alloc = POINTER <void *custom_alloc(size_t size)>
-    void *(void *, size_t) realloc = POINTER <void *custom_realloc(void *data, size_t new_size)>
-    void(void *) free = POINTER <void custom_free(void *data)>
+    void *(size_t) alloc = POINTER (void *custom_alloc(size_t size))
+    void *(void *, size_t) realloc = POINTER (void *custom_realloc(void *data, size_t new_size))
+    void(void *) free = POINTER (void custom_free(void *data))
 }
 {
-    void *(size_t) alloc = POINTER <void *custom_alloc(size_t size)>
-    void *(void *, size_t) realloc = POINTER <void *custom_realloc(void *data, size_t new_size)>
-    void(void *) free = POINTER <void free(void *)>
+    void *(size_t) alloc = POINTER (void *custom_alloc(size_t size))
+    void *(void *, size_t) realloc = POINTER (void *custom_realloc(void *data, size_t new_size))
+    void(void *) free = POINTER (void free(void *))
 }
 {
-    void *(size_t) alloc = POINTER <void *malloc(long unsigned int)>
-    void *(void *, size_t) realloc = POINTER <void *realloc(void *, long unsigned int)>
-    void(void *) free = POINTER <void custom_free(void *data)>
+    void *(size_t) alloc = POINTER (void *malloc(long unsigned int))
+    void *(void *, size_t) realloc = POINTER (void *realloc(void *, long unsigned int))
+    void(void *) free = POINTER (void custom_free(void *data))
 }
-libc functions: POINTER <void *malloc(long unsigned int)>, POINTER <int printf(const char *, ...)>, POINTER <size_t fread(void *restrict , size_t, size_t, FILE *restrict )>
+libc functions: POINTER (void *malloc(long unsigned int)), POINTER (int printf(const char *, ...)), POINTER (size_t fread(void *restrict , size_t, size_t, FILE *restrict ))

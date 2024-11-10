@@ -3405,6 +3405,11 @@ static void _upf_collect_circular_structs(_upf_indexed_struct_vec *seen, _upf_in
     }
 }
 
+// Brackets/parentheses printing guidelines:
+// () -> additional information, e.g. pointer's value, char's ascii, enum's value, etc.
+// [] -> arrays
+// {} -> structs/unions
+// <> -> meta information, e.g. unnamed, unknown, invalid, out of bounds, truncated, etc.
 static void _upf_print_type(_upf_indexed_struct_vec *circular, const uint8_t *data, const _upf_type *type, int depth) {
     _UPF_ASSERT(circular != NULL && type != NULL);
 
@@ -3632,7 +3637,7 @@ static void _upf_print_type(_upf_indexed_struct_vec *circular, const uint8_t *da
             if (function != NULL) {
                 _UPF_ASSERT(cu != NULL);
 
-                _upf_bprintf(" <");
+                _upf_bprintf(" (");
                 size_t return_type_idx
                     = function->return_type_die == NULL ? _upf_get_void_type() : _upf_parse_type(cu, function->return_type_die);
                 _upf_print_typename(_upf_get_type(return_type_idx), true);
@@ -3650,7 +3655,7 @@ static void _upf_print_type(_upf_indexed_struct_vec *circular, const uint8_t *da
                     if (function->args.length > 0) _upf_bprintf(", ");
                     _upf_bprintf("...");
                 }
-                _upf_bprintf(")>");
+                _upf_bprintf("))");
             }
         } break;
         case _UPF_TK_U1:
