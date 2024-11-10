@@ -643,10 +643,8 @@ struct _upf_state {
     size_t size;
     char *ptr;
     size_t free;
-    // info about PC relative-ness
-    _upf_range_vec uprintf_ranges;
-    bool init_pc;
-    uint8_t *pc_base;
+    // PC
+    const uint8_t *base;
     // error handling
     jmp_buf jmp_buf;
     const char *file_path;
@@ -2089,24 +2087,16 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *die, const uint
         abbrev = _upf_get_abbrev(&cu, code);
         if (abbrev->has_children) depth++;
 
-        bool is_uprintf = false;
         switch (abbrev->tag) {
             case DW_TAG_subprogram: {
                 _upf_function function = _upf_parse_cu_subprogram(&cu, die, abbrev);
-                if (function.name != NULL) {
-                    _UPF_VECTOR_PUSH(&cu.functions, function);
-                    if (strcmp(function.name, "_upf_uprintf") == 0) is_uprintf = true;
-                }
+                if (function.name != NULL) _UPF_VECTOR_PUSH(&cu.functions, function);
                 __attribute__((fallthrough));
             }
             case DW_TAG_lexical_block:
-            case DW_TAG_inlined_subroutine: {
-                bool is_scope = _upf_parse_cu_scope(&cu, &scope_stack, depth, die, abbrev);
-                if (is_uprintf && is_scope) {
-                    _UPF_ASSERT(_upf_state.uprintf_ranges.length == 0);
-                    _upf_state.uprintf_ranges = _UPF_VECTOR_TOP(&scope_stack).scope->ranges;
-                }
-            } break;
+            case DW_TAG_inlined_subroutine:
+                _upf_parse_cu_scope(&cu, &scope_stack, depth, die, abbrev);
+                break;
             case DW_TAG_array_type:
             case DW_TAG_enumeration_type:
             case DW_TAG_pointer_type:
@@ -2203,35 +2193,6 @@ static void _upf_parse_dwarf(void) {
     }
 }
 
-// ===================== GETTING PC =======================
-
-static int _upf_phdr_callback(struct dl_phdr_info *info_, size_t _size, void *data_) {
-    _upf_dl_phdr_info *info = (_upf_dl_phdr_info *) info_;
-    (void) _size;
-    void **data = data_;
-
-    // Empty name seems to indicate current executable
-    if (strcmp(info->dlpi_name, "") == 0) {
-        *data = (void *) info->dlpi_addr;
-        return 1;  // return non-zero value to exit early
-    }
-    return 0;
-}
-
-// Returns address at which the current executable is loaded in memory.
-static void *_upf_get_this_executable_address(void) {
-    static void *base = NULL;
-    if (base != NULL) return base;
-
-    dl_iterate_phdr(&_upf_phdr_callback, &base);
-    _UPF_ASSERT(base != NULL);
-    return base;
-}
-
-__attribute__((noinline)) static uint64_t _upf_get_pc(void) {
-    return (uint64_t) __builtin_extract_return_addr(__builtin_return_address(0));
-}
-
 // ======================= ELF ============================
 
 // Linker-generated entry to dynamic section of ELF.
@@ -2240,8 +2201,6 @@ extern Elf64_Dyn _DYNAMIC[];
 // Extern function mapping: function pointer -> GOT -> RELA -> symbol -> name -> DIE
 static void _upf_parse_extern_functions(void) {
     _UPF_ASSERT(_DYNAMIC != NULL);
-
-    const uint8_t *base = _upf_get_this_executable_address();
 
     const char *string_table = NULL;
     const Elf64_Sym *symbol_table = NULL;
@@ -2279,7 +2238,7 @@ static void _upf_parse_extern_functions(void) {
 
         Elf64_Sym symbol = symbol_table[symbol_idx];
         const char *symbol_name = string_table + symbol.st_name;
-        uint64_t symbol_address = *((uint64_t *) (base + rela.r_offset));
+        uint64_t symbol_address = *((uint64_t *) (_upf_state.base + rela.r_offset));
 
         _upf_extern_function extern_function = {
             .name = symbol_name,
@@ -3640,7 +3599,7 @@ static void _upf_print_type(_upf_indexed_struct_vec *circular, const uint8_t *da
         } break;
         case _UPF_TK_FUNCTION: {
             uint64_t absolute_function_pc = (uint64_t) data;
-            uint64_t relative_function_pc = data - _upf_state.pc_base;
+            uint64_t relative_function_pc = data - _upf_state.base;
 
             // Check pointer to function name mapping needed for extern functions
             const char *function_name = NULL;
@@ -3763,6 +3722,29 @@ static void _upf_print_type(_upf_indexed_struct_vec *circular, const uint8_t *da
     }
 }
 
+// ===================== GETTING PC =======================
+
+static int _upf_phdr_callback(struct dl_phdr_info *info_, size_t _size, void *data_) {
+    _upf_dl_phdr_info *info = (_upf_dl_phdr_info *) info_;
+    (void) _size;
+    void **data = data_;
+
+    // Empty name seems to indicate current executable
+    if (strcmp(info->dlpi_name, "") == 0) {
+        *data = (void *) info->dlpi_addr;
+        return 1;  // return non-zero value to exit early
+    }
+    return 0;
+}
+
+// Returns address at which the current executable is loaded in memory.
+static void *_upf_get_this_executable_address(void) {
+    void *base = NULL;
+    dl_iterate_phdr(&_upf_phdr_callback, &base);
+    _UPF_ASSERT(base != NULL);
+    return base;
+}
+
 // =================== ENTRY POINTS =======================
 
 __attribute__((constructor)) void _upf_init(void) {
@@ -3775,6 +3757,8 @@ __attribute__((constructor)) void _upf_init(void) {
     _UPF_VECTOR_INIT(&_upf_state.cus, &_upf_state.arena);
     _UPF_VECTOR_INIT(&_upf_state.type_map, &_upf_state.arena);
     _UPF_VECTOR_INIT(&_upf_state.extern_functions, &_upf_state.arena);
+
+    _upf_state.base = _upf_get_this_executable_address();
 
     _upf_parse_elf();
     _upf_parse_extern_functions();
@@ -3809,21 +3793,9 @@ __attribute__((noinline)) void _upf_uprintf(const char *file_path, int line, con
     _upf_state.file_path = file_path;
     _upf_state.line = line;
 
-    if (!_upf_state.init_pc) {
-        _upf_state.init_pc = true;
-
-        _UPF_ASSERT(_upf_state.uprintf_ranges.length > 0);
-        bool is_pc_absolute = _upf_is_in_range(_upf_get_pc(), _upf_state.uprintf_ranges);
-        if (is_pc_absolute) {
-            _upf_state.pc_base = NULL;
-        } else {
-            _upf_state.pc_base = _upf_get_this_executable_address();
-        }
-    }
-
     uint8_t *pc_ptr = __builtin_extract_return_addr(__builtin_return_address(0));
     _UPF_ASSERT(pc_ptr != NULL);
-    uint64_t pc = pc_ptr - _upf_state.pc_base;
+    uint64_t pc = pc_ptr - _upf_state.base;
 
     _upf_indexed_struct_vec seen = _UPF_VECTOR_NEW(&_upf_state.arena);
     _upf_indexed_struct_vec circular = _UPF_VECTOR_NEW(&_upf_state.arena);

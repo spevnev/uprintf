@@ -1,5 +1,5 @@
 CC     := gcc
-CFLAGS := -O2 -g2 -std=c99 -Wall -Wextra -pedantic -I . -fsanitize=undefined,address,leak -DUPRINTF_TEST
+CFLAGS := -O2 -g2 -std=c99 -Wall -Wextra -pedantic -I . -DUPRINTF_TEST -fsanitize=undefined,address,leak
 
 BUILD_DIR    := build
 LIB_DIR      := libs
