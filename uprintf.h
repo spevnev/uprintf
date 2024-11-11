@@ -616,7 +616,9 @@ struct _upf_state {
     _upf_arena arena;
     // has _upf_init finished
     bool is_init;
-    // mmap-ed file
+    // file loaded by dynamic linker (only with info required to run it)
+    const uint8_t *base;
+    // mmap-ed file (with debug info)
     uint8_t *file;
     off_t file_size;
     // DWARF info
@@ -645,8 +647,6 @@ struct _upf_state {
     size_t size;
     char *ptr;
     size_t free;
-    // PC
-    const uint8_t *base;
     // error handling
     jmp_buf jmp_buf;
     const char *file_path;
@@ -2230,6 +2230,7 @@ static void _upf_parse_extern_functions(void) {
         _UPF_WARN("Unable to find one of the required ELF sections. Ignoring extern functions.");
         return;
     }
+    _UPF_ASSERT(((void *) _upf_state.base) < ((void *) string_table));  // d_ptr may sometimes be relative to the base
 
     for (int i = 0; i < rela_size; i++) {
         Elf64_Rela rela = rela_table[i];
@@ -2245,7 +2246,6 @@ static void _upf_parse_extern_functions(void) {
             .name = symbol_name,
             .pc = symbol_address,
         };
-
         _UPF_VECTOR_PUSH(&_upf_state.extern_functions, extern_function);
     }
 }
@@ -2259,6 +2259,9 @@ static void _upf_parse_elf(void) {
     int fd = open("/proc/self/exe", O_RDONLY);
     _UPF_ASSERT(fd != -1);
 
+    // A new instance of file must be mmap-ed because the one loaded in memory
+    // only contains information needed at runtime, and doesn't include debug
+    // information, table with sections' names, etc.
     uint8_t *file = (uint8_t *) mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
     _UPF_ASSERT(file != MAP_FAILED);
     _upf_state.file = file;
@@ -2915,8 +2918,9 @@ static bool _upf_parse_expr(_upf_tokenizer *t, _upf_parser_state *p) {
     // 	: assignment_expr
     // 	| assignment_expr ',' expr
 
-    size_t save = t->idx;
+    // Copying is safe since vector's data is in the arena, and old entries are not modified.
     _upf_parser_state p_copy;
+    size_t save = t->idx;
     do {
         if (p) p_copy = *p;
         if (!_upf_parse_assignment_expr(t, p ? &p_copy : NULL)) {
