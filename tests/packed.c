@@ -34,8 +34,20 @@ typedef struct {
     const cstr const_str;
 
     bool b;
+
+    void (*void_fun)(void);
+    int (*other_fun)(char, float *, unsigned long);
 } Struct;
 #pragma pack(pop)
+
+void void_fun(void) {}
+
+int other_fun(char a, float *b, unsigned long c) {
+    (void) a;
+    (void) b;
+    (void) c;
+    return 1;
+}
 
 int main(void) {
     int i = 5;
@@ -64,6 +76,9 @@ int main(void) {
         .const_str = "const_str string",
 
         .b = true,
+
+        .void_fun = &void_fun,
+        .other_fun = &other_fun,
     };
 
     uprintf("Packed struct: %S\n", &s);

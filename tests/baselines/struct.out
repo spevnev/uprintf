@@ -18,4 +18,6 @@ Struct containing all types: {
     const char *str = POINTER ("str string")
     char *const const_str = POINTER ("const_str string")
     _Bool b = true
+    void() void_fun = POINTER (void void_fun())
+    int(char, float *, long unsigned int) other_fun = POINTER (int other_fun(char a, float *b, long unsigned int c))
 }
