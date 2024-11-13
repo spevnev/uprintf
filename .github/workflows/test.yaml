@@ -1,0 +1,22 @@
+name: Testing
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+jobs:
+  run_tests:
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        compiler: [ clang-18, clang-17, clang-16, clang-15, clang-14, gcc-14, gcc-13, gcc-12, gcc-11 ]
+    env:
+      COMPILER: ${{matrix.compiler}}
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install packages
+      run: sudo apt-get install -y wdiff $COMPILER
+    - name: Run tests
+      run: make COMPILERS=$COMPILER tests -j $(nproc)

@@ -32,6 +32,24 @@ function uses_shared_implementation {
     else echo true; fi
 }
 
+# Some tests don't work on older versions
+function should_skip {
+    if [ $(echo "$2" | head -c 3) = "gcc" ]; then
+        :
+    else # clang
+        major_version=$("$2" -dumpversion | cut -d. -f1)
+        if [ $major_version -le 15 ]; then
+            # uses old (non-v5) format for bit fields
+            if [ "$1" = "bits" ]; then echo true; fi
+        fi
+    fi
+}
+
+if [ $(should_skip $1 $2) ]; then
+    echo "[SKIPPING] $output_file"
+    exit 0
+fi
+
 # Compiling
 mkdir -p $dir
 if [ $(uses_shared_implementation $1) = false ]; then
@@ -47,17 +65,28 @@ else
 fi
 
 if [ $ret -ne 0 ]; then
-    echo "[COMPILATION FAILED] Log: $log. Rerun test: make $bin"
+    if [ $CI ]; then
+        echo "[COMPILATION FAILED] $log:"
+        cat $log
+    else
+        echo "[COMPILATION FAILED] Log: $log. Rerun test: make $bin"
+    fi
     exit 1
 fi
 
 # Running
 ./$bin > $output 2>&1
-if [ $? -ne 0 ]; then
-    echo "[TEST FAILED] Log: $log. Failed test binary: $bin. Rerun test: make $bin"
+ret=$?
+cat $output >> $log
+if [ $ret -ne 0 ]; then
+    if [ $CI ]; then
+        echo "[TEST FAILED] $log:"
+        cat $log
+    else
+        echo "[TEST FAILED] Log: $log. Failed test binary: $bin. Rerun test: make $bin"
+    fi
     exit 1
 fi
-cat $output >> $log
 
 # Comparing
 if [ ! -f $baseline ]; then
@@ -75,7 +104,15 @@ if [ $similarity -lt $(get_similarity $1) ]; then
     diff="$bin.diff"
     wdiff $baseline $output > $diff
 
-    echo "[DIFF FAILED] Similarity is $similarity%. Diff: $diff. Log: $log. Rerun test: make $bin"
+    if [ $CI ]; then
+        echo "[DIFF FAILED] Similarity is $similarity%"
+        echo "$log:"
+        cat $log
+        echo "$diff:"
+        cat $diff
+    else
+        echo "[DIFF FAILED] Similarity is $similarity%. Diff: $diff. Log: $log. Rerun test: make $bin"
+    fi
     exit 1
 fi
 

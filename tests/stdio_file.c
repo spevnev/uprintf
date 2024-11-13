@@ -10,7 +10,10 @@ int main(void) {
 
     char buffer[100];
     // Read populates FILE's fields
-    fread(buffer, 100, 1, file);
+    if (fread(buffer, 100, 1, file) < 1) {
+        fprintf(stderr, "fread failed.\n");
+        return EXIT_FAILURE;
+    }
 
     uprintf("stdio.h's FILE after read: %S\n", file);
 

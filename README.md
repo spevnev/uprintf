@@ -1063,9 +1063,9 @@ This way you should be able to include it without copying the header to every pr
 
 Architectures: `x86_64/amd64`
 
-Compilers: \
-`gcc-14.2`, `gcc-13.3`, `gcc-12.4` \
-`clang-18`, `clang-17`, `clang-14`
+Compilers (tested in CI/CD): \
+`gcc-14`, `gcc-12`, `gcc-11` \
+`clang-18`, `clang-16`, `clang-14`
 
 ### Limitations
 
