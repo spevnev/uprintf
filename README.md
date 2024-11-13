@@ -971,28 +971,13 @@ Compilers: \
     ```c
     uprintf("%S\n", (void (*)(void)) whatever);
     ```
-2. Variable shadowing on the same line, e.g.:
+2. Refering to the variable from higher scope when it is also defined in the current one, e.g.:
     ```c
     char var = 'c';
-
-    // Valid:
     {
-        uprintf("%S\n", &var); // prints char
+        uprintf("%S\n", &var); // prints char as an int
         int var = 1;
         uprintf("%S\n", &var); // prints int
-    }
-    {
-        uprintf("%S\n", &var); // prints char
-        int var = 1; uprintf("%S\n", &var); // prints int
-    }
-
-    // Invalid:
-    {
-        uprintf("%S\n", &var); int var = 1; // prints char as int
-        uprintf("%S\n", &var);
-    }
-    {
-        uprintf("%S\n", &var); int var = 1; uprintf("%S\n", &var); // prints char as int
     }
     ```
 

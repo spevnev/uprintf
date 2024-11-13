@@ -3,11 +3,7 @@
 #include <stdlib.h>
 #include "uprintf.h"
 
-static char var = 'v';
-
 int main(void) {
-    uprintf("char = %S\n", &var);
-
     int var = 1;
     uprintf("int = %S\n", &var);
     {
@@ -50,11 +46,13 @@ int main(void) {
         uprintf("c_str %S\n", &var);
     }
 
-    {
-        uprintf("int = %S\n", &var);
-        char var = 'c';
-        uprintf("char = %S\n", &var);
-    }
+    // Invalid:
+    // char var = 'c';
+    // {
+    //     uprintf("%S\n", &var);
+    //     int var = 1;
+    //     uprintf("%S\n", &var);
+    // }
 
     return _upf_test_status;
 }

@@ -218,7 +218,6 @@ int dl_iterate_phdr(int (*callback)(struct dl_phdr_info *info, size_t size, void
 #define DW_AT_abstract_origin 0x31
 #define DW_AT_count 0x37
 #define DW_AT_data_member_location 0x38
-#define DW_AT_decl_line 0x3b
 #define DW_AT_encoding 0x3e
 #define DW_AT_type 0x49
 #define DW_AT_ranges 0x55
@@ -471,14 +470,6 @@ typedef struct {
 _UPF_VECTOR_TYPEDEF(_upf_named_type_vec, _upf_named_type);
 
 typedef struct {
-    const uint8_t *die;
-    const char *name;
-    int64_t line;
-} _upf_variable;
-
-_UPF_VECTOR_TYPEDEF(_upf_variable_vec, _upf_variable);
-
-typedef struct {
     const char *name;
     const uint8_t *return_type_die;
     _upf_named_type_vec args;
@@ -509,7 +500,7 @@ _UPF_VECTOR_TYPEDEF(_upf_scope_vec, struct _upf_scope);
 
 typedef struct _upf_scope {
     _upf_range_vec ranges;
-    _upf_variable_vec vars;
+    _upf_named_type_vec vars;
     _upf_scope_vec scopes;
 } _upf_scope;
 
@@ -1959,13 +1950,12 @@ static const char *_upf_get_typename(const _upf_cu *cu, const uint8_t *die, cons
     return name;
 }
 
-static _upf_variable _upf_parse_cu_variable(const _upf_cu *cu, const uint8_t *die, const _upf_abbrev *abbrev) {
+static _upf_named_type _upf_parse_cu_variable(const _upf_cu *cu, const uint8_t *die, const _upf_abbrev *abbrev) {
     _UPF_ASSERT(cu != NULL && die != NULL);
 
-    _upf_variable var = {
+    _upf_named_type var = {
         .die = NULL,
         .name = NULL,
-        .line = -1,
     };
     for (uint32_t i = 0; i < abbrev->attrs.length; i++) {
         _upf_attr attr = abbrev->attrs.data[i];
@@ -1980,8 +1970,6 @@ static _upf_variable _upf_parse_cu_variable(const _upf_cu *cu, const uint8_t *di
             new_die += _upf_get_abbrev(&new_abbrev, cu, new_die);
 
             return _upf_parse_cu_variable(cu, new_die, new_abbrev);
-        } else if (attr.name == DW_AT_decl_line) {
-            var.line = _upf_get_data(die, attr);
         }
 
         die += _upf_get_attr_size(die, attr.form);
@@ -2100,7 +2088,7 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *die, const uint
                 _upf_scope *scope = _UPF_VECTOR_TOP(&scope_stack).scope;
                 if (scope == NULL) break;
 
-                _upf_variable var = _upf_parse_cu_variable(&cu, die, abbrev);
+                _upf_named_type var = _upf_parse_cu_variable(&cu, die, abbrev);
                 if (var.name == NULL) break;
                 if (var.die == NULL) {
                     _UPF_ERROR(
@@ -2930,10 +2918,7 @@ static _upf_type *_upf_get_variable_type(const _upf_cu *cu, const _upf_scope *sc
     }
 
     for (uint32_t i = 0; i < scope->vars.length; i++) {
-        _upf_variable var = scope->vars.data[i];
-        if (var.line <= _upf_state.line && strcmp(var.name, var_name) == 0) {
-            return _upf_parse_type(cu, var.die);
-        }
+        if (strcmp(scope->vars.data[i].name, var_name) == 0) return _upf_parse_type(cu, scope->vars.data[i].die);
     }
 
     return NULL;
