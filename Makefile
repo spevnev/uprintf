@@ -63,6 +63,10 @@ $(LIB_DIR)/sqlite/sqlite3.c:
 	cd $(LIB_DIR) && unzip sqlite.zip && mv sqlite-amalgamation-3460100 sqlite
 	rm $(LIB_DIR)/sqlite.zip
 
+$(BUILD_DIR)/$(EXAMPLE_DIR)/uprintf: $(EXAMPLE_DIR)/uprintf.c uprintf.h Makefile
+	@mkdir -p $(@D)
+	$(CC) $(CFLAGS) -o $@ $<
+
 .PHONY: test
 test: tests
 

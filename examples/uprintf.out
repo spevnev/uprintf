@@ -1,0 +1,95 @@
+uprintf's state: {
+    uint32_t capacity = 128
+    uint32_t length = 111
+    _upf_type_map_entry *data = 0x7a8aeed108e8 ({
+        const uint8_t *die = 0x7a8aeb686851 (14)
+        _upf_type *type_ptr = 0x7a8aeed0d8b8 ({
+            const char *name = 0x7a8aeb6d6ef4 ("_upf_arena_region")
+            _upf_type_kind kind = _UPF_TK_POINTER (4)
+            int modifiers = 0
+            size_t size = 8
+            union as = <union> {
+                struct cstruct = {
+                    _upf_member_vec members = {
+                        uint32_t capacity = 4006665512
+                        uint32_t length = 31370
+                        _upf_member *data = NULL
+                    }
+                }
+                struct cenum = {
+                    _upf_type *underlying_type = 0x7a8aeed0dd28 (<#0> {
+                        const char *name = 0x7a8aeb6d6ef4 ("_upf_arena_region")
+                        _upf_type_kind kind = _UPF_TK_STRUCT (0)
+                        int modifiers = 0
+                        size_t size = 32
+                        union as = <union> {
+                            struct cstruct = {
+                                _upf_member_vec members = {
+                                    uint32_t capacity = 4
+                                    uint32_t length = 4
+                                    _upf_member *data = 0x7a8aeed0db78 ({
+                                        const char *name = 0x7a8aeb6d6eba ("data")
+                                        _upf_type *type = 0x7a8aeed0d928 ({...})
+                                        size_t offset = 0
+                                        int bit_size = 0
+                                    })
+                                }
+                            }
+                            struct cenum = {
+                                _upf_type *underlying_type = 0x400000004 (<out-of-bounds>)
+                                _upf_enum_vec enums = {
+                                    uint32_t capacity = 4006665080
+                                    uint32_t length = 31370
+                                    _upf_enum *data = NULL
+                                }
+                            }
+                            struct array = {
+                                _upf_type *element_type = 0x400000004 (<out-of-bounds>)
+                                _upf_size_t_vec lengths = {
+                                    uint32_t capacity = 4006665080
+                                    uint32_t length = 31370
+                                    size_t *data = NULL
+                                }
+                            }
+                            struct pointer = {
+                                _upf_type *type = 0x400000004 (<out-of-bounds>)
+                            }
+                            struct function = {
+                                _upf_type *return_type = 0x400000004 (<out-of-bounds>)
+                                _upf_type_ptr_vec arg_types = {
+                                    uint32_t capacity = 4006665080
+                                    uint32_t length = 31370
+                                    _upf_type **data = NULL
+                                }
+                            }
+                        }
+                    })
+                    _upf_enum_vec enums = {
+                        uint32_t capacity = 0
+                        uint32_t length = 0
+                        _upf_enum *data = NULL
+                    }
+                }
+                struct array = {
+                    _upf_type *element_type = 0x7a8aeed0dd28 (<points to #0>)
+                    _upf_size_t_vec lengths = {
+                        uint32_t capacity = 0
+                        uint32_t length = 0
+                        size_t *data = NULL
+                    }
+                }
+                struct pointer = {
+                    _upf_type *type = 0x7a8aeed0dd28 (<points to #0>)
+                }
+                struct function = {
+                    _upf_type *return_type = 0x7a8aeed0dd28 (<points to #0>)
+                    _upf_type_ptr_vec arg_types = {
+                        uint32_t capacity = 0
+                        uint32_t length = 0
+                        _upf_type **data = NULL
+                    }
+                }
+            }
+        })
+    })
+}
