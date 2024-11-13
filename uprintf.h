@@ -3102,7 +3102,7 @@ static const _upf_type *_upf_get_arg_type(const char *arg, uint64_t pc) {
 
 // ================== /proc/pid/maps ======================
 
-static _upf_range_vec _upf_get_address_ranges(void) {
+static _upf_range_vec _upf_get_readable_address_ranges(void) {
     FILE *file = fopen("/proc/self/maps", "r");
     if (file == NULL) _UPF_ERROR("Unable to open \"/proc/self/maps\": %s.", strerror(errno));
 
@@ -3111,6 +3111,7 @@ static _upf_range_vec _upf_get_address_ranges(void) {
         .start = UINT64_MAX,
         .end = UINT64_MAX,
     };
+    char read_bit = '-';
     size_t length = 0;
     char *line = NULL;
     ssize_t read;
@@ -3118,11 +3119,13 @@ static _upf_range_vec _upf_get_address_ranges(void) {
         if (read == 0) continue;
         if (line[read - 1] == '\n') line[read - 1] = '\0';
 
-        if (sscanf(line, "%lx-%lx %*s %*x %*x:%*x %*u", &range.start, &range.end) != 2) {
+        if (sscanf(line, "%lx-%lx %c%*s %*x %*x:%*x %*u", &range.start, &range.end, &read_bit) != 3) {
+            free(line);
+            fclose(file);
             _UPF_ERROR("Unable to parse \"/proc/self/maps\": invalid format.");
         }
 
-        _UPF_VECTOR_PUSH(&ranges, range);
+        if (read_bit == 'r') _UPF_VECTOR_PUSH(&ranges, range);
     }
     if (line) free(line);
     fclose(file);
@@ -3131,6 +3134,7 @@ static _upf_range_vec _upf_get_address_ranges(void) {
 }
 
 static const void *_upf_get_memory_region_end(const void *ptr) {
+    _UPF_ASSERT(ptr != NULL);
     for (uint32_t i = 0; i < _upf_state.addresses.length; i++) {
         _upf_range range = _upf_state.addresses.data[i];
         if ((void *) range.start <= ptr && ptr <= (void *) range.end) return (void *) range.end;
@@ -3714,7 +3718,7 @@ __attribute__((noinline)) void _upf_uprintf(const char *file_path, int line, con
 
     _upf_state.ptr = _upf_state.buffer;
     _upf_state.free = _upf_state.size;
-    _upf_state.addresses = _upf_get_address_ranges();
+    _upf_state.addresses = _upf_get_readable_address_ranges();
     _upf_state.circular_id = 0;
     _upf_state.file_path = file_path;
     _upf_state.line = line;
