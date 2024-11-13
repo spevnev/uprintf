@@ -1634,9 +1634,7 @@ static _upf_range_vec _upf_get_ranges(const _upf_cu *cu, const uint8_t *die, uin
     _UPF_ASSERT(rnglist != NULL);
 
     uint64_t base = 0;
-    if (cu->scope.ranges.length == 1) {
-        base = cu->scope.ranges.data[0].start;
-    }
+    if (cu->scope.ranges.length == 1) base = cu->scope.ranges.data[0].start;
 
     _upf_range_vec ranges = _UPF_VECTOR_NEW(&_upf_state.arena);
     while (*rnglist != DW_RLE_end_of_list) {
@@ -1968,8 +1966,13 @@ static _upf_function _upf_parse_cu_subprogram(const _upf_cu *cu, const uint8_t *
             function.pc = _upf_get_addr(cu, die, attr.form);
         } else if (attr.name == DW_AT_ranges) {
             _upf_range_vec ranges = _upf_get_ranges(cu, die, attr.form);
-            _UPF_ASSERT(ranges.length > 0);
-            function.pc = ranges.data[0].start;
+            uint64_t low_pc = UINT64_MAX;
+            for (uint32_t i = 0; i < ranges.length; i++) {
+                if (ranges.data[i].start < low_pc) low_pc = ranges.data[i].start;
+            }
+            _UPF_ASSERT(low_pc != UINT64_MAX);
+
+            function.pc = low_pc;
         } else if (attr.name == DW_AT_abstract_origin) {
             const uint8_t *new_die = cu->base + _upf_get_ref(die, attr.form);
             const _upf_abbrev *new_abbrev;
@@ -2111,26 +2114,6 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *die, const uint
         }
 
         die = _upf_skip_die(die, abbrev);
-    }
-
-    if (cu.scope.scopes.length > 0 && cu.scope.ranges.length == 1) {
-        _upf_range *range = &cu.scope.ranges.data[0];
-
-        if (range->start == UINT64_MAX) {
-            if (cu.scope.scopes.data[0].ranges.length == 0) {
-                range->start = 0;
-            } else {
-                range->start = cu.scope.scopes.data[0].ranges.data[0].start;
-            }
-        }
-
-        if (range->end == UINT64_MAX) {
-            if (_UPF_VECTOR_TOP(&cu.scope.scopes).ranges.length == 0) {
-                range->end = UINT64_MAX;
-            } else {
-                range->end = _UPF_VECTOR_TOP(&_UPF_VECTOR_TOP(&cu.scope.scopes).ranges).end;
-            }
-        }
     }
 
     _UPF_VECTOR_PUSH(&_upf_state.cus, cu);
