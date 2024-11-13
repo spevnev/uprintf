@@ -392,6 +392,9 @@ typedef struct {
 
 _UPF_VECTOR_TYPEDEF(_upf_abbrev_vec, _upf_abbrev);
 
+typedef struct _upf_type _upf_type;
+_UPF_VECTOR_TYPEDEF(_upf_type_ptr_vec, struct _upf_type *);
+
 enum _upf_type_kind {
     _UPF_TK_STRUCT,
     _UPF_TK_UNION,
@@ -418,7 +421,7 @@ enum _upf_type_kind {
 
 typedef struct {
     const char *name;
-    size_t type;
+    _upf_type *type;
     size_t offset;
     int bit_size;  // non-zero means bit field
 } _upf_member;
@@ -437,7 +440,7 @@ _UPF_VECTOR_TYPEDEF(_upf_enum_vec, _upf_enum);
 #define _UPF_MOD_RESTRICT 1 << 2
 #define _UPF_MOD_ATOMIC 1 << 3
 
-typedef struct {
+struct _upf_type {
     const char *name;
     enum _upf_type_kind kind;
     int modifiers;
@@ -447,22 +450,22 @@ typedef struct {
             _upf_member_vec members;
         } cstruct;
         struct {
-            size_t underlying_type;
+            _upf_type *underlying_type;
             _upf_enum_vec enums;
         } cenum;
         struct {
-            size_t element_type;
+            _upf_type *element_type;
             _upf_size_t_vec lengths;
         } array;
         struct {
-            size_t type;
+            _upf_type *type;
         } pointer;
         struct {
-            size_t return_type;
-            _upf_size_t_vec arg_types;
+            _upf_type *return_type;
+            _upf_type_ptr_vec arg_types;
         } function;
     } as;
-} _upf_type;
+};
 
 typedef struct {
     uint64_t start;
@@ -530,7 +533,7 @@ _UPF_VECTOR_TYPEDEF(_upf_scope_stack, _upf_scope_stack_entry);
 
 typedef struct {
     const uint8_t *die;
-    _upf_type type;
+    _upf_type *type_ptr;
 } _upf_type_map_entry;
 
 _UPF_VECTOR_TYPEDEF(_upf_type_map_vec, _upf_type_map_entry);
@@ -604,7 +607,7 @@ typedef struct {
     int suffix_calls;
     union {
         const char *name;
-        uint64_t idx;
+        _upf_type *type;
     } base;
     enum _upf_base_type base_type;
     _upf_cstr_vec members;
@@ -810,11 +813,6 @@ static size_t _upf_LEB_to_int64(const uint8_t *leb, int64_t *result) {
 static const _upf_abbrev *_upf_get_abbrev(const _upf_cu *cu, size_t code) {
     _UPF_ASSERT(cu != NULL && code > 0 && code - 1 < cu->abbrevs.length);
     return &cu->abbrevs.data[code - 1];
-}
-
-static const _upf_type *_upf_get_type(size_t type_idx) {
-    _UPF_ASSERT(type_idx != UINT64_MAX && type_idx < _upf_state.type_map.length);
-    return &_upf_state.type_map.data[type_idx].type;
 }
 
 static bool _upf_is_in_range(uint64_t pc, _upf_range_vec ranges) {
@@ -1226,25 +1224,29 @@ static _upf_type _upf_get_subarray(const _upf_type *array, int count) {
     return subarray;
 }
 
-static size_t _upf_add_type(const uint8_t *type_die, _upf_type type) {
+static _upf_type *_upf_add_type(const uint8_t *type_die, _upf_type type) {
     if (type_die != NULL) {
         for (uint32_t i = 0; i < _upf_state.type_map.length; i++) {
-            if (_upf_state.type_map.data[i].die == type_die) return i;
+            _upf_type_map_entry entry = _upf_state.type_map.data[i];
+            if (entry.die == type_die) return entry.type_ptr;
         }
     }
 
+    _upf_type *type_ptr = _upf_arena_alloc(&_upf_state.arena, sizeof(type));
+    memcpy(type_ptr, &type, sizeof(type));
+
     _upf_type_map_entry entry = {
         .die = type_die,
-        .type = type,
+        .type_ptr = type_ptr,
     };
     _UPF_VECTOR_PUSH(&_upf_state.type_map, entry);
 
-    return _upf_state.type_map.length - 1;
+    return type_ptr;
 }
 
-static size_t _upf_get_void_type(void) {
-    static size_t idx = UINT64_MAX;
-    if (idx != UINT64_MAX) return idx;
+static _upf_type *_upf_get_void_type(void) {
+    static _upf_type *type_ptr = NULL;
+    if (type_ptr != NULL) return type_ptr;
 
     _upf_type type = {
         .name = "void",
@@ -1252,16 +1254,17 @@ static size_t _upf_get_void_type(void) {
         .modifiers = 0,
         .size = UINT64_MAX,
     };
-    idx = _upf_add_type(NULL, type);
+    type_ptr = _upf_add_type(NULL, type);
 
-    return idx;
+    return type_ptr;
 }
 
-static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
+static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
     _UPF_ASSERT(cu != NULL && die != NULL);
 
     for (uint32_t i = 0; i < _upf_state.type_map.length; i++) {
-        if (_upf_state.type_map.data[i].die == die) return i;
+        _upf_type_map_entry entry = _upf_state.type_map.data[i];
+        if (entry.die == die) return entry.type_ptr;
     }
 
     const uint8_t *base = die;
@@ -1297,18 +1300,18 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
         case DW_TAG_array_type: {
             _UPF_ASSERT(subtype_offset != UINT64_MAX);
 
+            _upf_type *element_type = _upf_parse_type(cu, cu->base + subtype_offset);
+
             _upf_type type = {
                 .name = name,
                 .kind = _UPF_TK_ARRAY,
                 .modifiers = 0,
                 .size = size,
                 .as.array = {
-                    .element_type = _upf_parse_type(cu, cu->base + subtype_offset),
+                    .element_type = element_type,
                     .lengths = _UPF_VECTOR_NEW(&_upf_state.arena),
                 },
             };
-
-            const _upf_type *element_type = _upf_get_type(type.as.array.element_type);
 
             bool generate_name = element_type->name != NULL && type.name == NULL;
             if (generate_name) type.name = element_type->name;
@@ -1377,7 +1380,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                 },
             };
 
-            if (type.size == UINT64_MAX) type.size = _upf_get_type(type.as.cenum.underlying_type)->size;
+            if (type.size == UINT64_MAX) type.size = type.as.cenum.underlying_type->size;
 
             if (!abbrev->has_children) return _upf_add_type(base, type);
             while (true) {
@@ -1425,27 +1428,24 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                 .modifiers = 0,
                 .size = sizeof(void*),
                 .as.pointer = {
-                    .type = UINT64_MAX,
+                    .type = NULL,
                 },
             };
 
             // Pointers have to be added before their data gets filled in so that
             // structs that pointer to themselves, such as linked lists, don't get
             // stuck in an infinite loop.
-            size_t type_idx = _upf_add_type(base, type);
+            _upf_type *type_ptr = _upf_add_type(base, type);
 
             if (subtype_offset != UINT64_MAX) {
                 // `void*`s have invalid offset (since they don't point to any type), thus
                 // pointer with invalid type represents a `void*`
 
-                size_t subtype_idx = _upf_parse_type(cu, cu->base + subtype_offset);
-                // Pointers inside vector may become invalid if _upf_parse_type fills up the vector triggering realloc
-                _upf_type *type = &_upf_state.type_map.data[type_idx].type;
-                type->as.pointer.type = subtype_idx;
-                type->name = _upf_get_type(subtype_idx)->name;
+                type_ptr->as.pointer.type = _upf_parse_type(cu, cu->base + subtype_offset);
+                type_ptr->name = type_ptr->as.pointer.type->name;
             }
 
-            return type_idx;
+            return type_ptr;
         }
         case DW_TAG_structure_type:
         case DW_TAG_union_type: {
@@ -1473,7 +1473,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
 
                 _upf_member member = {
                     .name = NULL,
-                    .type = UINT64_MAX,
+                    .type = NULL,
                     .offset = is_struct ? UINT64_MAX : 0,
                     .bit_size = 0,
                 };
@@ -1511,7 +1511,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                 }
                 if (skip_member) continue;
 
-                _UPF_ASSERT(member.name != NULL && member.type != UINT64_MAX && member.offset != UINT64_MAX);
+                _UPF_ASSERT(member.name != NULL && member.type != NULL && member.offset != UINT64_MAX);
                 _UPF_VECTOR_PUSH(&type.as.cstruct.members, member);
             }
 
@@ -1524,7 +1524,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                 .modifiers = 0,
                 .size = size,
                 .as.function = {
-                    .return_type = UINT64_MAX,
+                    .return_type = NULL,
                     .arg_types = _UPF_VECTOR_NEW(&_upf_state.arena),
                 },
             };
@@ -1549,8 +1549,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
 
                     if (attr.name == DW_AT_type) {
                         const uint8_t *type_die = cu->base + _upf_get_ref(die, attr.form);
-                        size_t arg_type = _upf_parse_type(cu, type_die);
-                        _UPF_VECTOR_PUSH(&type.as.function.arg_types, arg_type);
+                        _UPF_VECTOR_PUSH(&type.as.function.arg_types, _upf_parse_type(cu, type_die));
                     }
 
                     die += _upf_get_attr_size(die, attr.form);
@@ -1574,8 +1573,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                 return _upf_add_type(base, type);
             }
 
-            size_t type_idx = _upf_parse_type(cu, cu->base + subtype_offset);
-            _upf_type type = *_upf_get_type(type_idx);
+            _upf_type type = *_upf_parse_type(cu, cu->base + subtype_offset);
             type.name = name;
 
             if (type.kind == _UPF_TK_SCHAR && strcmp(name, "int8_t") == 0) type.kind = _UPF_TK_S1;
@@ -1602,8 +1600,7 @@ static size_t _upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
             if (subtype_offset == UINT64_MAX) {
                 return _upf_get_void_type();
             } else {
-                size_t type_idx = _upf_parse_type(cu, cu->base + subtype_offset);
-                _upf_type type = *_upf_get_type(type_idx);
+                _upf_type type = *_upf_parse_type(cu, cu->base + subtype_offset);
                 type.modifiers |= _upf_get_type_modifier(abbrev->tag);
 
                 return _upf_add_type(base, type);
@@ -2518,7 +2515,7 @@ static _upf_token _upf_consume2(_upf_tokenizer *t, ...) {
 static bool _upf_parse_unary_expr(_upf_tokenizer *t, _upf_parser_state *p);
 static bool _upf_parse_expr(_upf_tokenizer *t, _upf_parser_state *p);
 
-static bool _upf_parse_typename(int *dereference, const char **typename, size_t *type_idx, _upf_tokenizer *t) {
+static bool _upf_parse_typename(int *dereference, const char **typename, _upf_type **type_ptr, _upf_tokenizer *t) {
     _UPF_ASSERT(t != NULL);
     // pointer
     // 	: '*' type_qualifier[] pointer
@@ -2549,7 +2546,7 @@ static bool _upf_parse_typename(int *dereference, const char **typename, size_t 
         while (_upf_consume(t, _UPF_TOK_TYPE_QUALIFIER).kind != _UPF_TOK_NONE) continue;
     }
 
-    if (typename == NULL && type_idx == NULL) return true;
+    if (typename == NULL && type_ptr == NULL) return true;
 
     int kind = DW_ATE_signed;
     bool is_signed = true;
@@ -2632,7 +2629,7 @@ static bool _upf_parse_typename(int *dereference, const char **typename, size_t 
         _UPF_ERROR("Invalid integer type.");
     }
 
-    *type_idx = _upf_add_type(NULL, type);
+    *type_ptr = _upf_add_type(NULL, type);
     return true;
 }
 
@@ -2644,17 +2641,17 @@ static bool _upf_parse_cast_expr(_upf_tokenizer *t, _upf_parser_state *p) {
 
     int dereference = 0;
     const char *typename = NULL;
-    size_t type_idx = UINT64_MAX;
+    _upf_type *type = NULL;
     size_t save = t->idx;
     if (_upf_consume(t, _UPF_TOK_OPEN_PAREN).kind != _UPF_TOK_NONE &&   //
-        _upf_parse_typename(&dereference, &typename, &type_idx, t) &&   //
+        _upf_parse_typename(&dereference, &typename, &type, t) &&       //
         _upf_consume(t, _UPF_TOK_CLOSE_PAREN).kind != _UPF_TOK_NONE &&  //
         _upf_parse_cast_expr(t, NULL)) {
         if (p) {
             p->dereference = dereference;
             if (typename == NULL) {
-                _UPF_ASSERT(type_idx != UINT64_MAX);
-                p->base.idx = type_idx;
+                _UPF_ASSERT(type != NULL);
+                p->base.type = type;
                 p->base_type = _UPF_BT_INT_TYPE;
             } else {
                 p->base.name = typename;
@@ -2935,38 +2932,33 @@ static bool _upf_parse_expr(_upf_tokenizer *t, _upf_parser_state *p) {
 
 // ================== TYPE INFERENCE ======================
 
-static size_t _upf_get_return_type(size_t type_idx, int count) {
+static _upf_type *_upf_get_return_type(_upf_type *type, int count) {
     while (count-- > 0) {
-        const _upf_type *type = _upf_get_type(type_idx);
-        while (type->kind == _UPF_TK_POINTER) type = _upf_get_type(type->as.pointer.type);
+        while (type->kind == _UPF_TK_POINTER) type = type->as.pointer.type;
         if (type->kind != _UPF_TK_FUNCTION) {
             _UPF_ERROR("Unable to get return type of \"%s\" because it is not a function pointer.", type->name);
         }
-        type_idx = type->as.function.return_type;
+        type = type->as.function.return_type;
     }
 
-    return type_idx;
+    return type;
 }
 
-static size_t _upf_get_member_type(const _upf_cstr_vec *member_names, size_t idx, size_t type_idx) {
-    _UPF_ASSERT(member_names != NULL && type_idx != UINT64_MAX);
+static _upf_type *_upf_get_member_type(const _upf_cstr_vec *member_names, size_t idx, _upf_type *type) {
+    _UPF_ASSERT(member_names != NULL && type != NULL);
 
-    if (idx == member_names->length) return type_idx;
+    if (idx == member_names->length) return type;
 
-    const _upf_type *type = _upf_get_type(type_idx);
     if (type->kind == _UPF_TK_POINTER) {
         return _upf_get_member_type(member_names, idx, type->as.pointer.type);
     }
 
     if (type->kind == _UPF_TK_FUNCTION && idx < member_names->length) {
-        size_t return_type_idx = type_idx;
-        while (true) {
-            const _upf_type *type = _upf_get_type(return_type_idx);
-            if (type->kind == _UPF_TK_POINTER) type = _upf_get_type(type->as.pointer.type);
-            if (type->kind != _UPF_TK_FUNCTION) break;
-            return_type_idx = type->as.function.return_type;
-        }
-        return _upf_get_member_type(member_names, idx, return_type_idx);
+        do {
+            type = type->as.function.return_type;
+            if (type->kind == _UPF_TK_POINTER && type->as.pointer.type->kind == _UPF_TK_FUNCTION) type = type->as.pointer.type;
+        } while (type->kind == _UPF_TK_FUNCTION);
+        return _upf_get_member_type(member_names, idx, type);
     }
 
     if (type->kind == _UPF_TK_STRUCT || type->kind == _UPF_TK_UNION) {
@@ -2981,7 +2973,7 @@ static size_t _upf_get_member_type(const _upf_cstr_vec *member_names, size_t idx
     _UPF_ERROR("Unable to find member \"%s\" in \"%s\".", member_names->data[idx], type->name);
 }
 
-static size_t _upf_get_type_by_name(_upf_parser_state *p) {
+static _upf_type *_upf_get_type_by_name(_upf_parser_state *p) {
     _UPF_ASSERT(p != NULL);
 
     for (uint32_t i = 0; i < p->cu->types.length; i++) {
@@ -2990,17 +2982,17 @@ static size_t _upf_get_type_by_name(_upf_parser_state *p) {
         }
     }
 
-    return UINT64_MAX;
+    return NULL;
 }
 
-static size_t _upf_get_variable_type(const _upf_cu *cu, const _upf_scope *scope, uint64_t pc, const char *var_name) {
+static _upf_type *_upf_get_variable_type(const _upf_cu *cu, const _upf_scope *scope, uint64_t pc, const char *var_name) {
     _UPF_ASSERT(cu != NULL && scope != NULL && var_name != NULL);
 
-    if (!_upf_is_in_range(pc, scope->ranges)) return UINT64_MAX;
+    if (!_upf_is_in_range(pc, scope->ranges)) return NULL;
 
     for (uint32_t i = 0; i < scope->scopes.length; i++) {
-        size_t result = _upf_get_variable_type(cu, &scope->scopes.data[i], pc, var_name);
-        if (result != UINT64_MAX) return result;
+        _upf_type *result = _upf_get_variable_type(cu, &scope->scopes.data[i], pc, var_name);
+        if (result != NULL) return result;
     }
 
     for (uint32_t i = 0; i < scope->vars.length; i++) {
@@ -3010,10 +3002,10 @@ static size_t _upf_get_variable_type(const _upf_cu *cu, const _upf_scope *scope,
         }
     }
 
-    return UINT64_MAX;
+    return NULL;
 }
 
-static size_t _upf_get_function_return_type(_upf_parser_state *p) {
+static _upf_type *_upf_get_function_return_type(_upf_parser_state *p) {
     _UPF_ASSERT(p != NULL);
 
     for (uint32_t i = 0; i < p->cu->functions.length; i++) {
@@ -3024,21 +3016,21 @@ static size_t _upf_get_function_return_type(_upf_parser_state *p) {
         }
     }
 
-    return UINT64_MAX;
+    return NULL;
 }
 
-static size_t _upf_get_base_type(_upf_parser_state *p, uint64_t pc, const char *arg) {
+static _upf_type *_upf_get_base_type(_upf_parser_state *p, uint64_t pc, const char *arg) {
     _UPF_ASSERT(p != NULL && arg != NULL);
 
-    size_t type_idx = UINT64_MAX;
+    _upf_type *type_ptr = NULL;
     switch (p->base_type) {
         case _UPF_BT_INT_TYPE:
-            type_idx = p->base.idx;
+            type_ptr = p->base.type;
             break;
         case _UPF_BT_TYPE:
-            type_idx = _upf_get_type_by_name(p);
+            type_ptr = _upf_get_type_by_name(p);
 
-            if (type_idx == UINT64_MAX) {
+            if (type_ptr == NULL) {
                 _UPF_ERROR(
                     "Unable to find type \"%s\" in \"%s\" at %s:%d. "
                     "Ensure that the executable contains debugging information of at least 2nd level (-g2 or -g3).",
@@ -3046,20 +3038,20 @@ static size_t _upf_get_base_type(_upf_parser_state *p, uint64_t pc, const char *
             }
             break;
         case _UPF_BT_VARIABLE:
-            type_idx = _upf_get_variable_type(p->cu, &p->cu->scope, pc, p->base.name);
-            if (type_idx != UINT64_MAX) break;
+            type_ptr = _upf_get_variable_type(p->cu, &p->cu->scope, pc, p->base.name);
+            if (type_ptr != NULL) break;
 
-            if (_upf_get_function_return_type(p) != UINT64_MAX) {
+            if (_upf_get_function_return_type(p) != NULL) {
                 _upf_type type = {
                     .name = NULL,
                     .kind = _UPF_TK_FUNCTION,
                     .modifiers = 0,
                     .size = sizeof(void *),
                 };
-                type_idx = _upf_add_type(NULL, type);
+                type_ptr = _upf_add_type(NULL, type);
             }
 
-            if (type_idx == UINT64_MAX) {
+            if (type_ptr == NULL) {
                 _UPF_ERROR(
                     "Unable to find type of \"%s\" in \"%s\" at %s:%d. "
                     "Ensure that the executable contains debugging information of at least 2nd level (-g2 or -g3).",
@@ -3067,21 +3059,20 @@ static size_t _upf_get_base_type(_upf_parser_state *p, uint64_t pc, const char *
             }
             break;
         case _UPF_BT_FUNCTION:
-            type_idx = _upf_get_variable_type(p->cu, &p->cu->scope, pc, p->base.name);
+            type_ptr = _upf_get_variable_type(p->cu, &p->cu->scope, pc, p->base.name);
 
-            if (type_idx != UINT64_MAX) {
-                const _upf_type *type = _upf_get_type(type_idx);
-                if (type->kind != _UPF_TK_POINTER) goto not_function_error;
+            if (type_ptr != NULL) {
+                if (type_ptr->kind != _UPF_TK_POINTER) goto not_function_error;
 
-                type = _upf_get_type(type->as.pointer.type);
-                if (type->kind != _UPF_TK_FUNCTION) goto not_function_error;
+                type_ptr = type_ptr->as.pointer.type;
+                if (type_ptr->kind != _UPF_TK_FUNCTION) goto not_function_error;
 
-                type_idx = type->as.function.return_type;
+                type_ptr = type_ptr->as.function.return_type;
             } else {
-                type_idx = _upf_get_function_return_type(p);
+                type_ptr = _upf_get_function_return_type(p);
             }
 
-            if (type_idx == UINT64_MAX) {
+            if (type_ptr == NULL) {
             not_function_error:
                 _UPF_ERROR(
                     "Unable to find type of function \"%s\" in \"%s\" at %s:%d. "
@@ -3093,11 +3084,11 @@ static size_t _upf_get_base_type(_upf_parser_state *p, uint64_t pc, const char *
             break;
     }
 
-    _UPF_ASSERT(type_idx != UINT64_MAX);
-    return type_idx;
+    _UPF_ASSERT(type_ptr != NULL);
+    return type_ptr;
 }
 
-static size_t _upf_dereference_type(size_t type_idx, int dereference, const char *arg) {
+static _upf_type *_upf_dereference_type(_upf_type *type_ptr, int dereference, const char *arg) {
     _UPF_ASSERT(arg != NULL);
 
     // Arguments are pointers to data that should be printed, so they get dereferenced
@@ -3111,29 +3102,26 @@ static size_t _upf_dereference_type(size_t type_idx, int dereference, const char
             .modifiers = 0,
             .size = sizeof(void*),
             .as.pointer = {
-                .type = type_idx,
+                .type = type_ptr,
             },
         };
 
-        type_idx = _upf_add_type(NULL, type);
+        type_ptr = _upf_add_type(NULL, type);
         dereference++;
     }
 
     while (dereference > 0) {
-        const _upf_type *type = _upf_get_type(type_idx);
-
-        if (type->kind == _UPF_TK_POINTER) {
-            type_idx = type->as.pointer.type;
+        if (type_ptr->kind == _UPF_TK_POINTER) {
+            type_ptr = type_ptr->as.pointer.type;
             dereference--;
-        } else if (type->kind == _UPF_TK_ARRAY) {
-            int dimensions = type->as.array.lengths.length;
+        } else if (type_ptr->kind == _UPF_TK_ARRAY) {
+            int dimensions = type_ptr->as.array.lengths.length;
             if (dereference > dimensions) {
                 goto not_pointer_error;
             } else if (dereference == dimensions) {
-                type_idx = type->as.array.element_type;
+                type_ptr = type_ptr->as.array.element_type;
             } else {
-                // This may invalidate type pointer
-                type_idx = _upf_add_type(NULL, _upf_get_subarray(type, dereference));
+                type_ptr = _upf_add_type(NULL, _upf_get_subarray(type_ptr, dereference));
             }
 
             dereference = 0;
@@ -3143,7 +3131,7 @@ static size_t _upf_dereference_type(size_t type_idx, int dereference, const char
                        _upf_state.file_path, _upf_state.line);
         }
 
-        if (type_idx == UINT64_MAX) {
+        if (type_ptr == NULL) {
             _UPF_ERROR(
                 "Unable to print `void*` because it can point to arbitrary data of any length. "
                 "To print the pointer itself, you must get pointer (&) of \"%s\" at %s:%d.",
@@ -3151,7 +3139,7 @@ static size_t _upf_dereference_type(size_t type_idx, int dereference, const char
         }
     }
 
-    return type_idx;
+    return type_ptr;
 }
 
 static const _upf_type *_upf_get_arg_type(const char *arg, uint64_t pc) {
@@ -3184,13 +3172,13 @@ static const _upf_type *_upf_get_arg_type(const char *arg, uint64_t pc) {
         _UPF_ERROR("Unable to parse argument \"%s\" at %s:%d.", arg, _upf_state.file_path, _upf_state.line);
     }
 
-    size_t base_type = _upf_get_base_type(&p, pc, arg);
-    size_t member_type = _upf_get_member_type(&p.members, 0, base_type);
+    _upf_type *base_type = _upf_get_base_type(&p, pc, arg);
+    _upf_type *member_type = _upf_get_member_type(&p.members, 0, base_type);
     if (p.suffix_calls > 0) member_type = _upf_get_return_type(member_type, p.suffix_calls);
-    size_t type = _upf_dereference_type(member_type, p.dereference, arg);
+    const _upf_type *type = _upf_dereference_type(member_type, p.dereference, arg);
 
-    _UPF_ASSERT(type != UINT64_MAX);
-    return _upf_get_type(type);
+    _UPF_ASSERT(type != NULL);
+    return type;
 }
 
 // ================== /proc/pid/maps ======================
@@ -3290,13 +3278,13 @@ static void _upf_print_typename(const _upf_type *type, bool print_trailing_white
 
     switch (type->kind) {
         case _UPF_TK_POINTER: {
-            if (type->as.pointer.type == UINT64_MAX) {
+            if (type->as.pointer.type == NULL) {
                 _upf_bprintf("void *");
                 _upf_print_modifiers(type->modifiers);
                 break;
             }
 
-            const _upf_type *pointer_type = _upf_get_type(type->as.pointer.type);
+            const _upf_type *pointer_type = type->as.pointer.type;
             if (pointer_type->kind == _UPF_TK_FUNCTION) {
                 _upf_print_typename(pointer_type, print_trailing_whitespace, is_return_type);
                 break;
@@ -3309,16 +3297,16 @@ static void _upf_print_typename(const _upf_type *type, bool print_trailing_white
         case _UPF_TK_FUNCTION:
             if (is_return_type) _upf_bprintf("(");
 
-            if (type->as.function.return_type == UINT64_MAX) {
+            if (type->as.function.return_type == NULL) {
                 _upf_bprintf("void");
             } else {
-                _upf_print_typename(_upf_get_type(type->as.function.return_type), false, true);
+                _upf_print_typename(type->as.function.return_type, false, true);
             }
 
             _upf_bprintf("(");
             for (uint32_t i = 0; i < type->as.function.arg_types.length; i++) {
                 if (i > 0) _upf_bprintf(", ");
-                _upf_print_typename(_upf_get_type(type->as.function.arg_types.data[i]), false, false);
+                _upf_print_typename(type->as.function.arg_types.data[i], false, false);
             }
             _upf_bprintf(")");
             if (is_return_type) _upf_bprintf(")");
@@ -3384,11 +3372,9 @@ static void _upf_collect_circular_structs(_upf_indexed_struct_vec *seen, _upf_in
     if (type->kind == _UPF_TK_POINTER) {
         void *ptr;
         memcpy(&ptr, data, sizeof(ptr));
-        if (ptr == NULL || type->as.pointer.type == UINT64_MAX) return;
+        if (ptr == NULL || type->as.pointer.type == NULL) return;
 
-        const _upf_type *pointed_type = _upf_get_type(type->as.pointer.type);
-
-        _upf_collect_circular_structs(seen, circular, ptr, pointed_type, depth);
+        _upf_collect_circular_structs(seen, circular, ptr, type->as.pointer.type, depth);
         return;
     }
 
@@ -3417,7 +3403,7 @@ static void _upf_collect_circular_structs(_upf_indexed_struct_vec *seen, _upf_in
     for (uint32_t i = 0; i < members.length; i++) {
         const _upf_member *member = &members.data[i];
         if (member->bit_size == 0) {  // non-zero bit_size means bit field
-            _upf_collect_circular_structs(seen, circular, data + member->offset, _upf_get_type(member->type), depth + 1);
+            _upf_collect_circular_structs(seen, circular, data + member->offset, member->type, depth + 1);
         }
     }
 }
@@ -3491,13 +3477,12 @@ static void _upf_print_type(_upf_indexed_struct_vec *circular, const uint8_t *da
             _upf_bprintf("{\n");
             for (uint32_t i = 0; i < members.length; i++) {
                 const _upf_member *member = &members.data[i];
-                const _upf_type *member_type = _upf_get_type(member->type);
 
                 _upf_bprintf("%*s", UPRINTF_INDENTATION_WIDTH * (depth + 1), "");
-                _upf_print_typename(member_type, true, false);
+                _upf_print_typename(member->type, true, false);
                 _upf_bprintf("%s = ", member->name);
                 if (member->bit_size == 0) {
-                    _upf_print_type(circular, data + member->offset, member_type, depth + 1);
+                    _upf_print_type(circular, data + member->offset, member->type, depth + 1);
                 } else {
                     _upf_print_bit_field(data, member->offset, member->bit_size);
                 }
@@ -3507,7 +3492,7 @@ static void _upf_print_type(_upf_indexed_struct_vec *circular, const uint8_t *da
         } break;
         case _UPF_TK_ENUM: {
             _upf_enum_vec enums = type->as.cenum.enums;
-            const _upf_type *underlying_type = _upf_get_type(type->as.cenum.underlying_type);
+            const _upf_type *underlying_type = type->as.cenum.underlying_type;
 
             int64_t enum_value;
             if (underlying_type->kind == _UPF_TK_U4) {
@@ -3537,7 +3522,7 @@ static void _upf_print_type(_upf_indexed_struct_vec *circular, const uint8_t *da
             _upf_bprintf(")");
         } break;
         case _UPF_TK_ARRAY: {
-            const _upf_type *element_type = _upf_get_type(type->as.array.element_type);
+            const _upf_type *element_type = type->as.array.element_type;
             size_t element_size = element_type->size;
 
             if (element_size == UINT64_MAX) {
@@ -3595,12 +3580,12 @@ static void _upf_print_type(_upf_indexed_struct_vec *circular, const uint8_t *da
                 return;
             }
 
-            if (type->as.pointer.type == UINT64_MAX) {
+            if (type->as.pointer.type == NULL) {
                 _upf_bprintf("%p", ptr);
                 return;
             }
 
-            const _upf_type *pointed_type = _upf_get_type(type->as.pointer.type);
+            const _upf_type *pointed_type = type->as.pointer.type;
             if (pointed_type->kind == _UPF_TK_POINTER || pointed_type->kind == _UPF_TK_VOID) {
                 _upf_bprintf("%p", ptr);
                 return;
@@ -3655,17 +3640,17 @@ static void _upf_print_type(_upf_indexed_struct_vec *circular, const uint8_t *da
                 _UPF_ASSERT(cu != NULL);
 
                 _upf_bprintf(" (");
-                size_t return_type_idx
+                _upf_type *return_type
                     = function->return_type_die == NULL ? _upf_get_void_type() : _upf_parse_type(cu, function->return_type_die);
-                _upf_print_typename(_upf_get_type(return_type_idx), true, true);
+                _upf_print_typename(return_type, true, true);
                 _upf_bprintf("%s(", function->name);
                 for (uint32_t i = 0; i < function->args.length; i++) {
                     _upf_named_type arg = function->args.data[i];
-                    size_t arg_type_idx = _upf_parse_type(cu, arg.die);
+                    _upf_type *arg_type = _upf_parse_type(cu, arg.die);
                     bool has_name = arg.name != NULL;
 
                     if (i > 0) _upf_bprintf(", ");
-                    _upf_print_typename(_upf_get_type(arg_type_idx), has_name, false);
+                    _upf_print_typename(arg_type, has_name, false);
                     if (has_name) _upf_bprintf("%s", arg.name);
                 }
                 if (function->is_variadic) {
