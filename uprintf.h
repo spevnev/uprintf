@@ -2450,31 +2450,16 @@ static void _upf_tokenize(_upf_tokenizer *t, const char *string) {
     }
 }
 
-static _upf_token _upf_next(_upf_tokenizer *t) {
-    const _upf_token none = {
-        .kind = _UPF_TOK_NONE,
-        .string = "none",
-    };
-
-    _UPF_ASSERT(t != NULL);
-    return t->idx < t->tokens.length ? t->tokens.data[t->idx++] : none;
-}
-
 static void _upf_back(_upf_tokenizer *t) {
     _UPF_ASSERT(t != NULL && t->idx > 0);
     t->idx--;
 }
 
-static _upf_token _upf_consume2(_upf_tokenizer *t, ...) {
-    const _upf_token none = {
-        .kind = _UPF_TOK_NONE,
-        .string = "none",
-    };
-
+static const _upf_token *_upf_consume_any2(_upf_tokenizer *t, ...) {
     _UPF_ASSERT(t != NULL);
-    if (t->idx >= t->tokens.length) return none;
 
-    _upf_token token = t->tokens.data[t->idx];
+    if (t->idx >= t->tokens.length) return NULL;
+    const _upf_token *token = &t->tokens.data[t->idx];
 
     va_list va_args;
     va_start(va_args, t);
@@ -2482,7 +2467,7 @@ static _upf_token _upf_consume2(_upf_tokenizer *t, ...) {
         enum _upf_token_kind kind = va_arg(va_args, enum _upf_token_kind);
         if (kind == _UPF_TOK_NONE) break;
 
-        if (token.kind == kind) {
+        if (token->kind == kind) {
             t->idx++;
             va_end(va_args);
             return token;
@@ -2490,10 +2475,10 @@ static _upf_token _upf_consume2(_upf_tokenizer *t, ...) {
     }
     va_end(va_args);
 
-    return none;
+    return NULL;
 }
 
-#define _upf_consume(t, ...) _upf_consume2(t, __VA_ARGS__, _UPF_TOK_NONE)
+#define _upf_consume_any(t, ...) _upf_consume_any2(t, __VA_ARGS__, _UPF_TOK_NONE)
 
 // ===================== PARSING ==========================
 
@@ -2515,24 +2500,22 @@ static bool _upf_parse_typename(int *dereference, const char **typename, _upf_ty
     // 	: specifier_qualifier[] pointer
     // 	| specifier_qualifier[]
 
-    bool is_type = false;
     const char *ids[4];  // max is "unsigned long long int"
     int ids_length = 0;
-    while (true) {
-        _upf_token token = _upf_consume(t, _UPF_TOK_TYPE_SPECIFIER, _UPF_TOK_TYPE_QUALIFIER, _UPF_TOK_ID);
-        if (token.kind == _UPF_TOK_NONE) break;
-
+    bool is_type = false;
+    const _upf_token *token = NULL;
+    while ((token = _upf_consume_any(t, _UPF_TOK_TYPE_SPECIFIER, _UPF_TOK_TYPE_QUALIFIER, _UPF_TOK_ID))) {
         is_type = true;
-        if (token.kind == _UPF_TOK_ID) {
+        if (token->kind == _UPF_TOK_ID) {
             _UPF_ASSERT(ids_length < 4);
-            ids[ids_length++] = token.string;
+            ids[ids_length++] = token->string;
         }
     }
     if (!is_type) return false;
 
-    while (_upf_consume(t, _UPF_TOK_STAR).kind != _UPF_TOK_NONE) {
+    while (_upf_consume_any(t, _UPF_TOK_STAR)) {
         if (dereference) *dereference -= 1;
-        while (_upf_consume(t, _UPF_TOK_TYPE_QUALIFIER).kind != _UPF_TOK_NONE) continue;
+        while (_upf_consume_any(t, _UPF_TOK_TYPE_QUALIFIER)) continue;
     }
 
     if (typename == NULL && type_ptr == NULL) return true;
@@ -2632,10 +2615,8 @@ static bool _upf_parse_cast_expr(_upf_tokenizer *t, _upf_parser_state *p) {
     const char *typename = NULL;
     _upf_type *type = NULL;
     size_t save = t->idx;
-    if (_upf_consume(t, _UPF_TOK_OPEN_PAREN).kind != _UPF_TOK_NONE &&   //
-        _upf_parse_typename(&dereference, &typename, &type, t) &&       //
-        _upf_consume(t, _UPF_TOK_CLOSE_PAREN).kind != _UPF_TOK_NONE &&  //
-        _upf_parse_cast_expr(t, NULL)) {
+    if (_upf_consume_any(t, _UPF_TOK_OPEN_PAREN) && _upf_parse_typename(&dereference, &typename, &type, t)
+        && _upf_consume_any(t, _UPF_TOK_CLOSE_PAREN) && _upf_parse_cast_expr(t, NULL)) {
         if (p) {
             p->dereference = dereference;
             if (typename == NULL) {
@@ -2649,8 +2630,8 @@ static bool _upf_parse_cast_expr(_upf_tokenizer *t, _upf_parser_state *p) {
         }
         return true;
     }
-
     t->idx = save;
+
     return _upf_parse_unary_expr(t, p);
 }
 
@@ -2698,8 +2679,8 @@ static bool _upf_parse_math_expr(_upf_tokenizer *t, _upf_parser_state *p) {
 
         result = true;
         save = t->idx;
-    } while (_upf_consume(t, _UPF_TOK_MATH, _UPF_TOK_COMPARISON, _UPF_TOK_STAR, _UPF_TOK_AMPERSAND, _UPF_TOK_PLUS, _UPF_TOK_MINUS).kind
-             != _UPF_TOK_NONE);
+    } while (_upf_consume_any(t, _UPF_TOK_MATH, _UPF_TOK_COMPARISON, _UPF_TOK_STAR, _UPF_TOK_AMPERSAND, _UPF_TOK_PLUS, _UPF_TOK_MINUS));
+
     return true;
 }
 
@@ -2715,12 +2696,12 @@ static bool _upf_parse_assignment_expr(_upf_tokenizer *t, _upf_parser_state *p) 
     size_t save = t->idx;
     while (true) {
         if (!_upf_parse_math_expr(t, p)) break;
-        if (_upf_consume(t, _UPF_TOK_QUESTION).kind == _UPF_TOK_NONE) return true;
-        if (!_upf_parse_expr(t, NULL) || _upf_consume(t, _UPF_TOK_COLON).kind == _UPF_TOK_NONE) break;
+        if (!_upf_consume_any(t, _UPF_TOK_QUESTION)) return true;
+        if (!_upf_parse_expr(t, NULL) || !_upf_consume_any(t, _UPF_TOK_COLON)) break;
     }
     t->idx = save;
 
-    if (!_upf_parse_unary_expr(t, p) || _upf_consume(t, _UPF_TOK_ASSIGNMENT).kind == _UPF_TOK_NONE || !_upf_parse_assignment_expr(t, p)) {
+    if (!_upf_parse_unary_expr(t, p) || !_upf_consume_any(t, _UPF_TOK_ASSIGNMENT) || !_upf_parse_assignment_expr(t, p)) {
         t->idx = save;
         return false;
     }
@@ -2738,27 +2719,25 @@ static bool _upf_parse_postfix_expr(_upf_tokenizer *t, _upf_parser_state *p) {
     bool is_base = false;
     int dereference_save = p ? p->dereference : 0;
     size_t save = t->idx;
-    _upf_token token = _upf_next(t);
-    switch (token.kind) {
+
+    const _upf_token *token = _upf_consume_any(t, _UPF_TOK_ID, _UPF_TOK_STRING, _UPF_TOK_NUMBER, _UPF_TOK_OPEN_PAREN);
+    if (token == NULL) return false;
+    switch (token->kind) {
         case _UPF_TOK_ID:
             if (p) {
-                p->base.name = token.string;
+                p->base.name = token->string;
                 p->base_type = _UPF_BT_VARIABLE;
                 is_base = true;
             }
             break;
-        case _UPF_TOK_STRING:
-        case _UPF_TOK_NUMBER:
-            break;
         case _UPF_TOK_OPEN_PAREN:
-            if (!_upf_parse_expr(t, p) || _upf_consume(t, _UPF_TOK_CLOSE_PAREN).kind == _UPF_TOK_NONE) {
+            if (!_upf_parse_expr(t, p) || !_upf_consume_any(t, _UPF_TOK_CLOSE_PAREN)) {
                 t->idx = save;
                 return false;
             }
             break;
         default:
-            _upf_back(t);
-            return false;
+            break;
     }
 
     // postfix_expr'
@@ -2768,22 +2747,20 @@ static bool _upf_parse_postfix_expr(_upf_tokenizer *t, _upf_parser_state *p) {
     // 	| DOT IDENTIFIER postfix_expr'
     // 	| POSTFIX_OP postfix_expr'
     // 	| POSTFIX_OP postfix_expr'
-    while (true) {
-        token = _upf_next(t);
-        if (token.kind == _UPF_TOK_NONE) return true;
-
-        if (p && token.kind != _UPF_TOK_OPEN_PAREN) p->suffix_calls = 0;
-        switch (token.kind) {
+    while ((token = _upf_consume_any(t, _UPF_TOK_OPEN_BRACKET, _UPF_TOK_OPEN_PAREN, _UPF_TOK_DOT, _UPF_TOK_ARROW, _UPF_TOK_INCREMENT,
+                                     _UPF_TOK_DECREMENT))) {
+        if (p && token->kind != _UPF_TOK_OPEN_PAREN) p->suffix_calls = 0;
+        switch (token->kind) {
             case _UPF_TOK_OPEN_BRACKET:
                 if (p) p->dereference++;
-                if (!_upf_parse_expr(t, NULL) || _upf_consume(t, _UPF_TOK_CLOSE_BRACKET).kind == _UPF_TOK_NONE) {
+                if (!_upf_parse_expr(t, NULL) || !_upf_consume_any(t, _UPF_TOK_CLOSE_BRACKET)) {
                     t->idx = save;
                     return false;
                 }
                 break;
             case _UPF_TOK_OPEN_PAREN:
-                while (_upf_parse_assignment_expr(t, NULL) && _upf_consume(t, _UPF_TOK_COMMA).kind != _UPF_TOK_NONE) continue;
-                if (_upf_consume(t, _UPF_TOK_CLOSE_PAREN).kind == _UPF_TOK_NONE) {
+                while (_upf_parse_assignment_expr(t, NULL) && _upf_consume_any(t, _UPF_TOK_COMMA)) continue;
+                if (!_upf_consume_any(t, _UPF_TOK_CLOSE_PAREN)) {
                     t->idx = save;
                     return false;
                 }
@@ -2798,25 +2775,23 @@ static bool _upf_parse_postfix_expr(_upf_tokenizer *t, _upf_parser_state *p) {
             case _UPF_TOK_ARROW:
                 is_base = false;
 
-                token = _upf_next(t);
-                if (token.kind != _UPF_TOK_ID) {
+                token = _upf_consume_any(t, _UPF_TOK_ID);
+                if (token == NULL) {
                     t->idx = save;
                     return false;
                 }
 
                 if (p) {
                     p->dereference = dereference_save;
-                    _UPF_VECTOR_PUSH(&p->members, token.string);
+                    _UPF_VECTOR_PUSH(&p->members, token->string);
                 }
                 break;
-            case _UPF_TOK_INCREMENT:
-            case _UPF_TOK_DECREMENT:
-                break;
             default:
-                _upf_back(t);
-                return true;
+                break;
         }
     }
+
+    return true;
 }
 
 static bool _upf_parse_unary_expr(_upf_tokenizer *t, _upf_parser_state *p) {
@@ -2830,7 +2805,7 @@ static bool _upf_parse_unary_expr(_upf_tokenizer *t, _upf_parser_state *p) {
     // 	| alignof '(' typename ')'
 
     size_t save = t->idx;
-    if (_upf_consume(t, _UPF_TOK_INCREMENT, _UPF_TOK_DECREMENT).kind != _UPF_TOK_NONE) {
+    if (_upf_consume_any(t, _UPF_TOK_INCREMENT, _UPF_TOK_DECREMENT)) {
         if (!_upf_parse_unary_expr(t, p)) {
             t->idx = save;
             return false;
@@ -2838,7 +2813,7 @@ static bool _upf_parse_unary_expr(_upf_tokenizer *t, _upf_parser_state *p) {
         return true;
     }
 
-    if (_upf_consume(t, _UPF_TOK_PLUS, _UPF_TOK_MINUS, _UPF_TOK_TILDE, _UPF_TOK_EXCLAMATION).kind != _UPF_TOK_NONE) {
+    if (_upf_consume_any(t, _UPF_TOK_PLUS, _UPF_TOK_MINUS, _UPF_TOK_TILDE, _UPF_TOK_EXCLAMATION)) {
         if (!_upf_parse_cast_expr(t, p)) {
             t->idx = save;
             return false;
@@ -2846,7 +2821,7 @@ static bool _upf_parse_unary_expr(_upf_tokenizer *t, _upf_parser_state *p) {
         return true;
     }
 
-    if (_upf_consume(t, _UPF_TOK_AMPERSAND).kind != _UPF_TOK_NONE) {
+    if (_upf_consume_any(t, _UPF_TOK_AMPERSAND)) {
         if (!_upf_parse_cast_expr(t, p)) {
             t->idx = save;
             return false;
@@ -2856,7 +2831,7 @@ static bool _upf_parse_unary_expr(_upf_tokenizer *t, _upf_parser_state *p) {
         return true;
     }
 
-    if (_upf_consume(t, _UPF_TOK_STAR).kind != _UPF_TOK_NONE) {
+    if (_upf_consume_any(t, _UPF_TOK_STAR)) {
         if (!_upf_parse_cast_expr(t, p)) {
             t->idx = save;
             return false;
@@ -2866,12 +2841,12 @@ static bool _upf_parse_unary_expr(_upf_tokenizer *t, _upf_parser_state *p) {
         return true;
     }
 
-    _upf_token token = _upf_consume(t, _UPF_TOK_ID);
-    if (token.kind == _UPF_TOK_ID) {
-        if (strcmp(token.string, "sizeof") == 0) {
+    const _upf_token *token = _upf_consume_any(t, _UPF_TOK_ID);
+    if (token && token->kind == _UPF_TOK_ID) {
+        if (strcmp(token->string, "sizeof") == 0) {
             size_t save2 = t->idx;
-            if (_upf_consume(t, _UPF_TOK_OPEN_PAREN).kind != _UPF_TOK_NONE && _upf_parse_typename(NULL, NULL, NULL, t)
-                && _upf_consume(t, _UPF_TOK_CLOSE_PAREN).kind != _UPF_TOK_NONE) {
+            if (_upf_consume_any(t, _UPF_TOK_OPEN_PAREN) && _upf_parse_typename(NULL, NULL, NULL, t)
+                && _upf_consume_any(t, _UPF_TOK_CLOSE_PAREN)) {
                 return true;
             }
             t->idx = save2;
@@ -2883,9 +2858,9 @@ static bool _upf_parse_unary_expr(_upf_tokenizer *t, _upf_parser_state *p) {
             return true;
         }
 
-        if (strcmp(token.string, "_Alignof") == 0 || strcmp(token.string, "alignof") == 0) {
-            if (_upf_consume(t, _UPF_TOK_OPEN_PAREN).kind == _UPF_TOK_NONE || !_upf_parse_typename(NULL, NULL, NULL, t)
-                || _upf_consume(t, _UPF_TOK_CLOSE_PAREN).kind == _UPF_TOK_NONE) {
+        if (strcmp(token->string, "_Alignof") == 0 || strcmp(token->string, "alignof") == 0) {
+            if (!_upf_consume_any(t, _UPF_TOK_OPEN_PAREN) || !_upf_parse_typename(NULL, NULL, NULL, t)
+                || !_upf_consume_any(t, _UPF_TOK_CLOSE_PAREN)) {
                 t->idx = save;
                 return false;
             }
@@ -2913,7 +2888,7 @@ static bool _upf_parse_expr(_upf_tokenizer *t, _upf_parser_state *p) {
             t->idx = save;
             return false;
         }
-    } while (_upf_consume(t, _UPF_TOK_COMMA).kind != _UPF_TOK_NONE);
+    } while (_upf_consume_any(t, _UPF_TOK_COMMA));
     if (p) *p = p_copy;
 
     return true;
