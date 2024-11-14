@@ -14,7 +14,6 @@ int other_fun(char a, float *b, unsigned long c) {
 
 int main(void) {
     int i = 1;
-    char c = 'c';
 
     uint8_t u8 = 255;
     uint16_t u16 = 65535;
@@ -35,7 +34,6 @@ int main(void) {
     void *void_ptr = &i;
     int *int_ptr = &i;
     float *null_ptr = NULL;
-    char *ch_ptr = &c;
 
     const char *str = "string";
 
@@ -63,7 +61,6 @@ int main(void) {
     uprintf("void_ptr: %S\n", &void_ptr);
     uprintf("int_ptr: %S\n", &int_ptr);
     uprintf("null_ptr: %S\n", &null_ptr);
-    uprintf("ch_ptr: %S\n", &ch_ptr);
 
     uprintf("str: %S\n", &str);
 

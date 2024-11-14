@@ -14,7 +14,6 @@ Struct containing all types: {
     void *void_ptr = POINTER
     int *int_ptr = POINTER (5)
     float *null_ptr = NULL
-    char *ch_ptr = POINTER ("c")
     const char *str = POINTER ("str string")
     char *const const_str = POINTER ("const_str string")
     _Bool b = true

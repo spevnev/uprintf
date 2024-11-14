@@ -2134,7 +2134,7 @@ static void _upf_parse_dwarf(void) {
 
         uint8_t type = *die;
         die += sizeof(type);
-        _UPF_ASSERT(type == DW_UT_compile);
+        if (type != DW_UT_compile) _UPF_ERROR("uprintf does NOT support split debug information.");
 
         uint8_t address_size = *die;
         _UPF_ASSERT(_upf_state.address_size == 0 || _upf_state.address_size == address_size);
@@ -3710,11 +3710,10 @@ __attribute__((destructor)) void _upf_fini(void) {
 }
 
 __attribute__((noinline)) void _upf_uprintf(const char *file_path, int line, const char *fmt, const char *args_string, ...) {
-    if (setjmp(_upf_state.jmp_buf) != 0) return;
-
     _UPF_ASSERT(file_path != NULL && line > 0 && fmt != NULL && args_string != NULL);
 
-    if (!_upf_state.is_init) _UPF_ERROR("Error during initialization.");
+    if (setjmp(_upf_state.jmp_buf) != 0) return;
+    if (!_upf_state.is_init) return;
 
     _upf_state.ptr = _upf_state.buffer;
     _upf_state.free = _upf_state.size;

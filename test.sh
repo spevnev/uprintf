@@ -67,16 +67,17 @@ function get_similarity {
         # Baselines are generated from gcc, so decrease its similarity for clang:
         if   [ "$test" = "struct" ];        then result=90;
         elif [ "$test" = "packed_struct" ]; then result=90;
-        elif [ "$test" = "primitives" ];    then result=95;
-        # Clang doesn't produce DW_AT_subprogram for external functions, i.e. shared libraries
-        # or different CUs, so cross-CU retrieval of function signature/name doesn't work.
-        elif [ "$test" = "function" ];      then result=85; fi
+        elif [ "$test" = "primitives" ];    then result=95; fi
     fi
 
     # FILE has different implementation which is up to stdio.h and it often has pointers
     # that point out-of-bounds causing uprintf to print garbage from the memory, thus the
     # primary goal of the test is to check that there are no errors, i.e. segfaults, leaks.
-    if [ "$test" = "stdio_file" ]; then result=10; fi
+    if [ "$test" = "stdio_file" ]; then result=10;
+    # Clang doesn't produce DW_AT_subprogram for external functions, i.e. shared libraries
+    # or different CUs, so cross-CU retrieval of function signature/name doesn't work.
+    # Some GCC versions print "size_t" and some "unsigned long int"
+    elif [ "$test" = "function" ]; then result=85; fi
 
     echo $result
 }

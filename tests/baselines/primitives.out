@@ -13,7 +13,6 @@ sch: 157
 void_ptr: POINTER
 int_ptr: POINTER (1)
 null_ptr: NULL
-ch_ptr: POINTER ("c")
 str: POINTER ("string")
 b: false
 void_fun: POINTER (void void_fun())
