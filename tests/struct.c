@@ -50,6 +50,7 @@ int other_fun(char a, float *b, unsigned long c) {
 
 int main(void) {
     int i = 5;
+    char c = 'c';
 
     Struct s = {
         .u8 = 255,
@@ -71,6 +72,8 @@ int main(void) {
         .void_ptr = &i,
         .int_ptr = &i,
         .null_ptr = NULL,
+        .ch_ptr = &c,
+
         .str = "str string",
         .const_str = "const_str string",
 

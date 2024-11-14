@@ -3,7 +3,19 @@
 #include <stdlib.h>
 #include "uprintf.h"
 
+void void_fun(void) {}
+
+int other_fun(char a, float *b, unsigned long c) {
+    (void) a;
+    (void) b;
+    (void) c;
+    return 1;
+}
+
 int main(void) {
+    int i = 1;
+    char c = 'c';
+
     uint8_t u8 = 255;
     uint16_t u16 = 65535;
     uint32_t u32 = 4294967295;
@@ -20,11 +32,17 @@ int main(void) {
     signed char uch = 'c';
     unsigned char sch = -'c';
 
-    void *void_ptr = &i8;
-    void *null_ptr = NULL;
-    int i = 123;
+    void *void_ptr = &i;
     int *int_ptr = &i;
-    const char *str = "const char *str";
+    float *null_ptr = NULL;
+    char *ch_ptr = &c;
+
+    const char *str = "string";
+
+    bool b = false;
+
+    void (*void_fun_v)(void) = &void_fun;
+    int (*other_fun_v)(char, float *, unsigned long) = &other_fun;
 
     uprintf("u8: %S\n", &u8);
     uprintf("u16: %S\n", &u16);
@@ -43,9 +61,16 @@ int main(void) {
     uprintf("sch: %S\n", &sch);
 
     uprintf("void_ptr: %S\n", &void_ptr);
-    uprintf("null_ptr: %S\n", &null_ptr);
     uprintf("int_ptr: %S\n", &int_ptr);
+    uprintf("null_ptr: %S\n", &null_ptr);
+    uprintf("ch_ptr: %S\n", &ch_ptr);
+
     uprintf("str: %S\n", &str);
+
+    uprintf("b: %S\n", &b);
+
+    uprintf("void_fun: %S\n", &void_fun_v);
+    uprintf("other_fun: %S\n", &other_fun_v);
 
     return _upf_test_status;
 }

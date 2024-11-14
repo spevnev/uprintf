@@ -11,6 +11,10 @@ f64: -0.321000
 uch: 99 ('c')
 sch: 157
 void_ptr: POINTER
+int_ptr: POINTER (1)
 null_ptr: NULL
-int_ptr: POINTER (123)
-str: POINTER ("const char *str")
+ch_ptr: POINTER ("c")
+str: POINTER ("string")
+b: false
+void_fun: POINTER (void void_fun())
+other_fun: POINTER (int other_fun(char a, float *b, long unsigned int c))

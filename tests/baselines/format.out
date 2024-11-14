@@ -1,6 +1,0 @@
-Different format specifiers: 100 100 100 100 100 100 100 100 100
-Escaped format specifier: 100 %
-(uprintf) [ERROR] Unfinished format specifier at the end of the line at tests/format.c:14.
-(uprintf) [ERROR] Unfinished format specifier at the end of the line at tests/format.c:18.
-(uprintf) [ERROR] Unknown format specifier "%3" at tests/format.c:22.
-(uprintf) [ERROR] Unknown format specifier "%-" at tests/format.c:26.
