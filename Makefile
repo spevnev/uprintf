@@ -71,13 +71,13 @@ $(BUILD_DIR)/$(EXAMPLE_DIR)/uprintf: $(EXAMPLE_DIR)/uprintf.c uprintf.h Makefile
 test: tests
 
 .PHONY: tests
-tests: $(foreach C,$(COMPILERS),$(foreach O,$(O_LEVELS),$(foreach G,$(G_LEVELS),$(foreach T,$(TESTS),$(BUILD_DIR)/test/$T/$T-$C-$O-$G))))
+tests: $(foreach C,$(COMPILERS),$(foreach O,$(O_LEVELS),$(foreach G,$(G_LEVELS),$(foreach T,$(TESTS),$(BUILD_DIR)/test/$T/$C-$O-$G))))
 
 # Export all variables to subprocesses, i.e. test.sh
 export
 
 define TEST_TEMPLATE
-$(BUILD_DIR)/test/$1/$1-$2-$3-$4: $(BUILD_DIR)/impl/$2.o $(TEST_DIR)/$1.c uprintf.h Makefile test.sh
+$(BUILD_DIR)/test/$1/$2-$3-$4: $(BUILD_DIR)/impl/$2.o $(TEST_DIR)/$1.c uprintf.h Makefile test.sh
 	@./test.sh $1 $2 $3 $4
 endef
 

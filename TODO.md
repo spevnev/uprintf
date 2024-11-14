@@ -97,3 +97,7 @@ _Decimal32 a;
 _Decimal64 b;
 _Decimal128 c;
 ```
+
+### Use hash table
+There are functions which linearly search for a string, e.g. `_upf_get_variable_type`, `_upf_get_function_return_type`.
+Hash table should improve performance.

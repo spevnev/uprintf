@@ -1059,13 +1059,14 @@ This way you should be able to include it without copying the header to every pr
 - Debug information included, `-g2` or higher
 - Have `elf.h` in include path
 
-### Tested on:
+### Tested on (using CI/CD):
 
-Architectures: `x86_64/amd64`
+Architecture: \
+`x86_64/amd64`
 
-Compilers (tested in CI/CD): \
-`gcc-14`, `gcc-12`, `gcc-11` \
-`clang-18`, `clang-16`, `clang-14`
+Compilers: \
+`gcc`: 14, 13, 12, 11 \
+`clang`: 18, 17, 16, 15, 14
 
 ### Limitations
 
