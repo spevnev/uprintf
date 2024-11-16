@@ -1610,7 +1610,14 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
         case DW_TAG_restrict_type:
         case DW_TAG_atomic_type: {
             if (subtype_offset == UINT64_MAX) {
-                return _upf_get_void_type();
+                _upf_type type = {
+                    .name = "void",
+                    .kind = _UPF_TK_VOID,
+                    .modifiers = _upf_get_type_modifier(abbrev->tag),
+                    .size = sizeof(void *),
+                };
+
+                return _upf_add_type(die_base, type);
             } else {
                 _upf_type type = *_upf_parse_type(cu, cu->base + subtype_offset);
                 type.modifiers |= _upf_get_type_modifier(abbrev->tag);
@@ -1835,13 +1842,8 @@ static _upf_function _upf_parse_cu_subprogram(const _upf_cu *cu, const uint8_t *
             function.pc = _upf_get_addr(cu, die, attr.form);
         } else if (attr.name == DW_AT_ranges) {
             _upf_range_vec ranges = _upf_get_ranges(cu, die, attr.form);
-            uint64_t low_pc = UINT64_MAX;
-            for (uint32_t i = 0; i < ranges.length; i++) {
-                if (ranges.data[i].start < low_pc) low_pc = ranges.data[i].start;
-            }
-            _UPF_ASSERT(low_pc != UINT64_MAX);
-
-            function.pc = low_pc;
+            _UPF_ASSERT(ranges.length > 0);
+            function.pc = ranges.data[0].start;
         } else if (attr.name == DW_AT_abstract_origin) {
             const uint8_t *new_die = cu->base + _upf_get_ref(die, attr.form);
             const _upf_abbrev *new_abbrev;
