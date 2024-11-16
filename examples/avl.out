@@ -90,6 +90,6 @@ AVL tree: {
     void *key = 0xfff
     void *data = 0xfff
   })
-  int(void *, void *) comparator = 0x5f69682a31c0 <int cmp(void *k1, void *k2)>
+  int(void *, void *) comparator = 0x5f69682a31c0 (int cmp(void *k1, void *k2))
   void(void *) destructor = NULL
 }
