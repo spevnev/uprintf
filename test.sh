@@ -75,8 +75,8 @@ function get_similarity {
     # primary goal of the test is to check that there are no errors, i.e. segfaults, leaks.
     if [ "$test" = "stdio_file" ]; then result=10;
     # Clang doesn't produce DW_AT_subprogram for external functions, i.e. shared libraries
-    # or different CUs, so cross-CU retrieval of function signature/name doesn't work.
-    # Some GCC versions print "size_t" and some "unsigned long int"
+    # or different CUs, so cross-CU retrieval of function definition doesn't work.
+    # Also, some GCC versions use "size_t" while others use "unsigned long int".
     elif [ "$test" = "function" ]; then result=85; fi
 
     echo $result
