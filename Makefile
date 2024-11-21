@@ -1,15 +1,15 @@
 CC     := gcc
 CFLAGS := -O2 -g2 -std=c99 -Wall -Wextra -pedantic -I . -DUPRINTF_TEST -fsanitize=undefined,address,leak
 
-BUILD_DIR    := build
+BUILD_DIR    ?= build
 LIB_DIR      := libs
 EXAMPLE_DIR  := examples
 TEST_DIR     := tests
 BASELINE_DIR := tests/baselines
 
-COMPILERS := clang gcc
-O_LEVELS  := O0 O2 O3 Os
-G_LEVELS  := g2 g3
+COMPILERS ?= clang gcc
+O_LEVELS  ?= O0 O2 O3 Os
+G_LEVELS  ?= g2 g3
 
 EXAMPLES := $(patsubst $(EXAMPLE_DIR)/%.c, %, $(shell find $(EXAMPLE_DIR) -type f -name '*.c'))
 TESTS    := $(patsubst $(TEST_DIR)/%.c, %, $(shell find $(TEST_DIR) -type f -name '*.c'))
