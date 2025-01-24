@@ -1102,7 +1102,6 @@ static _upf_abbrev_vec _upf_parse_abbrevs(const uint8_t *abbrev_table) {
             .code = UINT64_MAX,
             .tag = UINT64_MAX,
             .has_children = false,
-            .attrs = {0},
         };
         abbrev_table += _upf_uLEB_to_uint64(abbrev_table, &abbrev.code);
         if (abbrev.code == 0) break;
@@ -1271,7 +1270,6 @@ static _upf_type *_upf_get_void_type(void) {
     _upf_type type = {
         .name = "void",
         .kind = _UPF_TK_VOID,
-        .modifiers = 0,
         .size = UINT64_MAX,
     };
     type_ptr = _upf_add_type(NULL, type);
@@ -1324,11 +1322,9 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
             _upf_type type = {
                 .name = name,
                 .kind = _UPF_TK_ARRAY,
-                .modifiers = 0,
                 .size = size,
                 .as.array = {
                     .element_type = element_type,
-                    .lengths = {0},
                 },
             };
 
@@ -1390,11 +1386,9 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
             _upf_type type = {
                 .name = name ? name : "enum",
                 .kind = _UPF_TK_ENUM,
-                .modifiers = 0,
                 .size = size,
                 .as.cenum = {
                     .underlying_type = _upf_parse_type(cu, cu->base + subtype_offset),
-                    .enums = {0},
                 },
             };
 
@@ -1407,10 +1401,7 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                 _UPF_ASSERT(abbrev->tag == DW_TAG_enumerator);
 
                 bool found_value = false;
-                _upf_enum cenum = {
-                    .name = NULL,
-                    .value = 0,
-                };
+                _upf_enum cenum = {0};
                 for (uint32_t i = 0; i < abbrev->attrs.length; i++) {
                     _upf_attr attr = abbrev->attrs.data[i];
 
@@ -1441,11 +1432,7 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
             _upf_type type = {
                 .name = name,
                 .kind = _UPF_TK_POINTER,
-                .modifiers = 0,
-                .size = sizeof(void*),
-                .as.pointer = {
-                    .type = NULL,
-                },
+                .size = sizeof(void *),
             };
 
             // Pointers have to be added before their data gets filled in so that
@@ -1469,11 +1456,7 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
             _upf_type type = {
                 .name = name ? name : (is_struct ? "struct" : "union"),
                 .kind = is_struct ? _UPF_TK_STRUCT : _UPF_TK_UNION,
-                .modifiers = 0,
                 .size = size,
-                .as.cstruct = {
-                    .members = {0},
-                },
             };
 
             if (!abbrev->has_children) return _upf_add_type(die_base, type);
@@ -1486,10 +1469,7 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                 }
 
                 _upf_member member = {
-                    .name = NULL,
-                    .type = NULL,
                     .offset = is_struct ? UINT64_MAX : 0,
-                    .bit_size = 0,
                 };
                 bool skip_member = false;
                 for (uint32_t i = 0; i < abbrev->attrs.length; i++) {
@@ -1535,12 +1515,7 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
             _upf_type type = {
                 .name = name,
                 .kind = _UPF_TK_FUNCTION,
-                .modifiers = 0,
                 .size = size,
-                .as.function = {
-                    .return_type = NULL,
-                    .arg_types = {0},
-                },
             };
 
             if (subtype_offset != UINT64_MAX) {
@@ -1579,7 +1554,6 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                 _upf_type type = {
                     .name = name,
                     .kind = _UPF_TK_VOID,
-                    .modifiers = 0,
                     .size = UINT64_MAX,
                 };
                 return _upf_add_type(die_base, type);
@@ -1599,7 +1573,6 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
             _upf_type type = {
                 .name = name,
                 .kind = _upf_get_type_kind(encoding, size),
-                .modifiers = 0,
                 .size = size,
             };
 
@@ -1632,7 +1605,7 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
 
     _upf_type type;
 unknown_type:
-    type = (_upf_type){
+    type = (_upf_type) {
         .name = name,
         .kind = _UPF_TK_UNKNOWN,
         .modifiers = 0,
@@ -1803,10 +1776,7 @@ static void _upf_parse_subprogram_parameters(_upf_function *function, const _upf
         if (abbrev->tag == DW_TAG_unspecified_parameters) function->is_variadic = true;
         if (abbrev->tag != DW_TAG_formal_parameter) break;
 
-        _upf_named_type arg = {
-            .die = NULL,
-            .name = NULL,
-        };
+        _upf_named_type arg = {0};
         for (uint32_t i = 0; i < abbrev->attrs.length; i++) {
             _upf_attr attr = abbrev->attrs.data[i];
 
@@ -1825,10 +1795,6 @@ static _upf_function _upf_parse_cu_subprogram(const _upf_cu *cu, const uint8_t *
     _UPF_ASSERT(cu != NULL && die != NULL && abbrev != NULL);
 
     _upf_function function = {
-        .name = NULL,
-        .return_type_die = NULL,
-        .args = {0},
-        .is_variadic = false,
         .pc = UINT64_MAX,
     };
     for (uint32_t i = 0; i < abbrev->attrs.length; i++) {
@@ -1869,11 +1835,7 @@ static bool _upf_parse_cu_scope(const _upf_cu *cu, _upf_scope_stack *scope_stack
     if (!abbrev->has_children) return false;
     _UPF_ASSERT(scope_stack->length > 0);
 
-    _upf_scope new_scope = {
-        .ranges = {0},
-        .vars = {0},
-        .scopes = {0},
-    };
+    _upf_scope new_scope = {0};
 
     uint64_t low_pc = UINT64_MAX;
     const uint8_t *high_pc_die = NULL;
@@ -1955,10 +1917,7 @@ static const char *_upf_get_typename(const _upf_cu *cu, const uint8_t *die, cons
 static _upf_named_type _upf_parse_cu_variable(const _upf_cu *cu, const uint8_t *die, const _upf_abbrev *abbrev) {
     _UPF_ASSERT(cu != NULL && die != NULL);
 
-    _upf_named_type var = {
-        .die = NULL,
-        .name = NULL,
-    };
+    _upf_named_type var = {0};
     for (uint32_t i = 0; i < abbrev->attrs.length; i++) {
         _upf_attr attr = abbrev->attrs.data[i];
 
@@ -1985,17 +1944,9 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *die, const uint
 
     _upf_cu cu = {
         .base = cu_base,
-        .scope = {
-            .ranges = {0},
-            .vars = {0},
-            .scopes = {0},
-        },
-        .addr_base = 0,
         .str_offsets_base = UINT64_MAX,
         .rnglists_base = UINT64_MAX,
         .abbrevs = _upf_parse_abbrevs(abbrev_table),
-        .types = {0},
-        .functions = {0},
     };
 
     const _upf_abbrev *abbrev;
@@ -2521,10 +2472,7 @@ static bool _upf_parse_typename(int *dereference, const char **typename, _upf_ty
     }
 
     _upf_type type = {
-        .name = NULL,
         .kind = _UPF_TK_UNKNOWN,
-        .modifiers = 0,
-        .size = 0,
     };
     if (kind == DW_ATE_signed_char) {
         type.kind = is_signed ? _UPF_TK_SCHAR : _UPF_TK_UCHAR;
@@ -2964,9 +2912,7 @@ static _upf_type *_upf_get_base_type(_upf_parser_state *p, uint64_t pc, const ch
 
             if (_upf_get_function_return_type(p) != NULL) {
                 _upf_type type = {
-                    .name = NULL,
                     .kind = _UPF_TK_FUNCTION,
-                    .modifiers = 0,
                     .size = sizeof(void *),
                 };
                 type_ptr = _upf_add_type(NULL, type);
@@ -3018,9 +2964,7 @@ static _upf_type *_upf_dereference_type(_upf_type *type_ptr, int dereference, co
 
     while (dereference < 0) {
         _upf_type type = {
-            .name = NULL,
             .kind = _UPF_TK_POINTER,
-            .modifiers = 0,
             .size = sizeof(void*),
             .as.pointer = {
                 .type = type_ptr,
@@ -3066,10 +3010,7 @@ static _upf_type *_upf_dereference_type(_upf_type *type_ptr, int dereference, co
 static const _upf_type *_upf_get_arg_type(const char *arg, uint64_t pc) {
     _UPF_ASSERT(arg != NULL);
 
-    _upf_tokenizer t = {
-        .tokens = {0},
-        .idx = 0,
-    };
+    _upf_tokenizer t = {0};
     _upf_tokenize(&t, arg);
 
     _upf_cu *cu = NULL;
@@ -3083,11 +3024,6 @@ static const _upf_type *_upf_get_arg_type(const char *arg, uint64_t pc) {
 
     _upf_parser_state p = {
         .cu = cu,
-        .dereference = 0,
-        .suffix_calls = 0,
-        .base = {0},
-        .base_type = 0,
-        .members = {0},
     };
     if (!_upf_parse_expr(&t, &p) || t.idx != t.tokens.length) {
         _UPF_ERROR("Unable to parse argument \"%s\" at %s:%d.", arg, _upf_state.file_path, _upf_state.line);
@@ -3481,6 +3417,7 @@ static void _upf_print_type(_upf_indexed_struct_vec *circular, const uint8_t *da
 
 #if UPRINTF_ARRAY_COMPRESSION_THRESHOLD > 0
                 size_t j = i;
+                // Advance while element at `j` is same as at `i`.
                 while (j < type->as.array.lengths.data[0] && memcmp(current, data + element_size * j, element_size) == 0) j++;
 
                 int count = j - i;
