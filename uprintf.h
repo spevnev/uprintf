@@ -352,11 +352,10 @@ typedef struct _upf_arena_region {
     uint8_t *data;
     size_t capacity;
     size_t length;
-    struct _upf_arena_region *next;
+    struct _upf_arena_region *prev;
 } _upf_arena_region;
 
 typedef struct {
-    _upf_arena_region *tail;
     _upf_arena_region *head;
 } _upf_arena;
 
@@ -642,35 +641,30 @@ static struct _upf_state _upf_state = {0};
 
 #define _UPF_INITIAL_ARENA_SIZE 65535
 
-static _upf_arena_region *_upf_arena_alloc_region(size_t capacity) {
+static _upf_arena_region *_upf_arena_alloc_region(size_t capacity, _upf_arena_region *prev) {
     _upf_arena_region *region = (_upf_arena_region *) malloc(sizeof(*region));
     if (region == NULL) _UPF_OUT_OF_MEMORY();
     region->capacity = capacity;
     region->data = (uint8_t *) malloc(region->capacity * sizeof(*region->data));
     if (region->data == NULL) _UPF_OUT_OF_MEMORY();
     region->length = 0;
-    region->next = NULL;
+    region->prev = prev;
     return region;
 }
 
 static void _upf_arena_init(_upf_arena *a) {
     _UPF_ASSERT(a != NULL);
-
-    _upf_arena_region *region = _upf_arena_alloc_region(_UPF_INITIAL_ARENA_SIZE);
-    a->head = region;
-    a->tail = region;
+    a->head = _upf_arena_alloc_region(_UPF_INITIAL_ARENA_SIZE, NULL);
 }
 
 static void *_upf_arena_alloc(_upf_arena *a, size_t size) {
-    _UPF_ASSERT(a != NULL && a->head != NULL && a->tail != NULL);
+    _UPF_ASSERT(a != NULL && a->head != NULL);
 
-    size_t alignment = (a->head->length % sizeof(void *));
+    size_t alignment = a->head->length % sizeof(void *);
     if (alignment > 0) alignment = sizeof(void *) - alignment;
 
     if (alignment + size > a->head->capacity - a->head->length) {
-        _upf_arena_region *region = _upf_arena_alloc_region(a->head->capacity * 2);
-        a->head->next = region;
-        a->head = region;
+        a->head = _upf_arena_alloc_region(a->head->capacity * 2, a->head);
         alignment = 0;
     }
 
@@ -680,20 +674,19 @@ static void *_upf_arena_alloc(_upf_arena *a, size_t size) {
 }
 
 static void _upf_arena_free(_upf_arena *a) {
-    if (a == NULL || a->head == NULL || a->tail == NULL) return;
+    if (a == NULL || a->head == NULL) return;
 
-    _upf_arena_region *region = a->tail;
+    _upf_arena_region *region = a->head;
     while (region != NULL) {
-        _upf_arena_region *next = region->next;
+        _upf_arena_region *prev = region->prev;
 
         free(region->data);
         free(region);
 
-        region = next;
+        region = prev;
     }
 
     a->head = NULL;
-    a->tail = NULL;
 }
 
 // Copies [begin, end) to arena-allocated string
@@ -2070,7 +2063,7 @@ static void _upf_parse_dwarf(void) {
         die += sizeof(uint32_t);
 
         _upf_state.is64bit = false;
-        if (length == 0xffffffffU) {
+        if (length == UINT32_MAX) {
             memcpy(&length, die, sizeof(uint64_t));
             die += sizeof(uint64_t);
             _upf_state.is64bit = true;
