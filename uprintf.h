@@ -310,13 +310,6 @@ int _upf_test_status = EXIT_SUCCESS;
         type *data;                     \
     } name
 
-#define _UPF_VECTOR_INIT(vec, a) \
-    do {                         \
-        (vec)->capacity = 0;     \
-        (vec)->length = 0;       \
-        (vec)->data = NULL;      \
-    } while (0)
-
 #define _UPF_VECTOR_PUSH(vec, element)                                          \
     do {                                                                        \
         if ((vec)->capacity == 0) {                                             \
@@ -639,7 +632,7 @@ static struct _upf_state _upf_state = {0};
 
 // ====================== ARENA ===========================
 
-#define _UPF_INITIAL_ARENA_SIZE 65535
+#define _UPF_INITIAL_ARENA_SIZE 65535  // 64kb
 
 static _upf_arena_region *_upf_arena_alloc_region(size_t capacity, _upf_arena_region *prev) {
     _upf_arena_region *region = (_upf_arena_region *) malloc(sizeof(*region));
@@ -652,19 +645,22 @@ static _upf_arena_region *_upf_arena_alloc_region(size_t capacity, _upf_arena_re
     return region;
 }
 
-static void _upf_arena_init(_upf_arena *a) {
-    _UPF_ASSERT(a != NULL);
-    a->head = _upf_arena_alloc_region(_UPF_INITIAL_ARENA_SIZE, NULL);
-}
-
 static void *_upf_arena_alloc(_upf_arena *a, size_t size) {
-    _UPF_ASSERT(a != NULL && a->head != NULL);
+    _UPF_ASSERT(a != NULL);
 
-    size_t alignment = a->head->length % sizeof(void *);
+    if (a->head == NULL) {
+        size_t capacity = _UPF_INITIAL_ARENA_SIZE;
+        if (size > capacity) capacity = size;
+        a->head = _upf_arena_alloc_region(capacity, NULL);
+    }
+
+    int alignment = a->head->length % sizeof(void *);
     if (alignment > 0) alignment = sizeof(void *) - alignment;
 
     if (alignment + size > a->head->capacity - a->head->length) {
-        a->head = _upf_arena_alloc_region(a->head->capacity * 2, a->head);
+        size_t new_capacity = a->head->capacity * 2;
+        if (size > new_capacity) new_capacity = size;
+        a->head = _upf_arena_alloc_region(new_capacity, a->head);
         alignment = 0;
     }
 
@@ -3615,11 +3611,6 @@ __attribute__((constructor)) void _upf_init(void) {
 
     if (access("/proc/self/exe", R_OK) != 0) _UPF_ERROR("Expected \"/proc/self/exe\" to be a valid path.");
     if (access("/proc/self/maps", R_OK) != 0) _UPF_ERROR("Expected \"/proc/self/maps\" to be a valid path.");
-
-    _upf_arena_init(&_upf_state.arena);
-    _UPF_VECTOR_INIT(&_upf_state.cus, &_upf_state.arena);
-    _UPF_VECTOR_INIT(&_upf_state.type_map, &_upf_state.arena);
-    _UPF_VECTOR_INIT(&_upf_state.extern_functions, &_upf_state.arena);
 
     _upf_state.base = _upf_get_this_executable_address();
 
