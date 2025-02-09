@@ -2760,7 +2760,7 @@ static bool _upf_parse_unary_expr(_upf_tokenizer *t, _upf_parser_state *p) {
             }
             t->idx = save2;
 
-            if (!_upf_parse_unary_expr(t, p)) {
+            if (!_upf_parse_unary_expr(t, NULL)) {
                 t->idx = save;
                 return false;
             }
