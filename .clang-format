@@ -15,3 +15,5 @@ SpaceBeforeRangeBasedForLoopColon: true
 AllowShortIfStatementsOnASingleLine: AllIfsAndElse
 MaxEmptyLinesToKeep: 2
 InsertNewlineAtEOF: true
+DerivePointerAlignment: false
+PointerAlignment: Right
