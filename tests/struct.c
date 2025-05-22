@@ -37,7 +37,6 @@ typedef struct {
     int (*other_fun)(char, float *, unsigned long);
 } Struct;
 
-
 void void_fun(void) {}
 
 int other_fun(char a, float *b, unsigned long c) {

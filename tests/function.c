@@ -53,7 +53,6 @@ void *custom_realloc(void *data, size_t new_size) {
 
 void custom_free(void *data) { (void) data; }
 
-
 int main(void) {
     uprintf("Variadic function: %S\n", &variadic);
 
@@ -103,7 +102,6 @@ int main(void) {
     uprintf("(*functions.fp)()().f0: %S\n", (*functions.fp)()()->f0);
     uprintf("&(*functions.fp)()().f0: %S\n", &(*functions.fp)()()->f0);
     uprintf("(*functions.fp)()().f0()(): %S\n", (*functions.fp)()()->f0());
-
 
     AllocatorMethods libc = {malloc, realloc, free};
     AllocatorMethods custom = {custom_alloc, custom_realloc, custom_free};

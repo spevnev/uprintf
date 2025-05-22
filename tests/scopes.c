@@ -35,7 +35,9 @@ int main(void) {
                     bool var = false;
                     for (int var = 0; var < 1; var++) {
                         void *var = NULL;
-                        { uprintf("void* %S\n", &var); }
+                        {
+                            uprintf("void* %S\n", &var);
+                        }
                     }
                     uprintf("bool %S\n", &var);
                 }
