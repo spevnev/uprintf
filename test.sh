@@ -1,7 +1,12 @@
 #!/bin/bash
 
+RESET="\e[0m"
+RED="\e[1;31m"
+GREEN="\e[1;32m"
+YELLOW="\e[1;33m"
+
 if [ "$#" -ne 4 ]; then
-    echo "usage: ./test.sh [test] [compiler] [o_level] [g_level]"
+    echo "usage: $(basename $0) <test> <compiler> <o_level> <g_level>"
     exit 1
 fi
 
@@ -10,17 +15,13 @@ compiler=$2
 o_level=$3
 g_level=$4
 
-
-if [ ! -x "$(command -v wdiff)" ]; then
-    echo "[ERROR] wdiff is required, but isn't installed."
-    exit 1
-fi
-
-if [ -x "$compiler" ]; then
-    echo "[ERROR] $compiler doesn't exist or isn't executable,"
-    exit 1
-fi
-
+executables=(wdiff $compiler)
+for executable in "${executables[@]}"; do
+    if [ ! -x "$(command -v $executable)" ]; then
+        echo -e "$RED[ERROR]$RESET $executable is not installed"
+        exit 1
+    fi
+done
 
 test_id="$test-$compiler-$o_level-$g_level"
 dir="$BUILD_DIR/test/$test"
@@ -30,10 +31,10 @@ log="$bin.log"
 output="$bin.out"
 baseline="$BASELINE_DIR/$test.out"
 is_gcc=false
+
 if [ $(echo "$compiler" | head -c 3) = "gcc" ]; then is_gcc=true; fi
 
-
-# Some tests don't work on older versions of compilers
+# Some tests fail on older versions of compilers
 function should_skip {
     result=false
 
@@ -41,7 +42,7 @@ function should_skip {
         major_version=$("$compiler" -dumpversion | cut -d. -f1)
 
         if [ $major_version -le 15 ]; then
-            # uses old (non-v5) format for bit fields
+            # Old bit fields format (not DWARFv5)
             if [ "$test" = "bits" ]; then result=true; fi
         fi
     fi
@@ -84,7 +85,7 @@ function get_similarity {
 
 
 if [ $(should_skip) = true ]; then
-    echo "[SKIPPING] $test_id"
+    echo -e "$YELLOW[SKIPPING]$RESET $test_id"
     exit 0
 fi
 
@@ -95,7 +96,7 @@ if [ $(uses_shared_implementation) = true ]; then
     implementation="$BUILD_DIR/impl/$compiler.o"
 
     if [ ! -r $implementation ]; then
-        echo "[COMPILATION FAILED] $test_id. \"$implementation\" doesn't exist.";
+        echo -e "$RED[COMPILATION FAILED]$RESET $test_id. \"$implementation\" doesn't exist.";
         exit 1
     fi
 
@@ -109,10 +110,10 @@ fi
 
 if [ $ret -ne 0 ]; then
     if [ $CI ]; then
-        echo "[COMPILATION FAILED] $test_id. Log:"
+        echo -e "$RED[COMPILATION FAILED]$RESET $test_id. Log:"
         cat $log
     else
-        echo "[COMPILATION FAILED] $test_id. Log: $log"
+        echo -e "$RED[COMPILATION FAILED]$RESET $test_id. Log: $log"
     fi
     exit 1
 fi
@@ -123,17 +124,17 @@ cat $output >> $log
 
 if [ $ret -ne 0 ]; then
     if [ $CI ]; then
-        echo "[TEST FAILED] $test_id. Log:"
+        echo -e "$RED[TEST FAILED]$RESET $test_id. Log:"
         cat $log
     else
-        echo "[TEST FAILED] $test_id. Log: $log. Binary: $bin."
+        echo -e "$RED[TEST FAILED]$RESET $test_id. Log: $log. Binary: $bin."
     fi
     exit 1
 fi
 
 if [ ! -r $baseline ]; then
-    echo "[WARNING] There is no $test baseline."
-    echo "[TEST PASSED] $test_id: ?";
+    echo -e "$YELLOW[WARNING]$RESET There is no $test baseline."
+    echo -e "$GREEN[TEST PASSED]$RESET $test_id: ?";
     exit 0
 fi
 
@@ -149,14 +150,14 @@ if [ $similarity -lt $(get_similarity) ]; then
     wdiff $baseline $output > $diff
 
     if [ $CI ]; then
-        echo "[DIFF FAILED] $test_id. Similarity is $similarity%, required $(get_similarity)%. Log:"
+        echo -e "$RED[DIFF FAILED]$RESET $test_id. Similarity is $similarity%, required $(get_similarity)%. Log:"
         cat $log
         echo "Diff:"
         cat $diff
     else
-        echo "[DIFF FAILED] $test_id. Similarity is $similarity%, required $(get_similarity)%. Log: $log. Diff: $diff."
+        echo -e "$RED[DIFF FAILED]$RESET $test_id. Similarity is $similarity%, required $(get_similarity)%. Log: $log. Diff: $diff."
     fi
     exit 1
 fi
 
-echo "[TEST PASSED] $test_id: $similarity%";
+echo -e "$GREEN[TEST PASSED]$RESET $test_id: $similarity%";
