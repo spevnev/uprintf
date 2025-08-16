@@ -1,41 +1,38 @@
+prefix     := /usr/local
+includedir := $(prefix)/include
+
 CC     := gcc
 CFLAGS := -O2 -g2 -std=c99 -Wall -Wextra -pedantic -I . -DUPRINTF_TEST -fsanitize=undefined,address,leak
 
-BUILD_DIR    ?= build
+BUILD_DIR    := build
 LIB_DIR      := libs
 EXAMPLE_DIR  := examples
 TEST_DIR     := tests
 BASELINE_DIR := tests/baselines
 
-COMPILERS ?= clang gcc
-O_LEVELS  ?= O0 O2 O3 Os
-G_LEVELS  ?= g2 g3
+COMPILERS := clang gcc
+O_LEVELS  := O0 O2 O3 Os
+G_LEVELS  := g2 g3
 
-EXAMPLES := $(patsubst $(EXAMPLE_DIR)/%.c, %, $(shell find $(EXAMPLE_DIR) -type f -name '*.c'))
-TESTS    := $(patsubst $(TEST_DIR)/%.c, %, $(shell find $(TEST_DIR) -type f -name '*.c'))
+EXAMPLE_SRCS := $(wildcard $(EXAMPLE_DIR)/*.c)
+EXAMPLES     := $(patsubst %.c, $(BUILD_DIR)/%, $(EXAMPLE_SRCS))
+TESTS        := $(patsubst $(TEST_DIR)/%.c, %, $(wildcard $(TEST_DIR)/*.c))
 
-
-.PHONY: all
+.PHONY: examples clean install uninstall test tests
 all: examples
 
-.PHONY: clean
+examples: $(EXAMPLES)
+
 clean:
 	rm -rf $(BUILD_DIR) $(LIB_DIR)
 
-.PHONY: install
 install:
-	cp uprintf.h /usr/local/include/uprintf.h
-	chmod 644 /usr/local/include/uprintf.h
+	install -D -m644 uprintf.h $(includedir)/uprintf.h
 
-.PHONY: uninstall
 uninstall:
-	rm /usr/local/include/uprintf.h
+	rm $(includedir)/uprintf.h
 
-
-.PHONY: examples
-examples: $(patsubst %, $(BUILD_DIR)/$(EXAMPLE_DIR)/%, $(EXAMPLES))
-
-$(BUILD_DIR)/$(EXAMPLE_DIR)/vorbis: $(EXAMPLE_DIR)/vorbis.c $(LIB_DIR)/stb_vorbis.c uprintf.h Makefile
+$(BUILD_DIR)/$(EXAMPLE_DIR)/vorbis: $(EXAMPLE_DIR)/vorbis.c $(LIB_DIR)/stb_vorbis.c uprintf.h
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) -I $(LIB_DIR) -o $@ $< -lm
 
@@ -43,7 +40,7 @@ $(LIB_DIR)/stb_vorbis.c:
 	@mkdir -p $(@D)
 	wget https://raw.githubusercontent.com/nothings/stb/master/stb_vorbis.c -O $@
 
-$(BUILD_DIR)/$(EXAMPLE_DIR)/avl: $(EXAMPLE_DIR)/avl.c $(LIB_DIR)/avl uprintf.h Makefile
+$(BUILD_DIR)/$(EXAMPLE_DIR)/avl: $(EXAMPLE_DIR)/avl.c $(LIB_DIR)/avl uprintf.h
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) -I $(LIB_DIR)/avl -o $@ $< $(LIB_DIR)/avl/avl.c
 
@@ -53,7 +50,7 @@ $(LIB_DIR)/avl:
 	mv $(LIB_DIR)/avl_src/src $@
 	rm -rf $(LIB_DIR)/avl_src
 
-$(BUILD_DIR)/$(EXAMPLE_DIR)/sqlite: $(EXAMPLE_DIR)/sqlite.c $(LIB_DIR)/sqlite/sqlite3.c uprintf.h Makefile
+$(BUILD_DIR)/$(EXAMPLE_DIR)/sqlite: $(EXAMPLE_DIR)/sqlite.c $(LIB_DIR)/sqlite/sqlite3.c uprintf.h
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) -I $(LIB_DIR)/sqlite -o $@ $<
 
@@ -67,10 +64,9 @@ $(BUILD_DIR)/$(EXAMPLE_DIR)/uprintf: $(EXAMPLE_DIR)/uprintf.c uprintf.h Makefile
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) -o $@ $<
 
-.PHONY: test
+
 test: tests
 
-.PHONY: tests
 tests: $(foreach C,$(COMPILERS),$(foreach O,$(O_LEVELS),$(foreach G,$(G_LEVELS),$(foreach T,$(TESTS),$(BUILD_DIR)/test/$T/$C-$O-$G))))
 
 # Export all variables to subprocesses, i.e. test.sh
