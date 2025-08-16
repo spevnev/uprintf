@@ -1,20 +1,10 @@
 # Universal printf
 
-uprintf is a single-header library that allows to print anything in C, intended for debugging and prototyping.
-
-### What is a single header library?
-
-The idea behind single-header libraries is that they're easy to distribute since it's trivial to add them to any project.
-
-By default the header file acts as any header would, i.e. contains **declarations** (without definitions). \
-However, by defining a macro the header start to act as a `.c` file, i.e. contains **definitions**.
+*uprintf* is a header-only library for printing anything in C.
 
 ## Examples
 
-Source files as well as their outputs can be found in [examples](examples). \
-You can also build them yourself using `make examples`, but note that `sqlite` takes long to build.
-
-In addition, there are also [tests](tests) with their outputs in the [baselines](tests/baselines).
+Examples and their outputs can be found in [examples](examples), and can be built using `make examples`.
 
 ### Example outputs
 
@@ -1045,79 +1035,35 @@ uprintf's state: {
   ```
 </details>
 
-## Installation
-
-Installing a single header library is as simple as downloading `uprintf.h`.
-
-If you have cloned the repository, it can be installed to `/usr/local/include` by running `make install`. \
-This way you should be able to include it without copying the header to every project (since it is a default include path).
-
 ## Requirements
 
-- Linux
-- Minimum C version is `c99`
-- Debug information included, `-g2` or higher
-- Have `elf.h` in include path
-
-### Tested on (using CI/CD):
-
-Architecture: \
-`x86_64/amd64`
-
-Compilers: \
-`gcc`: 14, 13, 12, 11 \
-`clang`: 18, 17, 16, 15, 14
-
-### Limitations
-
-1. Casting to function pointer, e.g.:
-    ```c
-    uprintf("%S\n", (void (*)(void)) whatever);
-    ```
-2. Refering to the variable from higher scope when it is also defined in the current one, e.g.:
-    ```c
-    char var = 'c';
-    {
-        uprintf("%S\n", &var); // prints char as an int
-        int var = 1;
-        uprintf("%S\n", &var); // prints int
-    }
-    ```
-
-3. Printing information about function from shared library with clang:
-    ```c
-    uprintf("%S\n", printf);
-    // gcc  : 0x12345678 <void printf(const char *, ...)>
-    // clang: 0x12345678
-    ```
+- Works only on Linux
+- The oldest supported C version is c99
+- Executable must have debugging information (`-g2` or higher)
+- `elf.h` must be in the include path
 
 ## Usage
 
-0. Copy or install the library, ensure it is in the include path
+1. [Download](https://raw.githubusercontent.com/spevnev/uprintf/refs/heads/main/uprintf.h) the library, or clone the repo
 
-1. Pick a single file and define `UPRINTF_IMPLEMENTATION` before the include:
+2. Define `UPRINTF_IMPLEMENTATION` in *one* of the files:
     ```c
     #define UPRINTF_IMPLEMENTATION
     #include "uprintf.h"
     ```
-    This will copy library's implementation to be built as a part of this file, so you should choose rarely modified file in order to avoid unnecessary rebuilding. \
-    You can also define options here, see below.
+    The implementation must be included in only one of the files. \
+    A rarely modified file should be used because it increases the build time. \
+    [Options](#options) can be defined before the implementation.
 
-2. Add include in other files where you intend to use it:
-    ```c
-    #include "uprintf.h"
-    ```
-
-3. Call function.
+3.
     ```c
     uprintf(fmt, ...);
     ```
-    `fmt` - a format string with placeholders(`%` followed by a letter). Unlike in `printf`, you can use anything, e.g. I use `%S`. Use `%%` to print `%`. \
-    For each format specifier there must be a pointer to whatever should be printed in its place (except `void*`).
+    `fmt` - a format string with placeholders (`%` followed by a letter, placeholder can be anything, e.g. examples use `%S`). Use `%%` to print `%`.
 
 ### Options
 
-Behavior of the library can be changed by setting options before **implementation**:
+Options must be defined *before the implementation*:
 
 ```c
 #define OPTION_NAME VALUE
@@ -1125,36 +1071,63 @@ Behavior of the library can be changed by setting options before **implementatio
 #include "uprintf.h"
 ```
 
-The list of options:
-
 macro |  description | default
 -|-|-
 `UPRINTF_INDENTATION_WIDTH` | The number of spaces to use for indentation | 4
-`UPRINTF_MAX_DEPTH` | How deep can nested structures be. Use a negative value to have no limit | 10
+`UPRINTF_MAX_DEPTH` | Limits the nesting depth of structures. Negative values remove the limit | 10
 `UPRINTF_IGNORE_STDIO_FILE` | Should `stdio.h`'s `FILE` be ignored | true
-`UPRINTF_ARRAY_COMPRESSION_THRESHOLD` | The minimum number of consecutive array values that get compressed(`VALUE <repeats X times>`). Use a non-positive value to disable it | 4
-`UPRINTF_MAX_STRING_LENGTH` | The max string length after which it will be truncated. Use a non-positive value to have no limit | 200
+`UPRINTF_ARRAY_COMPRESSION_THRESHOLD` | The number of consecutive identical array elements before they get compressed. Non-positive values disable compression | 4
+`UPRINTF_MAX_STRING_LENGTH` | The length before the string gets truncated. Non-positive values remove the limit | 200
+
+## Limitations
+
+- Casting to a function pointer:
+    ```c
+    uprintf("%S\n", (void (*)(void)) whatever);
+    ```
+
+- Incorrect type deduction when printing variables that get shadowed *later* in the same scope.
+    ```c
+    char var = 'c';
+    {
+        uprintf("%S\n", &var); // interprets char as an int
+        int var = 1;
+        uprintf("%S\n", &var); // prints int
+    }
+    ```
+
+- Printing information about function from a shared library only works with gcc:
+    ```c
+    uprintf("%S\n", printf);
+    // gcc  : 0x12345678 <void printf(const char *, ...)>
+    // clang: 0x12345678
+    ```
 
 ## How does it work?
 
-TL;DR: It works by inspecting debugging information of the executable in a debugger-like manner, which allows it to interpret and format passed pointers.
+The library uses debugging information to learn about the types.
 
-0. Read current binary.
-1. Parse ELF and DWARF.
-2. Get info about scopes and types.
-3. Locate scopes from which current call is invoked based on the PC.
-4. Parse provided arguments.
-5. Infer types from the parsed arguments.
-7. Print data using type definition as reference.
+On initialization:
+1. Read the current binary.
+2. Parse ELF and DWARF.
+3. Store information about scopes and types.
 
-## Tests
+On each invokation:
+1. Find scopes based on the PC.
+2. Parse the arguments string.
+3. Find types of argument in the current scope.
+4. Print data using type definition.
 
-Tests take long to complete, so it is highly recommended to set `-j NUMBER_OF_CORES`.
+## Testing
 
-If you use compiler other than `gcc` and `clang` (e.g. `clang-18`) make sure to specify `COMPILERS` or edit [Makefile](Makefile).
+### Tested on
+
+- x86_64
+- gcc: 11, 12, 13, 14
+- clang: 14, 15, 16, 17, 18
+
+### Running tests
 
 ```console
 $ make tests
-$ make tests -jNUMBER_OF_CORES
-$ make tests COMPILERS=COMPILER_NAME
 ```
