@@ -1,6 +1,6 @@
 #include "avl.h"  // https://github.com/etherealvisage/avl
 #include <stdint.h>
-#include <stdio.h>
+
 #define UPRINTF_INDENTATION_WIDTH 2
 #define UPRINTF_MAX_DEPTH 5
 #define UPRINTF_IMPLEMENTATION

@@ -1,5 +1,6 @@
 // Build sqlite as a part of this file because sqlite3 struct in the header is opaque
 #include "sqlite3.c"  // https://www.sqlite.org/
+
 #define UPRINTF_IMPLEMENTATION
 #include "uprintf.h"
 

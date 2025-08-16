@@ -1,0 +1,6 @@
+-std=c99
+-DUPRINTF_IMPLEMENTATION
+-I.
+-Ilibs
+-Ilibs/avl
+-Ilibs/sqlite
