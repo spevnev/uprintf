@@ -1,5 +1,6 @@
 -std=c99
 -DUPRINTF_IMPLEMENTATION
+-DUPRINTF_TEST
 -I.
 -Ilibs
 -Ilibs/avl

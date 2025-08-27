@@ -109,13 +109,9 @@ int main(void) {
     double d = 0.1234;
     uprintf("%S\n", (float *) &d);
     uprintf("%S\n", (double *) &d);
-
     if (_upf_test_status != EXIT_SUCCESS) return EXIT_FAILURE;
-    // should fail:
+
     uprintf("%S\n", (long double *) &d);
     uprintf("%S\n", (double long *) &d);
-    if (_upf_test_status == EXIT_SUCCESS) return EXIT_FAILURE;
-    _upf_test_status = EXIT_SUCCESS;
-
-    return _upf_test_status;
+    return _upf_test_status == EXIT_FAILURE ? EXIT_SUCCESS : EXIT_FAILURE;
 }

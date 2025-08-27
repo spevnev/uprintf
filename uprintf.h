@@ -2206,33 +2206,36 @@ static _upf_cstr_vec _upf_get_args(char *string) {
     _UPF_ASSERT(string != NULL);
 
     _upf_cstr_vec args = {0};
-
-    bool in_quotes = false;
     int paren = 0;
-    const char *prev = string;
+    const char *start = string;
     for (char *ch = string; *ch != '\0'; ch++) {
-        if (*ch == '"') {
-            if (in_quotes) {
-                if (*(ch - 1) == '\\') in_quotes = true;
-                else in_quotes = !in_quotes;
-            } else {
-                if (*(ch - 1) == '\'') in_quotes = false;
-                else in_quotes = !in_quotes;
-            }
-        }
-        if (in_quotes) continue;
-
-        if (*ch == '(') {
-            paren++;
-        } else if (*ch == ')') {
-            paren--;
-        } else if (*ch == ',' && paren == 0) {
-            *ch = '\0';
-            _UPF_VECTOR_PUSH(&args, prev);
-            prev = ch + 1;
+        switch (*ch) {
+            case '"': {
+                ch++;
+                bool is_escaped = false;
+                while (*ch != '\0') {
+                    if (is_escaped) is_escaped = false;
+                    else if (*ch == '\\') is_escaped = true;
+                    else if (*ch == '"') break;
+                    ch++;
+                }
+            } break;
+            case '(':
+                paren++;
+                break;
+            case ')':
+                paren--;
+                break;
+            case ',':
+                if (paren == 0) {
+                    *ch = '\0';
+                    _UPF_VECTOR_PUSH(&args, start);
+                    start = ch + 1;
+                }
+                break;
         }
     }
-    _UPF_VECTOR_PUSH(&args, prev);
+    _UPF_VECTOR_PUSH(&args, start);
 
     return args;
 }
@@ -2351,11 +2354,6 @@ static void _upf_tokenize(_upf_tokenizer *t, const char *string) {
             }
         }
     }
-}
-
-static void _upf_back(_upf_tokenizer *t) {
-    _UPF_ASSERT(t != NULL && t->idx > 0);
-    t->idx--;
 }
 
 static const _upf_token *_upf_consume_any2(_upf_tokenizer *t, ...) {
@@ -2767,7 +2765,8 @@ static bool _upf_parse_unary_expr(_upf_tokenizer *t, _upf_parser_state *p) {
             return true;
         }
 
-        _upf_back(t);
+        _UPF_ASSERT(t != NULL && t->idx > 0);
+        t->idx--;
     }
 
     return _upf_parse_postfix_expr(t, p);
