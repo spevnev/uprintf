@@ -524,6 +524,7 @@ _UPF_VECTOR_TYPEDEF(_upf_cu_vec, _upf_cu);
 
 enum _upf_token_kind {
     _UPF_TOK_NONE,
+    _UPF_TOK_UNKNOWN,
     _UPF_TOK_NUMBER,
     _UPF_TOK_STRING,
     _UPF_TOK_ID,
@@ -2321,12 +2322,12 @@ static void _upf_tokenize(_upf_tokenizer *t, const char *string) {
         } else if (*ch == '"') {
             ch++;
 
-            int escape = 0;
+            bool is_escaped = false;
             const char *end = ch;
-            while ((*end != '"' || escape % 2 == 1) && *end != '\0') {
-                if (*end == '\\') escape++;
-                else escape = 0;
-
+            while (*end != '\0') {
+                if (is_escaped) is_escaped = false;
+                else if (*end == '\\') is_escaped = true;
+                else if (*end == '\"') break;
                 end++;
             }
             _UPF_ASSERT(*end != '\0');
@@ -2348,9 +2349,14 @@ static void _upf_tokenize(_upf_tokenizer *t, const char *string) {
                     found = true;
                 }
             }
+
             if (!found) {
-                _UPF_ERROR("Unknown character '%c' when parsing arguments \"%s\" at %s:%d.", *ch, string, _upf_state.file_path,
-                           _upf_state.line);
+                _upf_token token = {
+                    .kind = _UPF_TOK_UNKNOWN,
+                    .string = _upf_arena_string(&_upf_state.arena, ch, ch + 1),
+                };
+                _UPF_VECTOR_PUSH(&t->tokens, token);
+                ch++;
             }
         }
     }
