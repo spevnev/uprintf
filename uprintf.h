@@ -48,10 +48,8 @@ void _upf_uprintf(const char *file, int line, const char *fmt, const char *args,
 // to their real values.
 #define _upf_stringify_va_args(...) #__VA_ARGS__
 
-// The noop following uprintf is required to guarantee that return PC of the
-// function is within the same scope. This is especially problematic if uprintf
-// is the last call in the function because then its return PC is that of the
-// caller, which optimizes two returns to one.
+// The noop instruction is required to keep the return PC within the scope of the
+// caller function. Otherwise, it might be optimized to return outside of it.
 #define uprintf(fmt, ...)                                                                        \
     do {                                                                                         \
         _upf_uprintf(__FILE__, __LINE__, fmt, _upf_stringify_va_args(__VA_ARGS__), __VA_ARGS__); \
@@ -96,7 +94,6 @@ extern int _upf_test_status;
 #define _GNU_SOURCE
 
 #include <dlfcn.h>
-#include <elf.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <link.h>
@@ -113,15 +110,13 @@ extern int _upf_test_status;
 
 // =================== DECLARATIONS =======================
 
-// Feature test macros might not work since it is possible that the header has
-// been included before this one and thus expanded without the macro, so the
-// functions must be declared here.
+// Feature test macros might not work since the header could have already been included,
+// and expanded without macros, so the functions must be declared here.
 
 ssize_t readlink(const char *path, char *buf, size_t bufsiz);
 ssize_t getline(char **lineptr, size_t *n, FILE *stream);
 
-// Part of dl_phdr_info used instead of it, since it may not be defined, but we
-// also cannot define it ourselves since it could cause redefinition error.
+// Partial redefinition of dl_phdr_info.
 typedef struct {
     Elf64_Addr dlpi_addr;
     const char *dlpi_name;
@@ -133,7 +128,7 @@ int dl_iterate_phdr(int (*callback)(struct dl_phdr_info *info, size_t size, void
 // ===================== dwarf.h ==========================
 
 // dwarf.h's location is inconsistent and the package containing it may not be
-// install, so we include a partial implementation of the header.
+// installed, so the library includes a partial implementation.
 
 #define DW_UT_compile 0x01
 
@@ -298,6 +293,8 @@ int _upf_test_status = EXIT_SUCCESS;
     } while (0)
 
 #define _UPF_OUT_OF_MEMORY() _UPF_ERROR("Process ran out of memory.")
+
+#define _UPF_NO_DEBUG_INFO_ERROR "Ensure that the executable contains debugging information of at least 2nd level (-g2 or -g3)."
 
 // ====================== VECTOR ==========================
 
@@ -591,7 +588,7 @@ struct _upf_state {
     _upf_arena arena;
     // has _upf_init finished
     bool is_init;
-    // file loaded by dynamic linker (only with info required to run it)
+    // file loaded by dynamic linker (without debug info)
     const uint8_t *base;
     // mmap-ed file (with debug info)
     uint8_t *file;
@@ -685,13 +682,12 @@ static void _upf_arena_free(_upf_arena *a) {
     a->head = NULL;
 }
 
-// Copies [begin, end) to arena-allocated string
+// Copies [begin, end) to arena-allocated string.
 static char *_upf_arena_string(_upf_arena *a, const char *begin, const char *end) {
-    _UPF_ASSERT(a != NULL && begin != NULL && end != NULL);
+    _UPF_ASSERT(a != NULL && begin != NULL && end != NULL && end > begin);
 
     size_t len = end - begin;
-
-    char *string = (char *) _upf_arena_alloc(a, len + 2);
+    char *string = (char *) _upf_arena_alloc(a, len + 1);
     memcpy(string, begin, len);
     string[len] = '\0';
 
@@ -734,7 +730,7 @@ static char *_upf_arena_concat2(_upf_arena *a, ...) {
 
 // ====================== DWARF ===========================
 
-// Converts unsigned LEB128 to uint64_t and returns the size of LEB in bytes
+// Converts unsigned LEB128 to uint64_t and returns the size of LEB in bytes.
 static size_t _upf_uLEB_to_uint64(const uint8_t *leb, uint64_t *result) {
     _UPF_ASSERT(leb != NULL && result != NULL);
 
@@ -742,20 +738,20 @@ static size_t _upf_uLEB_to_uint64(const uint8_t *leb, uint64_t *result) {
     static const uint8_t CONTINUE_MASK = 0x80;  // 10000000
 
     size_t i = 0;
+    uint8_t b = 0;
     int shift = 0;
-
     *result = 0;
-    while (true) {
-        uint8_t b = leb[i++];
+    do {
+        b = leb[i++];
+        _UPF_ASSERT(shift < 57);
         *result |= (((uint64_t) (b & BITS_MASK)) << shift);
-        if ((b & CONTINUE_MASK) == 0) break;
         shift += 7;
-    }
+    } while (b & CONTINUE_MASK);
 
     return i;
 }
 
-// Converts signed LEB128 to int64_t and returns the size of LEB in bytes
+// Converts signed LEB128 to int64_t and returns the size of LEB in bytes.
 static size_t _upf_LEB_to_int64(const uint8_t *leb, int64_t *result) {
     _UPF_ASSERT(leb != NULL && result != NULL);
 
@@ -766,14 +762,13 @@ static size_t _upf_LEB_to_int64(const uint8_t *leb, int64_t *result) {
     size_t i = 0;
     uint8_t b = 0;
     size_t shift = 0;
-
     *result = 0;
-    while (true) {
+    do {
         b = leb[i++];
+        _UPF_ASSERT(shift < 57);
         *result |= (((uint64_t) (b & BITS_MASK)) << shift);
         shift += 7;
-        if ((b & CONTINUE_MASK) == 0) break;
-    }
+    } while (b & CONTINUE_MASK);
     if ((shift < sizeof(*result) * 8) && (b & SIGN_MASK)) *result |= -(1 << shift);
 
     return i;
@@ -1244,7 +1239,7 @@ static _upf_type *_upf_get_return_type(_upf_type *type, int count) {
     while (count-- > 0) {
         while (type->kind == _UPF_TK_POINTER) type = type->as.pointer.type;
         if (type->kind != _UPF_TK_FUNCTION) {
-            _UPF_ERROR("Unable to get return type of \"%s\" because it is not a function pointer.", type->name);
+            _UPF_ERROR("Failed to get return type of \"%s\" because it is not a function pointer.", type->name);
         }
         type = type->as.function.return_type;
     }
@@ -1424,15 +1419,13 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                 .size = sizeof(void *),
             };
 
-            // Pointers have to be added before their data gets filled in so that
-            // structs that pointer to themselves, such as linked lists, don't get
-            // stuck in an infinite loop.
+            // Pointers must be added before parsing their data to prevent
+            // self-referential structs from infinite recursion.
             _upf_type *type_ptr = _upf_add_type(die_base, type);
 
+            // Void pointers have invalid type offset.
+            // Leave their `pointer.type` NULL.
             if (subtype_offset != UINT64_MAX) {
-                // `void*`s have invalid offset (since they don't point to any type), thus
-                // pointer with invalid type represents a `void*`
-
                 type_ptr->as.pointer.type = _upf_parse_type(cu, cu->base + subtype_offset);
                 type_ptr->name = type_ptr->as.pointer.type->name;
             }
@@ -1538,8 +1531,7 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
             _UPF_ASSERT(name != NULL);
 
             if (subtype_offset == UINT64_MAX) {
-                // void type is represented by absence of type attribute, e.g. typedef void NAME
-
+                // Invalid type offset means void typedef (typedef void NAME).
                 _upf_type type = {
                     .name = name,
                     .kind = _UPF_TK_VOID,
@@ -1897,7 +1889,8 @@ static const char *_upf_get_typename(const _upf_cu *cu, const uint8_t *die, cons
 
         die += _upf_get_attr_size(die, attr.form);
     }
-    // Type-less pointer is void. It must be named to allow casting to `void`.
+
+    // Typeless pointer is void. It must be named to allow casting to `void`.
     if (abbrev->tag == DW_TAG_pointer_type && type_offset == UINT64_MAX) return "void";
 
     return name;
@@ -1942,7 +1935,7 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *die, const uint
     die += _upf_get_abbrev(&abbrev, &cu, die);
     _UPF_ASSERT(abbrev != NULL && abbrev->tag == DW_TAG_compile_unit);
 
-    // Save to parse after the initializing addr_base, str_offsets, and rnglists_base
+    // Save to parse after initializing addr_base, str_offsets, and rnglists_base.
     const uint8_t *low_pc_die = NULL;
     _upf_attr low_pc_attr = {0};
     const uint8_t *high_pc_die = NULL;
@@ -2033,9 +2026,7 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *die, const uint
                 _upf_named_type var = _upf_parse_cu_variable(&cu, die, abbrev);
                 if (var.name == NULL) break;
                 if (var.die == NULL) {
-                    _UPF_ERROR(
-                        "Unable to find variable DIE. "
-                        "Ensure that the executable contains debugging information of at least 2nd level (-g2 or -g3).");
+                    _UPF_ERROR("Failed to find variable DIE. "_UPF_NO_DEBUG_INFO_ERROR);
                 }
 
                 _UPF_VECTOR_PUSH(&scope->vars, var);
@@ -2094,10 +2085,10 @@ static void _upf_parse_dwarf(void) {
 
 // ======================= ELF ============================
 
-// Linker-generated entry to dynamic section of ELF.
+// Linker-generated entry to the dynamic section of ELF.
 extern Elf64_Dyn _DYNAMIC[];
 
-// Extern function mapping: function pointer -> GOT -> RELA -> symbol -> name -> DIE
+// Extern function mapping: function pointer -> GOT -> RELA -> symbol -> name -> DIE.
 static void _upf_parse_extern_functions(void) {
     _UPF_ASSERT(_DYNAMIC != NULL);
 
@@ -2125,7 +2116,7 @@ static void _upf_parse_extern_functions(void) {
         }
     }
     if (string_table == NULL || symbol_table == NULL || rela_table == NULL || rela_size == -1) {
-        _UPF_WARN("Unable to find one of the required ELF sections. Ignoring extern functions.");
+        _UPF_WARN("Failed to find all required ELF sections. Ignoring extern functions.");
         return;
     }
     _UPF_ASSERT(((void *) _upf_state.base) < ((void *) string_table));  // d_ptr may sometimes be relative to the base
@@ -2150,7 +2141,7 @@ static void _upf_parse_extern_functions(void) {
 
 static void _upf_parse_elf(void) {
     struct stat file_info;
-    if (stat("/proc/self/exe", &file_info) == -1) _UPF_ERROR("Unable to stat \"/proc/self/exe\": %s.", strerror(errno));
+    if (stat("/proc/self/exe", &file_info) == -1) _UPF_ERROR("Failed to stat \"/proc/self/exe\": %s.", strerror(errno));
     size_t size = file_info.st_size;
     _upf_state.file_size = size;
 
@@ -2159,7 +2150,7 @@ static void _upf_parse_elf(void) {
 
     // A new instance of file must be mmap-ed because the one loaded in memory
     // only contains information needed at runtime, and doesn't include debug
-    // information, table with sections' names, etc.
+    // information, section table, etc.
     uint8_t *file = (uint8_t *) mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
     _UPF_ASSERT(file != MAP_FAILED);
     _upf_state.file = file;
@@ -2205,7 +2196,7 @@ static void _upf_parse_elf(void) {
     }
 
     if (_upf_state.die == NULL || _upf_state.abbrev == NULL || _upf_state.str == NULL) {
-        _UPF_ERROR("Unable to find debugging information. Ensure that the executable contains it by compiling with `-g2` or `-g3`.");
+        _UPF_ERROR("Failed to find the debugging information. "_UPF_NO_DEBUG_INFO_ERROR);
     }
 }
 
@@ -2831,7 +2822,7 @@ static _upf_type *_upf_get_member_type(const _upf_cstr_vec *member_names, size_t
         }
     }
 
-    _UPF_ERROR("Unable to find member \"%s\" in \"%s\".", member_names->data[idx], type->name);
+    _UPF_ERROR("Failed to find member \"%s\" in \"%s\".", member_names->data[idx], type->name);
 }
 
 static _upf_type *_upf_get_type_by_name(_upf_parser_state *p) {
@@ -2889,10 +2880,8 @@ static _upf_type *_upf_get_base_type(_upf_parser_state *p, uint64_t pc, const ch
             type_ptr = _upf_get_type_by_name(p);
 
             if (type_ptr == NULL) {
-                _UPF_ERROR(
-                    "Unable to find type \"%s\" in \"%s\" at %s:%d. "
-                    "Ensure that the executable contains debugging information of at least 2nd level (-g2 or -g3).",
-                    p->base.name, arg, _upf_state.file_path, _upf_state.line);
+                _UPF_ERROR("Failed to find type \"%s\" in \"%s\" at %s:%d. "_UPF_NO_DEBUG_INFO_ERROR, p->base.name, arg,
+                           _upf_state.file_path, _upf_state.line);
             }
             break;
         case _UPF_BT_VARIABLE:
@@ -2908,10 +2897,8 @@ static _upf_type *_upf_get_base_type(_upf_parser_state *p, uint64_t pc, const ch
             }
 
             if (type_ptr == NULL) {
-                _UPF_ERROR(
-                    "Unable to find type of \"%s\" in \"%s\" at %s:%d. "
-                    "Ensure that the executable contains debugging information of at least 2nd level (-g2 or -g3).",
-                    p->base.name, arg, _upf_state.file_path, _upf_state.line);
+                _UPF_ERROR("Failed to find type of \"%s\" in \"%s\" at %s:%d. "_UPF_NO_DEBUG_INFO_ERROR, p->base.name, arg,
+                           _upf_state.file_path, _upf_state.line);
             }
             break;
         case _UPF_BT_FUNCTION:
@@ -2930,10 +2917,8 @@ static _upf_type *_upf_get_base_type(_upf_parser_state *p, uint64_t pc, const ch
 
             if (type_ptr == NULL) {
             not_function_error:
-                _UPF_ERROR(
-                    "Unable to find type of function \"%s\" in \"%s\" at %s:%d. "
-                    "Ensure that the executable contains debugging information of at least 2nd level (-g2 or -g3).",
-                    p->base.name, arg, _upf_state.file_path, _upf_state.line);
+                _UPF_ERROR("Failed to find type of function \"%s\" in \"%s\" at %s:%d. "_UPF_NO_DEBUG_INFO_ERROR, p->base.name, arg,
+                           _upf_state.file_path, _upf_state.line);
             }
 
             if (p->members.length == 0 && p->suffix_calls > 0) p->suffix_calls--;
@@ -2981,15 +2966,13 @@ static _upf_type *_upf_dereference_type(_upf_type *type_ptr, int dereference, co
             dereference = 0;
         } else {
         not_pointer_error:
-            _UPF_ERROR("Arguments must be pointers to data that should be printed. You must get pointer (&) of \"%s\" at %s:%d.", arg,
-                       _upf_state.file_path, _upf_state.line);
+            _UPF_ERROR("Argument must be a pointer to the data. You must get pointer of \"%s\" at %s:%d.", arg, _upf_state.file_path,
+                       _upf_state.line);
         }
 
         if (type_ptr == NULL) {
-            _UPF_ERROR(
-                "Unable to print `void*` because it can point to arbitrary data of any length. "
-                "To print the pointer itself, you must get pointer (&) of \"%s\" at %s:%d.",
-                arg, _upf_state.file_path, _upf_state.line);
+            _UPF_ERROR("`void*` cannot be printed. To print the pointer itself, you must get pointer of \"%s\" at %s:%d.", arg,
+                       _upf_state.file_path, _upf_state.line);
         }
     }
 
@@ -3015,7 +2998,7 @@ static const _upf_type *_upf_get_arg_type(const char *arg, uint64_t pc) {
         .cu = cu,
     };
     if (!_upf_parse_expr(&t, &p) || t.idx != t.tokens.length) {
-        _UPF_ERROR("Unable to parse argument \"%s\" at %s:%d.", arg, _upf_state.file_path, _upf_state.line);
+        _UPF_ERROR("Failed to parse the argument \"%s\" at %s:%d.", arg, _upf_state.file_path, _upf_state.line);
     }
 
     _upf_type *base_type = _upf_get_base_type(&p, pc, arg);
@@ -3031,7 +3014,7 @@ static const _upf_type *_upf_get_arg_type(const char *arg, uint64_t pc) {
 
 static _upf_range_vec _upf_get_readable_address_ranges(void) {
     FILE *file = fopen("/proc/self/maps", "r");
-    if (file == NULL) _UPF_ERROR("Unable to open \"/proc/self/maps\": %s.", strerror(errno));
+    if (file == NULL) _UPF_ERROR("Failed to open \"/proc/self/maps\": %s.", strerror(errno));
 
     _upf_range_vec ranges = {0};
     _upf_range range = {
@@ -3049,12 +3032,12 @@ static _upf_range_vec _upf_get_readable_address_ranges(void) {
         if (sscanf(line, "%lx-%lx %c%*s %*x %*x:%*x %*u", &range.start, &range.end, &read_bit) != 3) {
             free(line);
             fclose(file);
-            _UPF_ERROR("Unable to parse \"/proc/self/maps\": invalid format.");
+            _UPF_ERROR("Failed to parse \"/proc/self/maps\": invalid format.");
         }
 
         if (read_bit == 'r') _UPF_VECTOR_PUSH(&ranges, range);
     }
-    if (line) free(line);
+    free(line);
     fclose(file);
 
     return ranges;
@@ -3070,9 +3053,6 @@ static const void *_upf_get_memory_region_end(const void *ptr) {
 }
 
 // ===================== PRINTING =========================
-
-// All the printing is done to the global buffer stored in the _upf_state, which
-// is why calls don't accept or return string pointers.
 
 #define _UPF_INITIAL_BUFFER_SIZE 512
 
@@ -3205,7 +3185,8 @@ __attribute__((no_sanitize_address)) static void _upf_print_char_ptr(const char 
             break;
         }
         _upf_bprintf("%s", _upf_escape_char(*str));
-        str++;  // Increment inside of macro (_upf_bprintf) may be triggered twice
+        // Increment inside of macro (_upf_bprintf) may be triggered twice.
+        str++;
     }
     _upf_bprintf("\"");
     if (is_truncated) _upf_bprintf("...");
@@ -3460,7 +3441,7 @@ static void _upf_print_type(_upf_indexed_struct_vec *circular, const uint8_t *da
             uint64_t absolute_function_pc = (uint64_t) data;
             uint64_t relative_function_pc = data - _upf_state.base;
 
-            // Check pointer to function name mapping needed for extern functions
+            // Check pointer to function name mapping needed for extern functions.
             const char *function_name = NULL;
             for (uint32_t i = 0; i < _upf_state.extern_functions.length; i++) {
                 if (_upf_state.extern_functions.data[i].pc == absolute_function_pc) {
@@ -3470,7 +3451,7 @@ static void _upf_print_type(_upf_indexed_struct_vec *circular, const uint8_t *da
                 }
             }
 
-            // Find function (and cu) which matches either name(extern) or PC(local)
+            // Find function (and cu) which matches either name(extern) or PC(local).
             _upf_function *function = NULL;
             _upf_cu *cu = NULL;
             for (uint32_t i = 0; i < _upf_state.cus.length; i++) {
@@ -3588,10 +3569,11 @@ static int _upf_phdr_callback(struct dl_phdr_info *info_, size_t _size, void *da
     (void) _size;
     void **data = data_;
 
-    // Empty name seems to indicate current executable
+    // Empty name seems to indicate current executable.
     if (strcmp(info->dlpi_name, "") == 0) {
         *data = (void *) info->dlpi_addr;
-        return 1;  // return non-zero value to exit early
+        // Return non-zero value to exit early.
+        return 1;
     }
     return 0;
 }
@@ -3625,10 +3607,8 @@ __attribute__((constructor)) void _upf_init(void) {
 }
 
 __attribute__((destructor)) void _upf_fini(void) {
-    // Must be unloaded at the end of the program because many variables point
-    // into the _upf_state.file to avoid unnecessarily copying date.
     if (_upf_state.file != NULL) munmap(_upf_state.file, _upf_state.file_size);
-    if (_upf_state.buffer != NULL) free(_upf_state.buffer);
+    free(_upf_state.buffer);
     _upf_arena_free(&_upf_state.arena);
 }
 
