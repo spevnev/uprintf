@@ -1,6 +1,6 @@
 #include <stdbool.h>
 #include <stdint.h>
-#include <stdlib.h>
+#include <stdlib.h>  // IWYU pragma: keep
 #include "uprintf.h"
 
 typedef int8_t i8_t;

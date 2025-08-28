@@ -1,4 +1,4 @@
-(uprintf) [ERROR] `void*` cannot be printed. To print the pointer itself, you must get pointer of "v" at tests/void_pointers.c:8.
+(uprintf) [ERROR] Cannot print type void. To print the void pointer itself, get a pointer to "v" at tests/void_pointers.c:8.
 void* POINTER
 void** POINTER, void* POINTER
 void*** POINTER, void** POINTER

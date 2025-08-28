@@ -562,6 +562,25 @@ typedef struct {
 
 _UPF_VECTOR_TYPEDEF(_upf_token_vec, _upf_token);
 
+// https://en.cppreference.com/w/c/language/operator_precedence.html
+typedef enum {
+    _UPF_PREC_NONE = 0,
+    _UPF_PREC_COMMA,
+    _UPF_PREC_ASSIGNMENT,
+    _UPF_PREC_TERNARY,
+    _UPF_PREC_LOGICAL,
+    _UPF_PREC_TERM,
+    _UPF_PREC_FACTOR,
+    _UPF_PREC_PREFIX,
+    _UPF_PREC_POSTFIX
+} _upf_parse_precedence;
+
+typedef struct {
+    _upf_type *(*prefix)(void);
+    _upf_type *(*infix)(_upf_type *);
+    _upf_parse_precedence precedence;
+} _upf_parse_rule;
+
 // =================== GLOBAL STATE =======================
 
 struct _upf_state {
@@ -606,6 +625,9 @@ struct _upf_state {
     // tokenizer
     _upf_token_vec tokens;
     size_t tokens_idx;
+    // parser
+    uint64_t current_pc;
+    _upf_cu *current_cu;
 };
 
 static struct _upf_state _upf_state = {0};
@@ -1218,16 +1240,15 @@ static _upf_type _upf_get_subarray(const _upf_type *array, int count) {
     return subarray;
 }
 
-static _upf_type *_upf_get_return_type(_upf_type *type, int count) {
-    while (count-- > 0) {
-        while (type->kind == _UPF_TK_POINTER) type = type->as.pointer.type;
-        if (type->kind != _UPF_TK_FUNCTION) {
-            _UPF_ERROR("Failed to get return type of \"%s\" because it is not a function pointer.", type->name);
-        }
-        type = type->as.function.return_type;
-    }
-
-    return type;
+static _upf_type *_upf_get_pointer_to_type(_upf_type *type_ptr) {
+    _upf_type type = {
+        .kind = _UPF_TK_POINTER,
+        .size = sizeof(void*),
+        .as.pointer = {
+            .type = type_ptr,
+        },
+    };
+    return _upf_add_type(NULL, type);
 }
 
 static _upf_type *_upf_get_void_type(void) {
@@ -1237,7 +1258,51 @@ static _upf_type *_upf_get_void_type(void) {
     _upf_type type = {
         .name = "void",
         .kind = _UPF_TK_VOID,
-        .size = UINT64_MAX,
+        .size = 0,
+    };
+    type_ptr = _upf_add_type(NULL, type);
+
+    return type_ptr;
+}
+
+static _upf_type *_upf_get_bool_type(void) {
+    static _upf_type *type_ptr = NULL;
+    if (type_ptr != NULL) return type_ptr;
+
+    _upf_type type = {
+        .name = "bool",
+        .kind = _UPF_TK_BOOL,
+        .size = sizeof(bool),
+    };
+    type_ptr = _upf_add_type(NULL, type);
+
+    return type_ptr;
+}
+
+static _upf_type *_upf_get_cstr_type(void) {
+    static _upf_type *type_ptr = NULL;
+    if (type_ptr != NULL) return type_ptr;
+
+    _upf_type const_char_type = {
+        .name = "char",
+        .kind = _UPF_TK_SCHAR,
+        .size = sizeof(char),
+        .modifiers = _UPF_MOD_CONST,
+    };
+    _upf_type *const_char_type_ptr = _upf_add_type(NULL, const_char_type);
+
+    type_ptr = _upf_get_pointer_to_type(const_char_type_ptr);
+    return type_ptr;
+}
+
+static _upf_type *_upf_get_number_type(void) {
+    static _upf_type *type_ptr = NULL;
+    if (type_ptr != NULL) return type_ptr;
+
+    _upf_type type = {
+        .name = "int",
+        .kind = _UPF_TK_S4,
+        .size = sizeof(int),
     };
     type_ptr = _upf_add_type(NULL, type);
 
@@ -1406,12 +1471,12 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
             // self-referential structs from infinite recursion.
             _upf_type *type_ptr = _upf_add_type(die_base, type);
 
-            // Void pointers have invalid type offset.
-            // Leave their `pointer.type` NULL.
-            if (subtype_offset != UINT64_MAX) {
+            if (subtype_offset == UINT64_MAX) {
+                type_ptr->as.pointer.type = _upf_get_void_type();
+            } else {
                 type_ptr->as.pointer.type = _upf_parse_type(cu, cu->base + subtype_offset);
-                type_ptr->name = type_ptr->as.pointer.type->name;
             }
+            type_ptr->name = type_ptr->as.pointer.type->name;
 
             return type_ptr;
         }
@@ -1514,11 +1579,10 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
             _UPF_ASSERT(name != NULL);
 
             if (subtype_offset == UINT64_MAX) {
-                // Invalid type offset means void typedef (typedef void NAME).
                 _upf_type type = {
                     .name = name,
                     .kind = _UPF_TK_VOID,
-                    .size = UINT64_MAX,
+                    .size = 0,
                 };
                 return _upf_add_type(die_base, type);
             }
@@ -1872,8 +1936,6 @@ static const char *_upf_get_typename(const _upf_cu *cu, const uint8_t *die, cons
 
         die += _upf_get_attr_size(die, attr.form);
     }
-
-    // Typeless pointer is void. It must be named to allow casting to `void`.
     if (abbrev->tag == DW_TAG_pointer_type && type_offset == UINT64_MAX) return "void";
 
     return name;
@@ -2189,7 +2251,7 @@ static _upf_cstr_vec _upf_get_args(char *string) {
     _UPF_ASSERT(string != NULL);
 
     _upf_cstr_vec args = {0};
-    int paren = 0;
+    int parens = 0;
     const char *start = string;
     for (char *ch = string; *ch != '\0'; ch++) {
         switch (*ch) {
@@ -2204,13 +2266,13 @@ static _upf_cstr_vec _upf_get_args(char *string) {
                 }
             } break;
             case '(':
-                paren++;
+                parens++;
                 break;
             case ')':
-                paren--;
+                parens--;
                 break;
             case ',':
-                if (paren == 0) {
+                if (parens == 0) {
                     *ch = '\0';
                     _UPF_VECTOR_PUSH(&args, start);
                     start = ch + 1;
@@ -2343,9 +2405,17 @@ static void _upf_tokenize(const char *string) {
     }
 }
 
-static _upf_token _upf_peek_token(void) { return _upf_state.tokens.data[_upf_state.tokens_idx]; }
+static bool _upf_has_token(void) { return _upf_state.tokens_idx < _upf_state.tokens.length; }
 
-static _upf_token _upf_consume_token(void) { return _upf_state.tokens.data[_upf_state.tokens_idx++]; }
+static _upf_token _upf_peek_token(void) {
+    _UPF_ASSERT(_upf_state.tokens_idx < _upf_state.tokens.length);
+    return _upf_state.tokens.data[_upf_state.tokens_idx];
+}
+
+static _upf_token _upf_consume_token(void) {
+    _UPF_ASSERT(_upf_state.tokens_idx < _upf_state.tokens.length);
+    return _upf_state.tokens.data[_upf_state.tokens_idx++];
+}
 
 static bool _upf_match_token(_upf_token_kind kind) {
     if (_upf_peek_token().kind != kind) return false;
@@ -2353,7 +2423,350 @@ static bool _upf_match_token(_upf_token_kind kind) {
     return true;
 }
 
-// ===================== PARSING ==========================
+static _upf_token _upf_expect_token(_upf_token_kind kind) {
+    _upf_token token = _upf_consume_token();
+    _UPF_ASSERT(token.kind == kind);
+    return token;
+}
+
+// ====================== PARSER ==========================
+
+static _upf_type *_upf_get_type_by_name(const char *typename) {
+    _upf_named_type_vec *types = &_upf_state.current_cu->types;
+    for (uint32_t i = 0; i < types->length; i++) {
+        if (strcmp(types->data[i].name, typename) == 0) {
+            return _upf_parse_type(_upf_state.current_cu, types->data[i].die);
+        }
+    }
+    return NULL;
+}
+
+static _upf_type *_upf_get_variable_type(const _upf_cu *cu, const _upf_scope *scope, uint64_t pc, const char *var_name) {
+    _UPF_ASSERT(cu != NULL && scope != NULL && var_name != NULL);
+
+    if (!_upf_is_in_range(pc, scope->ranges)) return NULL;
+
+    for (uint32_t i = 0; i < scope->scopes.length; i++) {
+        _upf_type *result = _upf_get_variable_type(cu, &scope->scopes.data[i], pc, var_name);
+        if (result != NULL) return result;
+    }
+
+    for (uint32_t i = 0; i < scope->vars.length; i++) {
+        if (strcmp(scope->vars.data[i].name, var_name) == 0) return _upf_parse_type(cu, scope->vars.data[i].die);
+    }
+
+    return NULL;
+}
+
+static _upf_type *_upf_get_function(const _upf_cu *cu, const char *function_name) {
+    _UPF_ASSERT(cu != NULL);
+    for (uint32_t i = 0; i < cu->functions.length; i++) {
+        _upf_function *function = &cu->functions.data[i];
+        if (strcmp(function->name, function_name) != 0) continue;
+
+        _upf_type *return_type
+            = function->return_type_die == NULL ? _upf_get_void_type() : _upf_parse_type(_upf_state.current_cu, function->return_type_die);
+        _upf_type function_type = {
+            .name = function->name,
+            .kind = _UPF_TK_FUNCTION,
+            .size = sizeof(void *),
+            .as.function = {
+                .return_type = return_type,
+            },
+        };
+        return _upf_add_type(NULL, function_type);
+    }
+    return NULL;
+}
+
+static _upf_type *_upf_parse(_upf_parse_precedence precedence);
+
+static _upf_type *_upf_parse_expression(void) { return _upf_parse(_UPF_PREC_POSTFIX); }
+
+static _upf_type *_upf_string(void) {
+    _upf_consume_token();
+    return _upf_get_cstr_type();
+}
+
+static _upf_type *_upf_number(void) {
+    _upf_consume_token();
+    return _upf_get_number_type();
+}
+
+static _upf_type *_upf_identifier(void) {
+    const char *identifier = _upf_consume_token().string;
+
+    _upf_type *type = _upf_get_variable_type(_upf_state.current_cu, &_upf_state.current_cu->scope, _upf_state.current_pc, identifier);
+    if (type != NULL) return type;
+
+    return _upf_get_function(_upf_state.current_cu, identifier);
+}
+
+static _upf_type *_upf_prefix(void) {
+    _upf_consume_token();
+    return _upf_parse(_UPF_PREC_PREFIX);
+}
+
+static _upf_type *_upf_dereference(void) {
+    _upf_consume_token();
+    _upf_type *type = _upf_parse(_UPF_PREC_PREFIX);
+    _UPF_ASSERT(type != NULL && type->kind == _UPF_TK_POINTER);  // TODO: array?
+    return type->as.pointer.type;
+}
+
+static _upf_type *_upf_reference(void) {
+    _upf_consume_token();
+    return _upf_get_pointer_to_type(_upf_parse(_UPF_PREC_PREFIX));
+}
+
+static _upf_type *_upf_parse_typename(void) {
+    const char *type_specifiers[4];
+    size_t type_specifiers_idx = 0;
+    const char *identifier = NULL;
+    bool parsed_type = false;
+    while (!parsed_type) {
+        switch (_upf_peek_token().kind) {
+            case _UPF_TOK_TYPE_SPECIFIER:
+                _UPF_ASSERT(type_specifiers_idx < (sizeof(type_specifiers) / sizeof(type_specifiers[0])));
+                type_specifiers[type_specifiers_idx++] = _upf_consume_token().string;
+                break;
+            case _UPF_TOK_TYPE_QUALIFIER:
+                _upf_consume_token();
+                break;
+            case _UPF_TOK_ATOMIC:
+                _upf_consume_token();
+                if (_upf_match_token(_UPF_TOK_OPEN_PAREN)) {
+                    _upf_parse_typename();
+                    _upf_expect_token(_UPF_TOK_CLOSE_PAREN);
+                }
+                break;
+            case _UPF_TOK_STRUCT:
+                _upf_consume_token();
+                if (_upf_peek_token().kind == _UPF_TOK_IDENTIFIER) identifier = _upf_consume_token().string;
+                if (_upf_match_token(_UPF_TOK_OPEN_BRACE)) _UPF_ERROR("Cast to anonymous struct is not supported.");
+                break;
+            case _UPF_TOK_ENUM:
+                _upf_consume_token();
+                if (_upf_peek_token().kind == _UPF_TOK_IDENTIFIER) identifier = _upf_consume_token().string;
+                if (_upf_match_token(_UPF_TOK_OPEN_BRACE)) _UPF_ERROR("Cast to anonymous enum is not supported.");
+                break;
+            case _UPF_TOK_IDENTIFIER:
+                identifier = _upf_consume_token().string;
+                break;
+            default:
+                parsed_type = true;
+                break;
+        }
+    }
+
+    int pointer = 0;
+    while (_upf_match_token(_UPF_TOK_STAR)) {
+        pointer++;
+        while (_upf_match_token(_UPF_TOK_TYPE_QUALIFIER)) continue;
+    }
+
+    bool parsed_declarator = false;
+    while (!parsed_declarator) {
+        switch (_upf_peek_token().kind) {
+            case _UPF_TOK_OPEN_PAREN: {
+                // TODO:
+                _UPF_ERROR("TODO");
+            } break;
+            case _UPF_TOK_OPEN_BRACKET:
+                _upf_consume_token();
+                while (!_upf_match_token(_UPF_TOK_CLOSE_BRACKET)) _upf_consume_token();
+                pointer++;
+                break;
+            default:
+                parsed_declarator = true;
+                break;
+        }
+    }
+
+    _upf_type *type_ptr;
+    if (identifier != NULL) {
+        _UPF_ASSERT(type_specifiers_idx == 0);
+        type_ptr = _upf_get_type_by_name(identifier);
+    } else if (strcmp(type_specifiers[0], "void") == 0) {
+        _UPF_ASSERT(type_specifiers_idx == 1);
+        type_ptr = _upf_get_void_type();
+    } else if (strcmp(type_specifiers[0], "bool") == 0) {
+        _UPF_ASSERT(type_specifiers_idx == 1);
+        type_ptr = _upf_get_bool_type();
+    } else {
+        int kind = DW_ATE_signed;
+        bool is_signed = true;
+        int longness = 0;
+        for (size_t i = 0; i < type_specifiers_idx; i++) {
+            if (strcmp(type_specifiers[i], "long") == 0) {
+                longness++;
+            } else if (strcmp(type_specifiers[i], "short") == 0) {
+                longness--;
+            } else if (strcmp(type_specifiers[i], "unsigned") == 0) {
+                is_signed = false;
+            } else if (strcmp(type_specifiers[i], "signed") == 0) {
+                is_signed = true;
+            } else if (strcmp(type_specifiers[i], "char") == 0) {
+                kind = DW_ATE_signed_char;
+            } else if (strcmp(type_specifiers[i], "int") == 0) {
+                kind = DW_ATE_signed;
+            } else if (strcmp(type_specifiers[i], "double") == 0) {
+                kind = DW_ATE_float;
+                longness++;
+            } else if (strcmp(type_specifiers[i], "float") == 0) {
+                kind = DW_ATE_float;
+            }
+        }
+
+        _upf_type type = {0};
+        if (kind == DW_ATE_signed_char) {
+            type.kind = is_signed ? _UPF_TK_SCHAR : _UPF_TK_UCHAR;
+            type.size = sizeof(char);
+        } else if (kind == DW_ATE_float) {
+            switch (longness) {
+                case 0:
+                    type.kind = _UPF_TK_F4;
+                    type.size = sizeof(float);
+                    break;
+                case 2:
+                    if (sizeof(long double) != sizeof(double)) {
+                        _UPF_WARN("Long doubles aren't supported. Ignoring this type.");
+                        type.kind = _UPF_TK_UNKNOWN;
+                        type.size = sizeof(long double);
+                        break;
+                    }
+                    __attribute__((fallthrough));
+                case 1:
+                    type.kind = _UPF_TK_F8;
+                    type.size = sizeof(double);
+                    break;
+                default:
+                    _UPF_ERROR("Invalid floating-point number length.");
+            }
+        } else if (kind == DW_ATE_signed) {
+            switch (longness) {
+                case -1:
+                    type.size = sizeof(short int);
+                    break;
+                case 0:
+                    type.size = sizeof(int);
+                    break;
+                case 1:
+                    type.size = sizeof(long int);
+                    break;
+                case 2:
+                    type.size = sizeof(long long int);
+                    break;
+                default:
+                    _UPF_ERROR("Invalid integer length.");
+            }
+            type.kind = _upf_get_type_kind(is_signed ? DW_ATE_signed : DW_ATE_unsigned, type.size);
+        } else {
+            _UPF_ERROR("Invalid integer type.");
+        }
+        type_ptr = _upf_add_type(NULL, type);
+    }
+
+    while (pointer > 0) {
+        type_ptr = _upf_get_pointer_to_type(type_ptr);
+        pointer--;
+    }
+
+    return type_ptr;
+}
+
+static _upf_type *_upf_paren(void) {
+    _upf_consume_token();
+
+    // Try to parse as "(expression)".
+    bool is_cast = false;
+    size_t current_idx = _upf_state.tokens_idx;
+    _upf_type *type = NULL;
+    do {
+        type = _upf_parse_expression();
+    } while (_upf_match_token(_UPF_TOK_COMMA));
+
+    // If failed, try to parse as "(typename) expression".
+    if (type == NULL) {
+        _upf_state.tokens_idx = current_idx;
+        type = _upf_parse_typename();
+        is_cast = true;
+    }
+
+    _upf_expect_token(_UPF_TOK_CLOSE_PAREN);
+    if (is_cast) _upf_parse(_UPF_PREC_PREFIX);
+    return type;
+}
+
+static _upf_type *_upf_call(_upf_type *c) {
+    (void) c;
+    return NULL;
+}
+
+static _upf_type *_upf_index(_upf_type *c) {
+    (void) c;
+    return NULL;
+}
+
+static _upf_type *_upf_dot(_upf_type *c) {
+    (void) c;
+    return NULL;
+}
+
+static _upf_type *_upf_binary(_upf_type *c) {
+    (void) c;
+    return NULL;
+}
+
+static _upf_type *_upf_ternary(_upf_type *c) {
+    (void) c;
+    return NULL;
+}
+
+static _upf_type *_upf_postfix(_upf_type *c) {
+    (void) c;
+    return NULL;
+}
+
+static _upf_type *_upf_assignment(_upf_type *c) {
+    (void) c;
+    return NULL;
+}
+
+static const _upf_parse_rule _upf_parse_rules[_UPF_TOK_COUNT] = {
+    // clang-format off
+    [_UPF_TOK_NUMBER]       = { _upf_number,      NULL,            _UPF_PREC_NONE       },
+    [_UPF_TOK_STRING]       = { _upf_string,      NULL,            _UPF_PREC_NONE       },
+    [_UPF_TOK_IDENTIFIER]   = { _upf_identifier,  NULL,            _UPF_PREC_NONE       },
+    [_UPF_TOK_PREFIX]       = { _upf_prefix,      NULL,            _UPF_PREC_NONE       },
+    [_UPF_TOK_OPEN_PAREN]   = { _upf_paren,       _upf_call,       _UPF_PREC_POSTFIX    },
+    [_UPF_TOK_OPEN_BRACKET] = { NULL,             _upf_index,      _UPF_PREC_POSTFIX    },
+    [_UPF_TOK_DOT]          = { NULL,             _upf_dot,        _UPF_PREC_POSTFIX    },
+    [_UPF_TOK_ARROW]        = { NULL,             _upf_dot,        _UPF_PREC_POSTFIX    },
+    [_UPF_TOK_INCREMENT]    = { _upf_prefix,      _upf_postfix,    _UPF_PREC_POSTFIX    },
+    [_UPF_TOK_PLUS]         = { _upf_prefix,      _upf_binary,     _UPF_PREC_TERM       },
+    [_UPF_TOK_STAR]         = { _upf_dereference, _upf_binary,     _UPF_PREC_FACTOR     },
+    [_UPF_TOK_AMPERSAND]    = { _upf_reference,   _upf_binary,     _UPF_PREC_LOGICAL    },
+    [_UPF_TOK_QUESTION]     = { NULL,             _upf_ternary,    _UPF_PREC_TERNARY    },
+    [_UPF_TOK_ASSIGNMENT]   = { NULL,             _upf_assignment, _UPF_PREC_ASSIGNMENT },
+    [_UPF_TOK_LOGICAL]      = { NULL,             _upf_binary,     _UPF_PREC_LOGICAL    },
+    [_UPF_TOK_FACTOR]       = { NULL,             _upf_binary,     _UPF_PREC_FACTOR     },
+    // clang-format on
+};
+
+static _upf_type *_upf_parse(_upf_parse_precedence precedence) {
+    _upf_token token = _upf_peek_token();
+    _upf_parse_rule rule = _upf_parse_rules[token.kind];
+    if (rule.prefix == NULL) return NULL;
+
+    _upf_type *type = rule.prefix();
+    while (_upf_has_token() && type != NULL) {
+        _upf_parse_rule next_rule = _upf_parse_rules[_upf_peek_token().kind];
+        if (precedence > next_rule.precedence) break;
+        type = next_rule.infix(type);
+    }
+    return type;
+}
 
 static _upf_cu *_upf_find_cu(uint64_t pc) {
     _upf_cu *cu = NULL;
@@ -2369,11 +2782,29 @@ static _upf_cu *_upf_find_cu(uint64_t pc) {
 static const _upf_type *_upf_get_arg_type(const char *arg, uint64_t pc) {
     _UPF_ASSERT(arg != NULL);
 
+    _upf_state.current_pc = pc;
     _upf_state.current_cu = _upf_find_cu(pc);
     _UPF_ASSERT(_upf_state.current_cu != NULL);
 
+    _upf_state.tokens.length = 0;
+    _upf_state.tokens_idx = 0;
     _upf_tokenize(arg);
-    return NULL
+
+    _upf_type *type = _upf_parse_expression();
+    if (type == NULL || _upf_state.tokens_idx != _upf_state.tokens.length) {
+        _UPF_ERROR("Failed to parse the argument \"%s\" at %s:%d.", arg, _upf_state.file_path, _upf_state.line);
+    }
+
+    if (type->kind != _UPF_TK_POINTER) {
+        _UPF_ERROR("Argument \"%s\" must be a pointer at %s:%d.", arg, _upf_state.file_path, _upf_state.line);
+    }
+    type = type->as.pointer.type;
+
+    if (type == NULL) {
+        _UPF_ERROR("Cannot print type void. To print the void pointer itself, get a pointer to \"%s\" at %s:%d.", arg, _upf_state.file_path,
+                   _upf_state.line);
+    }
+    return type;
 }
 
 // ================== /proc/pid/maps ======================
@@ -2838,9 +3269,12 @@ static void _upf_print_type(_upf_indexed_struct_vec *circular, const uint8_t *da
                 _UPF_ASSERT(cu != NULL);
 
                 _upf_bprintf(" (");
-                _upf_type *return_type
-                    = function->return_type_die == NULL ? _upf_get_void_type() : _upf_parse_type(cu, function->return_type_die);
-                _upf_print_typename(return_type, true, true);
+                if (function->return_type_die == NULL) {
+                    _upf_bprintf("void ");
+                } else {
+                    _upf_type *return_type = _upf_parse_type(cu, function->return_type_die);
+                    _upf_print_typename(return_type, true, true);
+                }
                 _upf_bprintf("%s(", function->name);
                 for (uint32_t i = 0; i < function->args.length; i++) {
                     _upf_named_type arg = function->args.data[i];

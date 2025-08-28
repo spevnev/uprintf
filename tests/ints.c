@@ -1,8 +1,9 @@
+#include <stdint.h>
 #include <stdlib.h>
 #include "uprintf.h"
 
 int main(void) {
-    unsigned long i = 18446744073709551615UL;
+    unsigned long i = UINT64_MAX;
 
     // int16_t
     uprintf("%S\n", (short *) &i);
