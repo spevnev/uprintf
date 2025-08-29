@@ -2779,9 +2779,12 @@ static _upf_type *_upf_binary(_upf_type *c) {
     return NULL;
 }
 
-static _upf_type *_upf_ternary(_upf_type *c) {
-    (void) c;
-    return NULL;
+static _upf_type *_upf_ternary(__attribute__((unused)) _upf_type *type) {
+    _upf_consume_token();
+    _upf_parse_expression();
+    _upf_expect_token(_UPF_TOK_COLON);
+    // The result of both branches must have the same type, get type from either branch.
+    return _upf_parse(_UPF_PREC_TERNARY);
 }
 
 static _upf_type *_upf_postfix(_upf_type *c) {
