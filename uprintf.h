@@ -1253,11 +1253,9 @@ static _upf_type *_upf_get_pointer_to_type(_upf_type *type_ptr) {
 
 static _upf_type *_upf_dereference_type(_upf_type *type_ptr) {
     _UPF_ASSERT(type_ptr != NULL && (type_ptr->kind == _UPF_TK_POINTER || type_ptr->kind == _UPF_TK_ARRAY));
-    if (type_ptr->kind == _UPF_TK_POINTER) {
-        return type_ptr->as.pointer.type;
-    } else {
-        return type_ptr->as.array.element_type;
-    }
+    if (type_ptr->kind == _UPF_TK_POINTER) return type_ptr->as.pointer.type;
+    if (type_ptr->as.array.lengths.length <= 1) return type_ptr->as.array.element_type;
+    return _upf_add_type(NULL, _upf_get_subarray(type_ptr, 1));
 }
 
 static _upf_type *_upf_get_void_type(void) {
@@ -2714,14 +2712,22 @@ static _upf_type *_upf_call(_upf_type *type) {
         else if (token.kind == _UPF_TOK_CLOSE_PAREN) parens--;
     }
 
+    _UPF_ASSERT(type != NULL);
     if (type->kind == _UPF_TK_POINTER) type = type->as.pointer.type;
     _UPF_ASSERT(type->kind == _UPF_TK_FUNCTION);
     return type->as.function.return_type;
 }
 
-static _upf_type *_upf_index(_upf_type *c) {
-    (void) c;
-    return NULL;
+static _upf_type *_upf_index(_upf_type *type) {
+    _upf_consume_token();
+    int brackets = 1;
+    while (brackets > 0) {
+        _upf_token token = _upf_consume_token();
+        if (token.kind == _UPF_TOK_OPEN_BRACKET) brackets++;
+        else if (token.kind == _UPF_TOK_CLOSE_BRACKET) brackets--;
+    }
+
+    return _upf_dereference_type(type);
 }
 
 static _upf_type *_upf_dot(_upf_type *type) {
@@ -2822,12 +2828,12 @@ static const _upf_type *_upf_get_arg_type(const char *arg, uint64_t pc) {
         _UPF_ERROR("Failed to parse the argument \"%s\" at %s:%d.", arg, _upf_state.file_path, _upf_state.line);
     }
 
-    if (type->kind != _UPF_TK_POINTER) {
+    if (type->kind != _UPF_TK_POINTER && type->kind != _UPF_TK_ARRAY) {
         _UPF_ERROR("Argument \"%s\" must be a pointer at %s:%d.", arg, _upf_state.file_path, _upf_state.line);
     }
-    type = type->as.pointer.type;
+    type = _upf_dereference_type(type);
 
-    if (type == NULL) {
+    if (type->kind == _UPF_TK_VOID) {
         _UPF_ERROR("Cannot print type void. To print the void pointer itself, get a pointer to \"%s\" at %s:%d.", arg, _upf_state.file_path,
                    _upf_state.line);
     }
