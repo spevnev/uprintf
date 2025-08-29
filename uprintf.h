@@ -532,6 +532,7 @@ typedef enum {
     _UPF_TOK_TYPE_SPECIFIER,
     _UPF_TOK_TYPE_QUALIFIER,
     _UPF_TOK_ATOMIC,
+    _UPF_TOK_GENERIC,
     _UPF_TOK_OPEN_PAREN,
     _UPF_TOK_CLOSE_PAREN,
     _UPF_TOK_OPEN_BRACKET,
@@ -2347,6 +2348,7 @@ static void _upf_tokenize(const char *string) {
         {_UPF_TOK_TYPE_QUALIFIER, "volatile"},
         {_UPF_TOK_TYPE_QUALIFIER, "restrict"},
         {_UPF_TOK_ATOMIC, "_Atomic"},
+        {_UPF_TOK_GENERIC, "_Generic"},
     };
 
     const char *ch = string;
@@ -2520,6 +2522,8 @@ static _upf_type *_upf_prefix(void) {
     _upf_consume_token();
     return _upf_parse(_UPF_PREC_PREFIX);
 }
+
+static _upf_type *_upf_generic(void) { _UPF_ERROR("Generics are not supported at %s:%d.", _upf_state.file_path, _upf_state.line); }
 
 static _upf_type *_upf_dereference(void) {
     _upf_consume_token();
@@ -2792,6 +2796,7 @@ static const _upf_parse_rule _upf_parse_rules[_UPF_TOK_COUNT] = {
     [_UPF_TOK_STRING]       = { _upf_string,      NULL,            _UPF_PREC_NONE       },
     [_UPF_TOK_IDENTIFIER]   = { _upf_identifier,  NULL,            _UPF_PREC_NONE       },
     [_UPF_TOK_PREFIX]       = { _upf_prefix,      NULL,            _UPF_PREC_NONE       },
+    [_UPF_TOK_GENERIC]      = { _upf_generic,     NULL,            _UPF_PREC_NONE       },
     [_UPF_TOK_OPEN_PAREN]   = { _upf_paren,       _upf_call,       _UPF_PREC_POSTFIX    },
     [_UPF_TOK_OPEN_BRACKET] = { NULL,             _upf_index,      _UPF_PREC_POSTFIX    },
     [_UPF_TOK_DOT]          = { NULL,             _upf_dot,        _UPF_PREC_POSTFIX    },

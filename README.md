@@ -1038,7 +1038,7 @@ uprintf's state: {
 ## Requirements
 
 - Works only on Linux
-- The oldest supported C version is c99
+- The oldest supported C version is c99 (tests require c11)
 - Executable must have debugging information (`-g2` or higher)
 - `elf.h` must be in the include path
 
