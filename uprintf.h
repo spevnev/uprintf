@@ -2789,9 +2789,11 @@ static _upf_type *_upf_postfix(_upf_type *c) {
     return NULL;
 }
 
-static _upf_type *_upf_assignment(_upf_type *c) {
-    (void) c;
-    return NULL;
+static _upf_type *_upf_assignment(_upf_type *type) {
+    _upf_consume_token();
+    _upf_parse(_UPF_PREC_ASSIGNMENT);
+    // Type of an assignment expression is that of its LHS.
+    return type;
 }
 
 static const _upf_parse_rule _upf_parse_rules[_UPF_TOK_COUNT] = {
