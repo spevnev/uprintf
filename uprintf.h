@@ -545,6 +545,7 @@ typedef enum {
     _UPF_TOK_PREFIX,
     _UPF_TOK_INCREMENT,
     _UPF_TOK_PLUS,
+    _UPF_TOK_MINUS,
     _UPF_TOK_STAR,
     _UPF_TOK_LOGICAL,
     _UPF_TOK_FACTOR,
@@ -1252,8 +1253,14 @@ static _upf_type *_upf_get_pointer_to_type(_upf_type *type_ptr) {
     return _upf_add_type(NULL, type);
 }
 
+static bool _upf_is_pointer(const _upf_type *type) {
+    _UPF_ASSERT(type != NULL);
+    if (type->kind == _UPF_TK_POINTER || type->kind == _UPF_TK_ARRAY) return true;
+    return false;
+}
+
 static _upf_type *_upf_dereference_type(_upf_type *type_ptr) {
-    _UPF_ASSERT(type_ptr != NULL && (type_ptr->kind == _UPF_TK_POINTER || type_ptr->kind == _UPF_TK_ARRAY));
+    _UPF_ASSERT(_upf_is_pointer(type_ptr));
     if (type_ptr->kind == _UPF_TK_POINTER) return type_ptr->as.pointer.type;
     if (type_ptr->as.array.lengths.length <= 1) return type_ptr->as.array.element_type;
     return _upf_add_type(NULL, _upf_get_subarray(type_ptr, 1));
@@ -2326,7 +2333,7 @@ static void _upf_tokenize(const char *string) {
            {_UPF_TOK_CLOSE_PAREN, ")"},  {_UPF_TOK_DOT, "."},          {_UPF_TOK_OPEN_BRACKET, "["}, {_UPF_TOK_CLOSE_BRACKET, "]"},
            {_UPF_TOK_OPEN_BRACE, "{"},   {_UPF_TOK_CLOSE_BRACE, "}"},  {_UPF_TOK_QUESTION, "?"},     {_UPF_TOK_COLON, ":"},
            {_UPF_TOK_LOGICAL, "<"},      {_UPF_TOK_LOGICAL, ">"},      {_UPF_TOK_PREFIX, "!"},       {_UPF_TOK_PLUS, "+"},
-           {_UPF_TOK_PLUS, "-"},         {_UPF_TOK_PREFIX, "~"},       {_UPF_TOK_FACTOR, "/"},       {_UPF_TOK_FACTOR, "%"},
+           {_UPF_TOK_MINUS, "-"},        {_UPF_TOK_PREFIX, "~"},       {_UPF_TOK_FACTOR, "/"},       {_UPF_TOK_FACTOR, "%"},
            {_UPF_TOK_LOGICAL, "^"},      {_UPF_TOK_LOGICAL, "|"},      {_UPF_TOK_ASSIGNMENT, "="}};
 
 
@@ -2495,6 +2502,7 @@ static _upf_type *_upf_get_function(const _upf_cu *cu, const char *function_name
     return NULL;
 }
 
+static _upf_parse_precedence _upf_get_operator_precedence(_upf_token_kind kind);
 static _upf_type *_upf_parse(_upf_parse_precedence precedence);
 
 static _upf_type *_upf_parse_expression(void) { return _upf_parse(_UPF_PREC_ASSIGNMENT); }
@@ -2741,7 +2749,7 @@ static _upf_type *_upf_call(_upf_type *type) {
     }
 
     _UPF_ASSERT(type != NULL);
-    if (type->kind == _UPF_TK_POINTER) type = type->as.pointer.type;
+    if (_upf_is_pointer(type)) type = _upf_dereference_type(type);
     _UPF_ASSERT(type->kind == _UPF_TK_FUNCTION);
     return type->as.function.return_type;
 }
@@ -2774,9 +2782,33 @@ static _upf_type *_upf_dot(_upf_type *type) {
     return NULL;
 }
 
-static _upf_type *_upf_binary(_upf_type *c) {
-    (void) c;
-    return NULL;
+static _upf_type *_upf_binary(__attribute__((unused)) _upf_type *type) {
+    // We don't care about the exact arithmetic type, so return either operand.
+    _upf_token binop = _upf_consume_token();
+    return _upf_parse(_upf_get_operator_precedence(binop.kind));
+}
+
+static _upf_type *_upf_plus(_upf_type *lhs) {
+    _upf_consume_token();
+    _upf_type *rhs = _upf_parse(_UPF_PREC_TERM);
+
+    // If either operands is pointer, the entire expression is of pointer type.
+    // Otherwise, return type of either side since we don't care about the exact arithmetic type.
+    if (_upf_is_pointer(lhs)) return lhs;
+    return rhs;
+}
+
+static _upf_type *_upf_minus(_upf_type *lhs) {
+    _upf_consume_token();
+    _upf_type *rhs = _upf_parse(_UPF_PREC_TERM);
+
+    // If exactly one operand is pointer, the expression is of pointer type.
+    // Otherwise, return type of either side since we don't care about the exact arithmetic type.
+    if (_upf_is_pointer(lhs)) {
+        if (_upf_is_pointer(rhs)) return _upf_get_number_type();
+        return lhs;
+    }
+    return rhs;
 }
 
 static _upf_type *_upf_ternary(__attribute__((unused)) _upf_type *type) {
@@ -2787,9 +2819,10 @@ static _upf_type *_upf_ternary(__attribute__((unused)) _upf_type *type) {
     return _upf_parse(_UPF_PREC_TERNARY);
 }
 
-static _upf_type *_upf_postfix(_upf_type *c) {
-    (void) c;
-    return NULL;
+static _upf_type *_upf_postfix(_upf_type *type) {
+    _upf_consume_token();
+    // Post increment cannot change the type.
+    return type;
 }
 
 static _upf_type *_upf_assignment(_upf_type *type) {
@@ -2811,7 +2844,8 @@ static const _upf_parse_rule _upf_parse_rules[_UPF_TOK_COUNT] = {
     [_UPF_TOK_DOT]          = { NULL,             _upf_dot,        _UPF_PREC_POSTFIX    },
     [_UPF_TOK_ARROW]        = { NULL,             _upf_dot,        _UPF_PREC_POSTFIX    },
     [_UPF_TOK_INCREMENT]    = { _upf_prefix,      _upf_postfix,    _UPF_PREC_POSTFIX    },
-    [_UPF_TOK_PLUS]         = { _upf_prefix,      _upf_binary,     _UPF_PREC_TERM       },
+    [_UPF_TOK_PLUS]         = { _upf_prefix,      _upf_plus,       _UPF_PREC_TERM       },
+    [_UPF_TOK_MINUS]        = { _upf_prefix,      _upf_minus,      _UPF_PREC_TERM       },
     [_UPF_TOK_STAR]         = { _upf_dereference, _upf_binary,     _UPF_PREC_FACTOR     },
     [_UPF_TOK_AMPERSAND]    = { _upf_reference,   _upf_binary,     _UPF_PREC_LOGICAL    },
     [_UPF_TOK_QUESTION]     = { NULL,             _upf_ternary,    _UPF_PREC_TERNARY    },
@@ -2820,6 +2854,8 @@ static const _upf_parse_rule _upf_parse_rules[_UPF_TOK_COUNT] = {
     [_UPF_TOK_FACTOR]       = { NULL,             _upf_binary,     _UPF_PREC_FACTOR     },
     // clang-format on
 };
+
+static _upf_parse_precedence _upf_get_operator_precedence(_upf_token_kind kind) { return _upf_parse_rules[kind].precedence; }
 
 static _upf_type *_upf_parse(_upf_parse_precedence precedence) {
     _upf_token token = _upf_peek_token();
@@ -2862,9 +2898,7 @@ static const _upf_type *_upf_get_arg_type(const char *arg, uint64_t pc) {
         _UPF_ERROR("Failed to parse the argument \"%s\" at %s:%d.", arg, _upf_state.file_path, _upf_state.line);
     }
 
-    if (type->kind != _UPF_TK_POINTER && type->kind != _UPF_TK_ARRAY) {
-        _UPF_ERROR("Argument \"%s\" must be a pointer at %s:%d.", arg, _upf_state.file_path, _upf_state.line);
-    }
+    if (!_upf_is_pointer(type)) _UPF_ERROR("Argument \"%s\" must be a pointer at %s:%d.", arg, _upf_state.file_path, _upf_state.line);
     type = _upf_dereference_type(type);
 
     _UPF_ASSERT(type != NULL);
@@ -3432,9 +3466,8 @@ static void _upf_print_type(_upf_indexed_struct_vec *circular, const uint8_t *da
 
 // ===================== GETTING PC =======================
 
-static int _upf_phdr_callback(struct dl_phdr_info *info_, size_t _size, void *data_) {
+static int _upf_phdr_callback(struct dl_phdr_info *info_, __attribute__((unused)) size_t _size, void *data_) {
     _upf_dl_phdr_info *info = (_upf_dl_phdr_info *) info_;
-    (void) _size;
     void **data = data_;
 
     // Empty name seems to indicate current executable.
