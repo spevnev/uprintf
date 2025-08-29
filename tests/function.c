@@ -105,10 +105,7 @@ int main(void) {
 
     AllocatorMethods libc = {malloc, realloc, free};
     AllocatorMethods custom = {custom_alloc, custom_realloc, custom_free};
-    AllocatorMethods mixed1 = {custom_alloc, custom_realloc, free};
-    AllocatorMethods mixed2 = {malloc, realloc, custom_free};
-
-    uprintf("Allocator methods: %S\n%S\n%S\n%S\n", &libc, &custom, &mixed1, &mixed2);
+    uprintf("Allocator methods: %S\n%S\n", &libc, &custom);
 
 #ifndef __clang__
     uprintf("libc functions: %S, %S, %S\n", &malloc, &printf, &fread);

@@ -1251,6 +1251,15 @@ static _upf_type *_upf_get_pointer_to_type(_upf_type *type_ptr) {
     return _upf_add_type(NULL, type);
 }
 
+static _upf_type *_upf_dereference_type(_upf_type *type_ptr) {
+    _UPF_ASSERT(type_ptr != NULL && (type_ptr->kind == _UPF_TK_POINTER || type_ptr->kind == _UPF_TK_ARRAY));
+    if (type_ptr->kind == _UPF_TK_POINTER) {
+        return type_ptr->as.pointer.type;
+    } else {
+        return type_ptr->as.array.element_type;
+    }
+}
+
 static _upf_type *_upf_get_void_type(void) {
     static _upf_type *type_ptr = NULL;
     if (type_ptr != NULL) return type_ptr;
@@ -2509,9 +2518,7 @@ static _upf_type *_upf_prefix(void) {
 
 static _upf_type *_upf_dereference(void) {
     _upf_consume_token();
-    _upf_type *type = _upf_parse(_UPF_PREC_PREFIX);
-    _UPF_ASSERT(type != NULL && type->kind == _UPF_TK_POINTER);  // TODO: array?
-    return type->as.pointer.type;
+    return _upf_dereference_type(_upf_parse(_UPF_PREC_PREFIX));
 }
 
 static _upf_type *_upf_reference(void) {
@@ -2698,9 +2705,18 @@ static _upf_type *_upf_paren(void) {
     return type;
 }
 
-static _upf_type *_upf_call(_upf_type *c) {
-    (void) c;
-    return NULL;
+static _upf_type *_upf_call(_upf_type *type) {
+    _upf_consume_token();
+    int parens = 1;
+    while (parens > 0) {
+        _upf_token token = _upf_consume_token();
+        if (token.kind == _UPF_TOK_OPEN_PAREN) parens++;
+        else if (token.kind == _UPF_TOK_CLOSE_PAREN) parens--;
+    }
+
+    if (type->kind == _UPF_TK_POINTER) type = type->as.pointer.type;
+    _UPF_ASSERT(type->kind == _UPF_TK_FUNCTION);
+    return type->as.function.return_type;
 }
 
 static _upf_type *_upf_index(_upf_type *c) {
@@ -2708,8 +2724,19 @@ static _upf_type *_upf_index(_upf_type *c) {
     return NULL;
 }
 
-static _upf_type *_upf_dot(_upf_type *c) {
-    (void) c;
+static _upf_type *_upf_dot(_upf_type *type) {
+    _upf_token dot = _upf_consume_token();
+    const char *member_name = _upf_expect_token(_UPF_TOK_IDENTIFIER).string;
+
+    if (dot.kind == _UPF_TOK_ARROW) type = _upf_dereference_type(type);
+
+    _UPF_ASSERT(type->kind == _UPF_TK_STRUCT || type->kind == _UPF_TK_UNION);
+    _upf_member_vec members = type->as.cstruct.members;
+    for (uint32_t i = 0; i < members.length; i++) {
+        if (strcmp(members.data[i].name, member_name) == 0) {
+            return members.data[i].type;
+        }
+    }
     return NULL;
 }
 

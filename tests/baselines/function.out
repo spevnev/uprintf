@@ -62,14 +62,4 @@ Allocator methods: {
     void *(void *, size_t) realloc = POINTER (void *custom_realloc(void *data, size_t new_size))
     void(void *) free = POINTER (void custom_free(void *data))
 }
-{
-    void *(size_t) alloc = POINTER (void *custom_alloc(size_t size))
-    void *(void *, size_t) realloc = POINTER (void *custom_realloc(void *data, size_t new_size))
-    void(void *) free = POINTER (void free(void *))
-}
-{
-    void *(size_t) alloc = POINTER (void *malloc(long unsigned int))
-    void *(void *, size_t) realloc = POINTER (void *realloc(void *, long unsigned int))
-    void(void *) free = POINTER (void custom_free(void *data))
-}
 libc functions: POINTER (void *malloc(long unsigned int)), POINTER (int printf(const char *, ...)), POINTER (size_t fread(void *restrict , size_t, size_t, FILE *restrict ))
