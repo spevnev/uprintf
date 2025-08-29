@@ -2559,12 +2559,16 @@ static _upf_type *_upf_parse_typename(void) {
             case _UPF_TOK_STRUCT:
                 _upf_consume_token();
                 if (_upf_peek_token().kind == _UPF_TOK_IDENTIFIER) identifier = _upf_consume_token().string;
-                if (_upf_match_token(_UPF_TOK_OPEN_BRACE)) _UPF_ERROR("Cast to anonymous struct is not supported.");
+                if (_upf_match_token(_UPF_TOK_OPEN_BRACE)) {
+                    _UPF_ERROR("Cast to anonymous struct is not supported at %s:%d.", _upf_state.file_path, _upf_state.line);
+                }
                 break;
             case _UPF_TOK_ENUM:
                 _upf_consume_token();
                 if (_upf_peek_token().kind == _UPF_TOK_IDENTIFIER) identifier = _upf_consume_token().string;
-                if (_upf_match_token(_UPF_TOK_OPEN_BRACE)) _UPF_ERROR("Cast to anonymous enum is not supported.");
+                if (_upf_match_token(_UPF_TOK_OPEN_BRACE)) {
+                    _UPF_ERROR("Cast to anonymous enum is not supported at %s:%d.", _upf_state.file_path, _upf_state.line);
+                }
                 break;
             case _UPF_TOK_IDENTIFIER:
                 identifier = _upf_consume_token().string;
@@ -2658,7 +2662,7 @@ static _upf_type *_upf_parse_typename(void) {
                     type.size = sizeof(double);
                     break;
                 default:
-                    _UPF_ERROR("Invalid floating-point number length.");
+                    _UPF_ERROR("Invalid floating-point number length at %s:%d.", _upf_state.file_path, _upf_state.line);
             }
         } else if (kind == DW_ATE_signed) {
             switch (longness) {
@@ -2675,11 +2679,11 @@ static _upf_type *_upf_parse_typename(void) {
                     type.size = sizeof(long long int);
                     break;
                 default:
-                    _UPF_ERROR("Invalid integer length.");
+                    _UPF_ERROR("Invalid integer length at %s:%d.", _upf_state.file_path, _upf_state.line);
             }
             type.kind = _upf_get_type_kind(is_signed ? DW_ATE_signed : DW_ATE_unsigned, type.size);
         } else {
-            _UPF_ERROR("Invalid integer type.");
+            _UPF_ERROR("Invalid integer type at %s:%d.", _upf_state.file_path, _upf_state.line);
         }
         type_ptr = _upf_add_type(NULL, type);
     }

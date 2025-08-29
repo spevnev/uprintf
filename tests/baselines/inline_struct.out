@@ -1,0 +1,4 @@
+(uprintf) [ERROR] Cast to anonymous struct is not supported at tests/inline_struct.c:5.
+(uprintf) [ERROR] Cast to anonymous struct is not supported at tests/inline_struct.c:9.
+(uprintf) [ERROR] Cast to anonymous struct is not supported at tests/inline_struct.c:13.
+(uprintf) [ERROR] Cast to anonymous struct is not supported at tests/inline_struct.c:17.
