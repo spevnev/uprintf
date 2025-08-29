@@ -1,0 +1,14 @@
+1
+POINTER ("str")
+{
+    int i = 1
+    const char *str = POINTER ("clang")
+}
+{
+    int i = 1
+    const char *str = POINTER ("initializer")
+}
+{
+    int i = 2
+    const char *str = POINTER ("designated initializer")
+}

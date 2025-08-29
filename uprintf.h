@@ -2259,6 +2259,7 @@ static _upf_cstr_vec _upf_get_args(char *string) {
 
     _upf_cstr_vec args = {0};
     int parens = 0;
+    int braces = 0;
     const char *start = string;
     for (char *ch = string; *ch != '\0'; ch++) {
         switch (*ch) {
@@ -2278,8 +2279,14 @@ static _upf_cstr_vec _upf_get_args(char *string) {
             case ')':
                 parens--;
                 break;
+            case '{':
+                braces++;
+                break;
+            case '}':
+                braces--;
+                break;
             case ',':
-                if (parens == 0) {
+                if (parens == 0 && braces == 0) {
                     *ch = '\0';
                     _UPF_VECTOR_PUSH(&args, start);
                     start = ch + 1;
@@ -2488,7 +2495,7 @@ static _upf_type *_upf_get_function(const _upf_cu *cu, const char *function_name
 
 static _upf_type *_upf_parse(_upf_parse_precedence precedence);
 
-static _upf_type *_upf_parse_expression(void) { return _upf_parse(_UPF_PREC_POSTFIX); }
+static _upf_type *_upf_parse_expression(void) { return _upf_parse(_UPF_PREC_ASSIGNMENT); }
 
 static _upf_type *_upf_string(void) {
     _upf_consume_token();
@@ -2592,6 +2599,7 @@ static _upf_type *_upf_parse_typename(void) {
     if (identifier != NULL) {
         _UPF_ASSERT(type_specifiers_idx == 0);
         type_ptr = _upf_get_type_by_name(identifier);
+        if (type_ptr == NULL) _UPF_ERROR("Failed to find type \"%s\" at %s:%d.", identifier, _upf_state.file_path, _upf_state.line);
     } else if (strcmp(type_specifiers[0], "void") == 0) {
         _UPF_ASSERT(type_specifiers_idx == 1);
         type_ptr = _upf_get_void_type();
@@ -2672,6 +2680,7 @@ static _upf_type *_upf_parse_typename(void) {
         type_ptr = _upf_add_type(NULL, type);
     }
 
+    _UPF_ASSERT(type_ptr != NULL);
     while (pointer > 0) {
         type_ptr = _upf_get_pointer_to_type(type_ptr);
         pointer--;
@@ -2683,23 +2692,34 @@ static _upf_type *_upf_parse_typename(void) {
 static _upf_type *_upf_paren(void) {
     _upf_consume_token();
 
-    // Try to parse as "(expression)".
-    bool is_cast = false;
+    // Try to parse as grouping: "(expression)".
     size_t current_idx = _upf_state.tokens_idx;
     _upf_type *type = NULL;
     do {
         type = _upf_parse_expression();
     } while (_upf_match_token(_UPF_TOK_COMMA));
-
-    // If failed, try to parse as "(typename) expression".
-    if (type == NULL) {
-        _upf_state.tokens_idx = current_idx;
-        type = _upf_parse_typename();
-        is_cast = true;
+    if (type != NULL) {
+        _upf_expect_token(_UPF_TOK_CLOSE_PAREN);
+        return type;
     }
 
+    // If failed, try to parse as a cast expression: "(typename) expression".
+    _upf_state.tokens_idx = current_idx;
+    type = _upf_parse_typename();
     _upf_expect_token(_UPF_TOK_CLOSE_PAREN);
-    if (is_cast) _upf_parse(_UPF_PREC_PREFIX);
+
+    if (_upf_match_token(_UPF_TOK_OPEN_BRACE)) {
+        // If parenthesised typename is followed by a '{', it is a compound literal.
+        int braces = 1;
+        while (braces > 0) {
+            _upf_token token = _upf_consume_token();
+            if (token.kind == _UPF_TOK_OPEN_BRACE) braces++;
+            else if (token.kind == _UPF_TOK_CLOSE_BRACE) braces--;
+        }
+    } else {
+        _upf_parse(_UPF_PREC_PREFIX);
+    }
+
     return type;
 }
 
@@ -2833,6 +2853,7 @@ static const _upf_type *_upf_get_arg_type(const char *arg, uint64_t pc) {
     }
     type = _upf_dereference_type(type);
 
+    _UPF_ASSERT(type != NULL);
     if (type->kind == _UPF_TK_VOID) {
         _UPF_ERROR("Cannot print type void. To print the void pointer itself, get a pointer to \"%s\" at %s:%d.", arg, _upf_state.file_path,
                    _upf_state.line);
