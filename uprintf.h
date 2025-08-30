@@ -542,7 +542,7 @@ typedef enum {
     _UPF_TOK_COMMA,
     _UPF_TOK_DOT,
     _UPF_TOK_ARROW,
-    _UPF_TOK_PREFIX,
+    _UPF_TOK_UNARY,
     _UPF_TOK_INCREMENT,
     _UPF_TOK_PLUS,
     _UPF_TOK_MINUS,
@@ -573,7 +573,7 @@ typedef enum {
     _UPF_PREC_LOGICAL,
     _UPF_PREC_TERM,
     _UPF_PREC_FACTOR,
-    _UPF_PREC_PREFIX,
+    _UPF_PREC_UNARY,
     _UPF_PREC_POSTFIX
 } _upf_parse_precedence;
 
@@ -2318,8 +2318,8 @@ static void _upf_new_token(_upf_token_kind kind, const char *string) {
 static void _upf_tokenize(const char *string) {
     _UPF_ASSERT(string != NULL);
 
-    // Signs should be ordered so that longer ones go first in order to avoid multi character sign
-    // being tokenized as multiple single character ones, e.g. >= being '>' '='.
+    // Signs must be ordered from longest to shortest to prevent multicharacter
+    // sign from being tokenized as multiple single character ones.
     static const _upf_token signs[]
         = {{_UPF_TOK_ASSIGNMENT, "<<="}, {_UPF_TOK_ASSIGNMENT, ">>="},
 
@@ -2332,8 +2332,8 @@ static void _upf_tokenize(const char *string) {
            {_UPF_TOK_COMMA, ","},        {_UPF_TOK_AMPERSAND, "&"},    {_UPF_TOK_STAR, "*"},         {_UPF_TOK_OPEN_PAREN, "("},
            {_UPF_TOK_CLOSE_PAREN, ")"},  {_UPF_TOK_DOT, "."},          {_UPF_TOK_OPEN_BRACKET, "["}, {_UPF_TOK_CLOSE_BRACKET, "]"},
            {_UPF_TOK_OPEN_BRACE, "{"},   {_UPF_TOK_CLOSE_BRACE, "}"},  {_UPF_TOK_QUESTION, "?"},     {_UPF_TOK_COLON, ":"},
-           {_UPF_TOK_LOGICAL, "<"},      {_UPF_TOK_LOGICAL, ">"},      {_UPF_TOK_PREFIX, "!"},       {_UPF_TOK_PLUS, "+"},
-           {_UPF_TOK_MINUS, "-"},        {_UPF_TOK_PREFIX, "~"},       {_UPF_TOK_FACTOR, "/"},       {_UPF_TOK_FACTOR, "%"},
+           {_UPF_TOK_LOGICAL, "<"},      {_UPF_TOK_LOGICAL, ">"},      {_UPF_TOK_UNARY, "!"},        {_UPF_TOK_PLUS, "+"},
+           {_UPF_TOK_MINUS, "-"},        {_UPF_TOK_UNARY, "~"},        {_UPF_TOK_FACTOR, "/"},       {_UPF_TOK_FACTOR, "%"},
            {_UPF_TOK_LOGICAL, "^"},      {_UPF_TOK_LOGICAL, "|"},      {_UPF_TOK_ASSIGNMENT, "="}};
 
 
@@ -2516,42 +2516,6 @@ static _upf_type *_upf_parse(_upf_parse_precedence precedence);
 
 static _upf_type *_upf_parse_expression(void) { return _upf_parse(_UPF_PREC_ASSIGNMENT); }
 
-static _upf_type *_upf_string(void) {
-    _upf_consume_token();
-    return _upf_get_cstr_type();
-}
-
-static _upf_type *_upf_number(void) {
-    _upf_consume_token();
-    return _upf_get_number_type();
-}
-
-static _upf_type *_upf_identifier(void) {
-    const char *identifier = _upf_consume_token().string;
-
-    _upf_type *type = _upf_get_variable_type(_upf_state.current_cu, &_upf_state.current_cu->scope, _upf_state.current_pc, identifier);
-    if (type != NULL) return type;
-
-    return _upf_get_function(_upf_state.current_cu, identifier);
-}
-
-static _upf_type *_upf_prefix(void) {
-    _upf_consume_token();
-    return _upf_parse(_UPF_PREC_PREFIX);
-}
-
-static _upf_type *_upf_generic(void) { _UPF_ERROR("Generics are not supported at %s:%d.", _upf_state.file_path, _upf_state.line); }
-
-static _upf_type *_upf_dereference(void) {
-    _upf_consume_token();
-    return _upf_dereference_type(_upf_parse(_UPF_PREC_PREFIX));
-}
-
-static _upf_type *_upf_reference(void) {
-    _upf_consume_token();
-    return _upf_get_pointer_to_type(_upf_parse(_UPF_PREC_PREFIX));
-}
-
 static _upf_type *_upf_parse_typename(void) {
     const char *type_specifiers[4];
     size_t type_specifiers_idx = 0;
@@ -2714,6 +2678,41 @@ static _upf_type *_upf_parse_typename(void) {
     return type_ptr;
 }
 
+static _upf_type *_upf_string(void) {
+    _upf_consume_token();
+    return _upf_get_cstr_type();
+}
+
+static _upf_type *_upf_number(void) {
+    _upf_consume_token();
+    return _upf_get_number_type();
+}
+
+static _upf_type *_upf_identifier(void) {
+    const char *identifier = _upf_consume_token().string;
+
+    _upf_type *type = _upf_get_variable_type(_upf_state.current_cu, &_upf_state.current_cu->scope, _upf_state.current_pc, identifier);
+    if (type != NULL) return type;
+
+    return _upf_get_function(_upf_state.current_cu, identifier);
+}
+
+static _upf_type *_upf_generic(void) { _UPF_ERROR("Generics are not supported at %s:%d.", _upf_state.file_path, _upf_state.line); }
+
+static _upf_type *_upf_unary(void) {
+    _upf_token unop = _upf_consume_token();
+    _upf_type *type = _upf_parse(_UPF_PREC_UNARY);
+
+    switch (unop.kind) {
+        case _UPF_TOK_AMPERSAND:
+            return _upf_get_pointer_to_type(type);
+        case _UPF_TOK_STAR:
+            return _upf_dereference_type(type);
+        default:
+            return type;
+    }
+}
+
 static _upf_type *_upf_paren(void) {
     _upf_consume_token();
 
@@ -2737,7 +2736,7 @@ static _upf_type *_upf_paren(void) {
         // If parenthesised typename is followed by a '{', it is a compound literal.
         _upf_consume_parens(_UPF_TOK_OPEN_BRACE, _UPF_TOK_CLOSE_BRACE);
     } else {
-        _upf_parse(_UPF_PREC_PREFIX);
+        _upf_parse(_UPF_PREC_UNARY);
     }
 
     return type;
@@ -2776,33 +2775,34 @@ static _upf_type *_upf_dot(_upf_type *type) {
     return NULL;
 }
 
-static _upf_type *_upf_binary(__attribute__((unused)) _upf_type *type) {
-    // We don't care about the exact arithmetic type, so return either operand.
+static _upf_type *_upf_postfix(_upf_type *type) {
+    _upf_consume_token();
+    // Post increment cannot change the type.
+    return type;
+}
+
+static _upf_type *_upf_binary(_upf_type *lhs) {
     _upf_token binop = _upf_consume_token();
-    return _upf_parse(_upf_get_operator_precedence(binop.kind));
-}
+    _upf_type *rhs = _upf_parse(_upf_get_operator_precedence(binop.kind) + 1);
 
-static _upf_type *_upf_plus(_upf_type *lhs) {
-    _upf_consume_token();
-    _upf_type *rhs = _upf_parse(_UPF_PREC_TERM);
-
-    // If either operands is pointer, the entire expression is of pointer type.
-    // Otherwise, return type of either side since we don't care about the exact arithmetic type.
-    if (_upf_is_pointer(lhs)) return lhs;
-    return rhs;
-}
-
-static _upf_type *_upf_minus(_upf_type *lhs) {
-    _upf_consume_token();
-    _upf_type *rhs = _upf_parse(_UPF_PREC_TERM);
-
-    // If exactly one operand is pointer, the expression is of pointer type.
-    // Otherwise, return type of either side since we don't care about the exact arithmetic type.
-    if (_upf_is_pointer(lhs)) {
-        if (_upf_is_pointer(rhs)) return _upf_get_number_type();
-        return lhs;
+    switch (binop.kind) {
+        case _UPF_TOK_PLUS:
+            // If either operands is pointer, the entire expression is of pointer type.
+            // Otherwise, return type of either side since we don't care about the exact arithmetic type.
+            if (_upf_is_pointer(lhs)) return lhs;
+            return rhs;
+        case _UPF_TOK_MINUS:
+            // If exactly one operand is pointer, the expression is of pointer type.
+            // Otherwise, return type of either side since we don't care about the exact arithmetic type.
+            if (_upf_is_pointer(lhs)) {
+                if (_upf_is_pointer(rhs)) return _upf_get_number_type();
+                return lhs;
+            }
+            return rhs;
+        default:
+            // We don't care about the exact arithmetic type, so return either operand.
+            return rhs;
     }
-    return rhs;
 }
 
 static _upf_type *_upf_ternary(__attribute__((unused)) _upf_type *type) {
@@ -2811,12 +2811,6 @@ static _upf_type *_upf_ternary(__attribute__((unused)) _upf_type *type) {
     _upf_expect_token(_UPF_TOK_COLON);
     // The result of both branches must have the same type, get type from either branch.
     return _upf_parse(_UPF_PREC_TERNARY);
-}
-
-static _upf_type *_upf_postfix(_upf_type *type) {
-    _upf_consume_token();
-    // Post increment cannot change the type.
-    return type;
 }
 
 static _upf_type *_upf_assignment(_upf_type *type) {
@@ -2831,21 +2825,21 @@ static const _upf_parse_rule _upf_parse_rules[_UPF_TOK_COUNT] = {
     [_UPF_TOK_NUMBER]       = { _upf_number,      NULL,            _UPF_PREC_NONE       },
     [_UPF_TOK_STRING]       = { _upf_string,      NULL,            _UPF_PREC_NONE       },
     [_UPF_TOK_IDENTIFIER]   = { _upf_identifier,  NULL,            _UPF_PREC_NONE       },
-    [_UPF_TOK_PREFIX]       = { _upf_prefix,      NULL,            _UPF_PREC_NONE       },
     [_UPF_TOK_GENERIC]      = { _upf_generic,     NULL,            _UPF_PREC_NONE       },
+    [_UPF_TOK_UNARY]        = { _upf_unary,       NULL,            _UPF_PREC_NONE       },
     [_UPF_TOK_OPEN_PAREN]   = { _upf_paren,       _upf_call,       _UPF_PREC_POSTFIX    },
     [_UPF_TOK_OPEN_BRACKET] = { NULL,             _upf_index,      _UPF_PREC_POSTFIX    },
     [_UPF_TOK_DOT]          = { NULL,             _upf_dot,        _UPF_PREC_POSTFIX    },
     [_UPF_TOK_ARROW]        = { NULL,             _upf_dot,        _UPF_PREC_POSTFIX    },
-    [_UPF_TOK_INCREMENT]    = { _upf_prefix,      _upf_postfix,    _UPF_PREC_POSTFIX    },
-    [_UPF_TOK_PLUS]         = { _upf_prefix,      _upf_plus,       _UPF_PREC_TERM       },
-    [_UPF_TOK_MINUS]        = { _upf_prefix,      _upf_minus,      _UPF_PREC_TERM       },
-    [_UPF_TOK_STAR]         = { _upf_dereference, _upf_binary,     _UPF_PREC_FACTOR     },
-    [_UPF_TOK_AMPERSAND]    = { _upf_reference,   _upf_binary,     _UPF_PREC_LOGICAL    },
-    [_UPF_TOK_QUESTION]     = { NULL,             _upf_ternary,    _UPF_PREC_TERNARY    },
-    [_UPF_TOK_ASSIGNMENT]   = { NULL,             _upf_assignment, _UPF_PREC_ASSIGNMENT },
+    [_UPF_TOK_INCREMENT]    = { _upf_unary,       _upf_postfix,    _UPF_PREC_POSTFIX    },
+    [_UPF_TOK_PLUS]         = { _upf_unary,       _upf_binary,     _UPF_PREC_TERM       },
+    [_UPF_TOK_MINUS]        = { _upf_unary,       _upf_binary,     _UPF_PREC_TERM       },
+    [_UPF_TOK_STAR]         = { _upf_unary,       _upf_binary,     _UPF_PREC_FACTOR     },
+    [_UPF_TOK_AMPERSAND]    = { _upf_unary,       _upf_binary,     _UPF_PREC_LOGICAL    },
     [_UPF_TOK_LOGICAL]      = { NULL,             _upf_binary,     _UPF_PREC_LOGICAL    },
     [_UPF_TOK_FACTOR]       = { NULL,             _upf_binary,     _UPF_PREC_FACTOR     },
+    [_UPF_TOK_QUESTION]     = { NULL,             _upf_ternary,    _UPF_PREC_TERNARY    },
+    [_UPF_TOK_ASSIGNMENT]   = { NULL,             _upf_assignment, _UPF_PREC_ASSIGNMENT },
     // clang-format on
 };
 
