@@ -2440,6 +2440,15 @@ static _upf_token _upf_consume_token(void) {
     return _upf_state.tokens.data[_upf_state.tokens_idx++];
 }
 
+static void _upf_consume_parens(_upf_token_kind open, _upf_token_kind close) {
+    int parens = 1;
+    while (parens > 0) {
+        _upf_token token = _upf_consume_token();
+        if (token.kind == open) parens++;
+        else if (token.kind == close) parens--;
+    }
+}
+
 static bool _upf_match_token(_upf_token_kind kind) {
     if (_upf_peek_token().kind != kind) return false;
     _upf_state.tokens_idx++;
@@ -2596,10 +2605,10 @@ static _upf_type *_upf_parse_typename(void) {
     bool parsed_declarator = false;
     while (!parsed_declarator) {
         switch (_upf_peek_token().kind) {
-            case _UPF_TOK_OPEN_PAREN: {
+            case _UPF_TOK_OPEN_PAREN:
                 // TODO:
                 _UPF_ERROR("TODO");
-            } break;
+                break;
             case _UPF_TOK_OPEN_BRACKET:
                 _upf_consume_token();
                 while (!_upf_match_token(_UPF_TOK_CLOSE_BRACKET)) _upf_consume_token();
@@ -2726,12 +2735,7 @@ static _upf_type *_upf_paren(void) {
 
     if (_upf_match_token(_UPF_TOK_OPEN_BRACE)) {
         // If parenthesised typename is followed by a '{', it is a compound literal.
-        int braces = 1;
-        while (braces > 0) {
-            _upf_token token = _upf_consume_token();
-            if (token.kind == _UPF_TOK_OPEN_BRACE) braces++;
-            else if (token.kind == _UPF_TOK_CLOSE_BRACE) braces--;
-        }
+        _upf_consume_parens(_UPF_TOK_OPEN_BRACE, _UPF_TOK_CLOSE_BRACE);
     } else {
         _upf_parse(_UPF_PREC_PREFIX);
     }
@@ -2741,28 +2745,18 @@ static _upf_type *_upf_paren(void) {
 
 static _upf_type *_upf_call(_upf_type *type) {
     _upf_consume_token();
-    int parens = 1;
-    while (parens > 0) {
-        _upf_token token = _upf_consume_token();
-        if (token.kind == _UPF_TOK_OPEN_PAREN) parens++;
-        else if (token.kind == _UPF_TOK_CLOSE_PAREN) parens--;
-    }
+    _upf_consume_parens(_UPF_TOK_OPEN_PAREN, _UPF_TOK_CLOSE_PAREN);
 
     _UPF_ASSERT(type != NULL);
     if (_upf_is_pointer(type)) type = _upf_dereference_type(type);
+
     _UPF_ASSERT(type->kind == _UPF_TK_FUNCTION);
     return type->as.function.return_type;
 }
 
 static _upf_type *_upf_index(_upf_type *type) {
     _upf_consume_token();
-    int brackets = 1;
-    while (brackets > 0) {
-        _upf_token token = _upf_consume_token();
-        if (token.kind == _UPF_TOK_OPEN_BRACKET) brackets++;
-        else if (token.kind == _UPF_TOK_CLOSE_BRACKET) brackets--;
-    }
-
+    _upf_consume_parens(_UPF_TOK_OPEN_BRACKET, _UPF_TOK_CLOSE_BRACKET);
     return _upf_dereference_type(type);
 }
 
