@@ -1,17 +1,17 @@
 AVL tree: {
-  avl_tree_node_t *root = 0x50400003ffd0 ({
-    avl_tree_node_t *left = 0x50400001ffd0 ({
-      avl_tree_node_t *left = 0x50400000ffd0 ({
-        avl_tree_node_t *left = 0x504000007fd0 ({
-          avl_tree_node_t *left = 0x504000003fd0 ({...})
-          avl_tree_node_t *right = 0x50400000bfd0 ({...})
+  avl_tree_node_t *root = 0x7bde7a21ffd0 ({
+    avl_tree_node_t *left = 0x7bde7a1fffd0 ({
+      avl_tree_node_t *left = 0x7bde7a1effd0 ({
+        avl_tree_node_t *left = 0x7bde7a1e7fd0 ({
+          avl_tree_node_t *left = 0x7bde7a1e3fd0 ({...})
+          avl_tree_node_t *right = 0x7bde7a1ebfd0 ({...})
           int depth = 10
           void *key = 0x1ff
           void *data = 0x1ff
         })
-        avl_tree_node_t *right = 0x504000017fd0 ({
-          avl_tree_node_t *left = 0x504000013fd0 ({...})
-          avl_tree_node_t *right = 0x50400001bfd0 ({...})
+        avl_tree_node_t *right = 0x7bde7a1f7fd0 ({
+          avl_tree_node_t *left = 0x7bde7a1f3fd0 ({...})
+          avl_tree_node_t *right = 0x7bde7a1fbfd0 ({...})
           int depth = 10
           void *key = 0x5ff
           void *data = 0x5ff
@@ -20,17 +20,17 @@ AVL tree: {
         void *key = 0x3ff
         void *data = 0x3ff
       })
-      avl_tree_node_t *right = 0x50400002ffd0 ({
-        avl_tree_node_t *left = 0x504000027fd0 ({
-          avl_tree_node_t *left = 0x504000023fd0 ({...})
-          avl_tree_node_t *right = 0x50400002bfd0 ({...})
+      avl_tree_node_t *right = 0x7bde7a20ffd0 ({
+        avl_tree_node_t *left = 0x7bde7a207fd0 ({
+          avl_tree_node_t *left = 0x7bde7a203fd0 ({...})
+          avl_tree_node_t *right = 0x7bde7a20bfd0 ({...})
           int depth = 10
           void *key = 0x9ff
           void *data = 0x9ff
         })
-        avl_tree_node_t *right = 0x504000037fd0 ({
-          avl_tree_node_t *left = 0x504000033fd0 ({...})
-          avl_tree_node_t *right = 0x50400003bfd0 ({...})
+        avl_tree_node_t *right = 0x7bde7a217fd0 ({
+          avl_tree_node_t *left = 0x7bde7a213fd0 ({...})
+          avl_tree_node_t *right = 0x7bde7a21bfd0 ({...})
           int depth = 10
           void *key = 0xdff
           void *data = 0xdff
@@ -43,18 +43,18 @@ AVL tree: {
       void *key = 0x7ff
       void *data = 0x7ff
     })
-    avl_tree_node_t *right = 0x50400005ffd0 ({
-      avl_tree_node_t *left = 0x50400004ffd0 ({
-        avl_tree_node_t *left = 0x504000047fd0 ({
-          avl_tree_node_t *left = 0x504000043fd0 ({...})
-          avl_tree_node_t *right = 0x50400004bfd0 ({...})
+    avl_tree_node_t *right = 0x7bde7a23ffd0 ({
+      avl_tree_node_t *left = 0x7bde7a22ffd0 ({
+        avl_tree_node_t *left = 0x7bde7a227fd0 ({
+          avl_tree_node_t *left = 0x7bde7a223fd0 ({...})
+          avl_tree_node_t *right = 0x7bde7a22bfd0 ({...})
           int depth = 10
           void *key = 0x11ff
           void *data = 0x11ff
         })
-        avl_tree_node_t *right = 0x504000057fd0 ({
-          avl_tree_node_t *left = 0x504000053fd0 ({...})
-          avl_tree_node_t *right = 0x50400005bfd0 ({...})
+        avl_tree_node_t *right = 0x7bde7a237fd0 ({
+          avl_tree_node_t *left = 0x7bde7a233fd0 ({...})
+          avl_tree_node_t *right = 0x7bde7a23bfd0 ({...})
           int depth = 10
           void *key = 0x15ff
           void *data = 0x15ff
@@ -63,17 +63,17 @@ AVL tree: {
         void *key = 0x13ff
         void *data = 0x13ff
       })
-      avl_tree_node_t *right = 0x50400007ffd0 ({
-        avl_tree_node_t *left = 0x50400006ffd0 ({
-          avl_tree_node_t *left = 0x504000067fd0 ({...})
-          avl_tree_node_t *right = 0x504000077fd0 ({...})
+      avl_tree_node_t *right = 0x7bde7a25ffd0 ({
+        avl_tree_node_t *left = 0x7bde7a24ffd0 ({
+          avl_tree_node_t *left = 0x7bde7a247fd0 ({...})
+          avl_tree_node_t *right = 0x7bde7a257fd0 ({...})
           int depth = 11
           void *key = 0x1bff
           void *data = 0x1bff
         })
-        avl_tree_node_t *right = 0x50400008ffd0 ({
-          avl_tree_node_t *left = 0x504000087fd0 ({...})
-          avl_tree_node_t *right = 0x504000097fd0 ({...})
+        avl_tree_node_t *right = 0x7bde7a26ffd0 ({
+          avl_tree_node_t *left = 0x7bde7a267fd0 ({...})
+          avl_tree_node_t *right = 0x7bde7a277fd0 ({...})
           int depth = 11
           void *key = 0x23ff
           void *data = 0x23ff
@@ -90,6 +90,6 @@ AVL tree: {
     void *key = 0xfff
     void *data = 0xfff
   })
-  int(void *, void *) comparator = 0x5f69682a31c0 (int cmp(void *k1, void *k2))
+  int(void *, void *) comparator = 0x557b024a4650 (int cmp(void *k1, void *k2))
   void(void *) destructor = NULL
 }

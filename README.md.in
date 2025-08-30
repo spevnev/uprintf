@@ -1,0 +1,138 @@
+# Universal printf
+
+*uprintf* is a header-only library for printing anything in C.
+
+## Examples
+
+Examples and their outputs can be found in [examples](examples), and can be built using `make examples`.
+
+### Example outputs
+
+<details>
+  <summary>avl</summary>
+
+```c
+!examples/avl.out
+```
+</details>
+
+<details>
+  <summary>sqlite</summary>
+
+```c
+!examples/sqlite.out
+```
+</details>
+
+<details>
+  <summary>vorbis</summary>
+
+```c
+!examples/vorbis.out
+```
+</details>
+
+<details>
+  <summary>uprintf</summary>
+
+```c
+!examples/uprintf.out
+```
+</details>
+
+## Requirements
+
+- Works only on Linux
+- The oldest supported C version is c99 (tests require c11)
+- Executable must have debugging information (`-g2` or higher)
+- `elf.h` must be in the include path
+
+## Usage
+
+1. [Download](https://raw.githubusercontent.com/spevnev/uprintf/refs/heads/main/uprintf.h) the library, or clone the repo
+
+2. Define `UPRINTF_IMPLEMENTATION` in *one* of the files:
+    ```c
+    #define UPRINTF_IMPLEMENTATION
+    #include "uprintf.h"
+    ```
+    The implementation must be included in only one of the files. \
+    A rarely modified file should be used because it increases the build time. \
+    [Options](#options) can be defined before the implementation.
+
+3.
+    ```c
+    uprintf(fmt, ...);
+    ```
+    `fmt` - a format string with placeholders (`%` followed by a letter, placeholder can be anything, e.g. examples use `%S`). Use `%%` to print `%`.
+
+### Options
+
+Options must be defined *before the implementation*:
+
+```c
+#define OPTION_NAME VALUE
+#define UPRINTF_IMPLEMENTATION
+#include "uprintf.h"
+```
+
+macro |  description | default
+-|-|-
+`UPRINTF_INDENTATION_WIDTH` | The number of spaces to use for indentation | 4
+`UPRINTF_MAX_DEPTH` | Limits the nesting depth of structures. Negative values remove the limit | 10
+`UPRINTF_IGNORE_STDIO_FILE` | Should `stdio.h`'s `FILE` be ignored | true
+`UPRINTF_ARRAY_COMPRESSION_THRESHOLD` | The number of consecutive identical array elements before they get compressed. Non-positive values disable compression | 4
+`UPRINTF_MAX_STRING_LENGTH` | The length before the string gets truncated. Non-positive values remove the limit | 200
+
+## Limitations
+
+- Casting to a function pointer:
+    ```c
+    uprintf("%S\n", (void (*)(void)) whatever);
+    ```
+
+- Incorrect type deduction when printing variables that get shadowed *later* in the same scope.
+    ```c
+    char var = 'c';
+    {
+        uprintf("%S\n", &var); // interprets char as an int
+        int var = 1;
+        uprintf("%S\n", &var); // prints int
+    }
+    ```
+
+- Printing information about function from a shared library only works with gcc:
+    ```c
+    uprintf("%S\n", printf);
+    // gcc  : 0x12345678 <void printf(const char *, ...)>
+    // clang: 0x12345678
+    ```
+
+## How does it work?
+
+The library uses debugging information to learn about the types.
+
+On initialization:
+1. Read the current binary.
+2. Parse ELF and DWARF.
+3. Store information about scopes and types.
+
+On each invokation:
+1. Find scopes based on the PC.
+2. Parse the arguments string.
+3. Find types of argument in the current scope.
+4. Print data using type definition.
+
+## Testing
+
+### Tested on
+
+- x86_64
+- gcc: 11, 12, 13, 14
+- clang: 14, 15, 16, 17, 18
+
+### Running tests
+
+```console
+$ make tests
+```

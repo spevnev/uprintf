@@ -15,13 +15,13 @@ O_LEVELS  := O0 O2 O3 Os
 G_LEVELS  := g2 g3
 
 EXAMPLE_SRCS := $(wildcard $(EXAMPLE_DIR)/*.c)
+EXAMPLE_OUTS := $(EXAMPLE_SRCS:.c=.out)
 EXAMPLES     := $(patsubst %.c, $(BUILD_DIR)/%, $(EXAMPLE_SRCS))
+
 TESTS        := $(patsubst $(TEST_DIR)/%.c, %, $(wildcard $(TEST_DIR)/*.c))
 
-.PHONY: examples clean install uninstall test tests
+.PHONY: clean install uninstall examples readme test tests
 all: examples
-
-examples: $(EXAMPLES)
 
 clean:
 	rm -rf $(BUILD_DIR) $(LIB_DIR)
@@ -31,6 +31,9 @@ install:
 
 uninstall:
 	rm $(includedir)/uprintf.h
+
+
+examples: $(EXAMPLES)
 
 $(BUILD_DIR)/$(EXAMPLE_DIR)/vorbis: $(EXAMPLE_DIR)/vorbis.c $(LIB_DIR)/stb_vorbis.c uprintf.h
 	@mkdir -p $(@D)
@@ -60,20 +63,28 @@ $(LIB_DIR)/sqlite/sqlite3.c:
 	cd $(LIB_DIR) && unzip sqlite.zip && mv sqlite-amalgamation-3460100 sqlite
 	rm $(LIB_DIR)/sqlite.zip
 
-$(BUILD_DIR)/$(EXAMPLE_DIR)/uprintf: $(EXAMPLE_DIR)/uprintf.c uprintf.h Makefile
+$(BUILD_DIR)/$(EXAMPLE_DIR)/uprintf: $(EXAMPLE_DIR)/uprintf.c uprintf.h
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) -o $@ $<
 
 
-test: tests
+readme: README.md.in $(EXAMPLE_OUTS)
+	cp README.md.in README.md
+	@for file in $(EXAMPLE_OUTS); do                     \
+		sed -i -e "\:^!$$file$$: {" -e "r $$file" -e "d" -e "}" README.md; \
+	done
 
+$(EXAMPLE_DIR)/%.out: $(BUILD_DIR)/$(EXAMPLE_DIR)/%
+	./$< > $@
+
+test: tests
 tests: $(foreach C,$(COMPILERS),$(foreach O,$(O_LEVELS),$(foreach G,$(G_LEVELS),$(foreach T,$(TESTS),$(BUILD_DIR)/test/$T/$C-$O-$G))))
 
 # Export all variables to subprocesses, i.e. test.sh
 export
 
 define TEST_TEMPLATE
-$(BUILD_DIR)/test/$1/$2-$3-$4: $(BUILD_DIR)/impl/$2.o $(TEST_DIR)/$1.c uprintf.h Makefile test.sh
+$(BUILD_DIR)/test/$1/$2-$3-$4: $(BUILD_DIR)/impl/$2.o $(TEST_DIR)/$1.c uprintf.h test.sh
 	@./test.sh $1 $2 $3 $4
 endef
 
@@ -88,7 +99,7 @@ $(foreach C,$(COMPILERS),                                 \
 )
 
 define IMPL_TEMPLATE
-$(BUILD_DIR)/impl/$1.o: uprintf.h Makefile
+$(BUILD_DIR)/impl/$1.o: uprintf.h
 	@mkdir -p $$(@D)
 	$1 $(CFLAGS) -DUPRINTF_IMPLEMENTATION -x c -c $$< -o $$@
 endef

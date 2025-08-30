@@ -11,101 +11,101 @@ Examples and their outputs can be found in [examples](examples), and can be buil
 <details>
   <summary>avl</summary>
 
-  ```c
+```c
 AVL tree: {
-    avl_tree_node_t *root = 0x50400003ffd0 ({
-        avl_tree_node_t *left = 0x50400001ffd0 ({
-            avl_tree_node_t *left = 0x50400000ffd0 ({
-                avl_tree_node_t *left = 0x504000007fd0 ({
-                    avl_tree_node_t *left = 0x504000003fd0 ({...})
-                    avl_tree_node_t *right = 0x50400000bfd0 ({...})
-                    int depth = 10
-                    void *key = 0x1ff
-                    void *data = 0x1ff
-                })
-                avl_tree_node_t *right = 0x504000017fd0 ({
-                    avl_tree_node_t *left = 0x504000013fd0 ({...})
-                    avl_tree_node_t *right = 0x50400001bfd0 ({...})
-                    int depth = 10
-                    void *key = 0x5ff
-                    void *data = 0x5ff
-                })
-                int depth = 11
-                void *key = 0x3ff
-                void *data = 0x3ff
-            })
-            avl_tree_node_t *right = 0x50400002ffd0 ({
-                avl_tree_node_t *left = 0x504000027fd0 ({
-                    avl_tree_node_t *left = 0x504000023fd0 ({...})
-                    avl_tree_node_t *right = 0x50400002bfd0 ({...})
-                    int depth = 10
-                    void *key = 0x9ff
-                    void *data = 0x9ff
-                })
-                avl_tree_node_t *right = 0x504000037fd0 ({
-                    avl_tree_node_t *left = 0x504000033fd0 ({...})
-                    avl_tree_node_t *right = 0x50400003bfd0 ({...})
-                    int depth = 10
-                    void *key = 0xdff
-                    void *data = 0xdff
-                })
-                int depth = 11
-                void *key = 0xbff
-                void *data = 0xbff
-            })
-            int depth = 12
-            void *key = 0x7ff
-            void *data = 0x7ff
+  avl_tree_node_t *root = 0x7bde7a21ffd0 ({
+    avl_tree_node_t *left = 0x7bde7a1fffd0 ({
+      avl_tree_node_t *left = 0x7bde7a1effd0 ({
+        avl_tree_node_t *left = 0x7bde7a1e7fd0 ({
+          avl_tree_node_t *left = 0x7bde7a1e3fd0 ({...})
+          avl_tree_node_t *right = 0x7bde7a1ebfd0 ({...})
+          int depth = 10
+          void *key = 0x1ff
+          void *data = 0x1ff
         })
-        avl_tree_node_t *right = 0x50400005ffd0 ({
-            avl_tree_node_t *left = 0x50400004ffd0 ({
-                avl_tree_node_t *left = 0x504000047fd0 ({
-                    avl_tree_node_t *left = 0x504000043fd0 ({...})
-                    avl_tree_node_t *right = 0x50400004bfd0 ({...})
-                    int depth = 10
-                    void *key = 0x11ff
-                    void *data = 0x11ff
-                })
-                avl_tree_node_t *right = 0x504000057fd0 ({
-                    avl_tree_node_t *left = 0x504000053fd0 ({...})
-                    avl_tree_node_t *right = 0x50400005bfd0 ({...})
-                    int depth = 10
-                    void *key = 0x15ff
-                    void *data = 0x15ff
-                })
-                int depth = 11
-                void *key = 0x13ff
-                void *data = 0x13ff
-            })
-            avl_tree_node_t *right = 0x50400007ffd0 ({
-                avl_tree_node_t *left = 0x50400006ffd0 ({
-                    avl_tree_node_t *left = 0x504000067fd0 ({...})
-                    avl_tree_node_t *right = 0x504000077fd0 ({...})
-                    int depth = 11
-                    void *key = 0x1bff
-                    void *data = 0x1bff
-                })
-                avl_tree_node_t *right = 0x50400008ffd0 ({
-                    avl_tree_node_t *left = 0x504000087fd0 ({...})
-                    avl_tree_node_t *right = 0x504000097fd0 ({...})
-                    int depth = 11
-                    void *key = 0x23ff
-                    void *data = 0x23ff
-                })
-                int depth = 12
-                void *key = 0x1fff
-                void *data = 0x1fff
-            })
-            int depth = 13
-            void *key = 0x17ff
-            void *data = 0x17ff
+        avl_tree_node_t *right = 0x7bde7a1f7fd0 ({
+          avl_tree_node_t *left = 0x7bde7a1f3fd0 ({...})
+          avl_tree_node_t *right = 0x7bde7a1fbfd0 ({...})
+          int depth = 10
+          void *key = 0x5ff
+          void *data = 0x5ff
         })
-        int depth = 14
-        void *key = 0xfff
-        void *data = 0xfff
+        int depth = 11
+        void *key = 0x3ff
+        void *data = 0x3ff
+      })
+      avl_tree_node_t *right = 0x7bde7a20ffd0 ({
+        avl_tree_node_t *left = 0x7bde7a207fd0 ({
+          avl_tree_node_t *left = 0x7bde7a203fd0 ({...})
+          avl_tree_node_t *right = 0x7bde7a20bfd0 ({...})
+          int depth = 10
+          void *key = 0x9ff
+          void *data = 0x9ff
+        })
+        avl_tree_node_t *right = 0x7bde7a217fd0 ({
+          avl_tree_node_t *left = 0x7bde7a213fd0 ({...})
+          avl_tree_node_t *right = 0x7bde7a21bfd0 ({...})
+          int depth = 10
+          void *key = 0xdff
+          void *data = 0xdff
+        })
+        int depth = 11
+        void *key = 0xbff
+        void *data = 0xbff
+      })
+      int depth = 12
+      void *key = 0x7ff
+      void *data = 0x7ff
     })
-    int(void *, void *) comparator = 0x5f69682a31c0 (int cmp(void *k1, void *k2))
-    void(void *) destructor = NULL
+    avl_tree_node_t *right = 0x7bde7a23ffd0 ({
+      avl_tree_node_t *left = 0x7bde7a22ffd0 ({
+        avl_tree_node_t *left = 0x7bde7a227fd0 ({
+          avl_tree_node_t *left = 0x7bde7a223fd0 ({...})
+          avl_tree_node_t *right = 0x7bde7a22bfd0 ({...})
+          int depth = 10
+          void *key = 0x11ff
+          void *data = 0x11ff
+        })
+        avl_tree_node_t *right = 0x7bde7a237fd0 ({
+          avl_tree_node_t *left = 0x7bde7a233fd0 ({...})
+          avl_tree_node_t *right = 0x7bde7a23bfd0 ({...})
+          int depth = 10
+          void *key = 0x15ff
+          void *data = 0x15ff
+        })
+        int depth = 11
+        void *key = 0x13ff
+        void *data = 0x13ff
+      })
+      avl_tree_node_t *right = 0x7bde7a25ffd0 ({
+        avl_tree_node_t *left = 0x7bde7a24ffd0 ({
+          avl_tree_node_t *left = 0x7bde7a247fd0 ({...})
+          avl_tree_node_t *right = 0x7bde7a257fd0 ({...})
+          int depth = 11
+          void *key = 0x1bff
+          void *data = 0x1bff
+        })
+        avl_tree_node_t *right = 0x7bde7a26ffd0 ({
+          avl_tree_node_t *left = 0x7bde7a267fd0 ({...})
+          avl_tree_node_t *right = 0x7bde7a277fd0 ({...})
+          int depth = 11
+          void *key = 0x23ff
+          void *data = 0x23ff
+        })
+        int depth = 12
+        void *key = 0x1fff
+        void *data = 0x1fff
+      })
+      int depth = 13
+      void *key = 0x17ff
+      void *data = 0x17ff
+    })
+    int depth = 14
+    void *key = 0xfff
+    void *data = 0xfff
+  })
+  int(void *, void *) comparator = 0x557b024a4650 (int cmp(void *k1, void *k2))
+  void(void *) destructor = NULL
 }
 ```
 </details>
@@ -113,133 +113,133 @@ AVL tree: {
 <details>
   <summary>sqlite</summary>
 
-  ```c
+```c
 Sqlite's database: <#0> {
-    sqlite3_vfs *pVfs = 0x609a01405d40 (<#1> {
+    sqlite3_vfs *pVfs = 0x558f46be8be0 (<#1> {
         int iVersion = 3
         int szOsFile = 120
         int mxPathname = 512
-        sqlite3_vfs *pNext = 0x609a01408040 ({
+        sqlite3_vfs *pNext = 0x558f46beae60 ({
             int iVersion = 2
             int szOsFile = 120
             int mxPathname = 1024
-            sqlite3_vfs *pNext = 0x609a01405f38 ({
+            sqlite3_vfs *pNext = 0x558f46be8dd8 ({
                 int iVersion = 3
                 int szOsFile = 120
                 int mxPathname = 512
-                sqlite3_vfs *pNext = 0x609a01405e90 ({
+                sqlite3_vfs *pNext = 0x558f46be8d30 ({
                     int iVersion = 3
                     int szOsFile = 120
                     int mxPathname = 512
-                    sqlite3_vfs *pNext = 0x609a01405de8 ({
+                    sqlite3_vfs *pNext = 0x558f46be8c88 ({
                         int iVersion = 3
                         int szOsFile = 120
                         int mxPathname = 512
                         sqlite3_vfs *pNext = NULL
-                        const char *zName = 0x609a0103fce0 ("unix-none")
-                        void *pAppData = 0x609a01077a40
-                        int(sqlite3_vfs *, const char *, sqlite3_file *, int, int *) xOpen = 0x609a00d15c20 (int unixOpen(sqlite3_vfs *pVfs, const char *zPath, sqlite3_file *pFile, int flags, int *pOutFlags))
-                        int(sqlite3_vfs *, const char *, int) xDelete = 0x609a00bf3a40 (int unixDelete(sqlite3_vfs *NotUsed, const char *zPath, int dirSync))
-                        int(sqlite3_vfs *, const char *, int, int *) xAccess = 0x609a00ab3f20 (int unixAccess(sqlite3_vfs *NotUsed, const char *zPath, int flags, int *pResOut))
-                        int(sqlite3_vfs *, const char *, int, char *) xFullPathname = 0x609a00bf58c0 (int unixFullPathname(sqlite3_vfs *pVfs, const char *zPath, int nOut, char *zOut))
-                        void *(sqlite3_vfs *, const char *) xDlOpen = 0x609a00a4c930 (void *unixDlOpen(sqlite3_vfs *NotUsed, const char *zFilename))
-                        void(sqlite3_vfs *, int, char *) xDlError = 0x609a00bcf730 (void unixDlError(sqlite3_vfs *NotUsed, int nBuf, char *zBufOut))
-                        (void())(sqlite3_vfs *, void *, const char *) xDlSym = 0x609a00a4c920 ((void()) unixDlSym(sqlite3_vfs *NotUsed, void *p, const char *zSym))
-                        void(sqlite3_vfs *, void *) xDlClose = 0x609a00a9f630 (void unixDlClose(sqlite3_vfs *NotUsed, void *pHandle))
-                        int(sqlite3_vfs *, int, char *) xRandomness = 0x609a00bf1ee0 (int unixRandomness(sqlite3_vfs *NotUsed, int nBuf, char *zBuf))
-                        int(sqlite3_vfs *, int) xSleep = 0x609a00a4c7d0 (int unixSleep(sqlite3_vfs *NotUsed, int microseconds))
-                        int(sqlite3_vfs *, double *) xCurrentTime = 0x609a00ad6bc0 (int unixCurrentTime(sqlite3_vfs *NotUsed, double *prNow))
-                        int(sqlite3_vfs *, int, char *) xGetLastError = 0x609a00a85aa0 (int unixGetLastError(sqlite3_vfs *NotUsed, int NotUsed2, char *NotUsed3))
-                        int(sqlite3_vfs *, sqlite3_int64 *) xCurrentTimeInt64 = 0x609a00a95a40 (int unixCurrentTimeInt64(sqlite3_vfs *NotUsed, sqlite3_int64 *piNow))
-                        int(sqlite3_vfs *, const char *, void()) xSetSystemCall = 0x609a00a9b2c0 (int unixSetSystemCall(sqlite3_vfs *pNotUsed, const char *zName, void() pNewFunc))
-                        (void())(sqlite3_vfs *, const char *) xGetSystemCall = 0x609a00a9b100 ((void()) unixGetSystemCall(sqlite3_vfs *pNotUsed, const char *zName))
-                        const char *(sqlite3_vfs *, const char *) xNextSystemCall = 0x609a00a9ae60 (const char *unixNextSystemCall(sqlite3_vfs *p, const char *zName))
+                        const char *zName = 0x558f46848680 ("unix-none")
+                        void *pAppData = 0x558f4687aa40
+                        int(sqlite3_vfs *, const char *, sqlite3_file *, int, int *) xOpen = 0x558f46535780 (int unixOpen(sqlite3_vfs *pVfs, const char *zPath, sqlite3_file *pFile, int flags, int *pOutFlags))
+                        int(sqlite3_vfs *, const char *, int) xDelete = 0x558f46415330 (int unixDelete(sqlite3_vfs *NotUsed, const char *zPath, int dirSync))
+                        int(sqlite3_vfs *, const char *, int, int *) xAccess = 0x558f462caf30 (int unixAccess(sqlite3_vfs *NotUsed, const char *zPath, int flags, int *pResOut))
+                        int(sqlite3_vfs *, const char *, int, char *) xFullPathname = 0x558f46416d10 (int unixFullPathname(sqlite3_vfs *pVfs, const char *zPath, int nOut, char *zOut))
+                        void *(sqlite3_vfs *, const char *) xDlOpen = 0x558f46257b80 (void *unixDlOpen(sqlite3_vfs *NotUsed, const char *zFilename))
+                        void(sqlite3_vfs *, int, char *) xDlError = 0x558f463f1870 (void unixDlError(sqlite3_vfs *NotUsed, int nBuf, char *zBufOut))
+                        (void())(sqlite3_vfs *, void *, const char *) xDlSym = 0x558f46257b70 ((void()) unixDlSym(sqlite3_vfs *NotUsed, void *p, const char *zSym))
+                        void(sqlite3_vfs *, void *) xDlClose = 0x558f462b58b0 (void unixDlClose(sqlite3_vfs *NotUsed, void *pHandle))
+                        int(sqlite3_vfs *, int, char *) xRandomness = 0x558f464135d0 (int unixRandomness(sqlite3_vfs *NotUsed, int nBuf, char *zBuf))
+                        int(sqlite3_vfs *, int) xSleep = 0x558f46257a20 (int unixSleep(sqlite3_vfs *NotUsed, int microseconds))
+                        int(sqlite3_vfs *, double *) xCurrentTime = 0x558f462ed2f0 (int unixCurrentTime(sqlite3_vfs *NotUsed, double *prNow))
+                        int(sqlite3_vfs *, int, char *) xGetLastError = 0x558f46299ff0 (int unixGetLastError(sqlite3_vfs *NotUsed, int NotUsed2, char *NotUsed3))
+                        int(sqlite3_vfs *, sqlite3_int64 *) xCurrentTimeInt64 = 0x558f462abf30 (int unixCurrentTimeInt64(sqlite3_vfs *NotUsed, sqlite3_int64 *piNow))
+                        int(sqlite3_vfs *, const char *, void()) xSetSystemCall = 0x558f462b10e0 (int unixSetSystemCall(sqlite3_vfs *pNotUsed, const char *zName, void() pNewFunc))
+                        (void())(sqlite3_vfs *, const char *) xGetSystemCall = 0x558f462b0f20 ((void()) unixGetSystemCall(sqlite3_vfs *pNotUsed, const char *zName))
+                        const char *(sqlite3_vfs *, const char *) xNextSystemCall = 0x558f462b0c90 (const char *unixNextSystemCall(sqlite3_vfs *p, const char *zName))
                     })
-                    const char *zName = 0x609a0103fd20 ("unix-dotfile")
-                    void *pAppData = 0x609a01077940
-                    int(sqlite3_vfs *, const char *, sqlite3_file *, int, int *) xOpen = 0x609a00d15c20 (int unixOpen(sqlite3_vfs *pVfs, const char *zPath, sqlite3_file *pFile, int flags, int *pOutFlags))
-                    int(sqlite3_vfs *, const char *, int) xDelete = 0x609a00bf3a40 (int unixDelete(sqlite3_vfs *NotUsed, const char *zPath, int dirSync))
-                    int(sqlite3_vfs *, const char *, int, int *) xAccess = 0x609a00ab3f20 (int unixAccess(sqlite3_vfs *NotUsed, const char *zPath, int flags, int *pResOut))
-                    int(sqlite3_vfs *, const char *, int, char *) xFullPathname = 0x609a00bf58c0 (int unixFullPathname(sqlite3_vfs *pVfs, const char *zPath, int nOut, char *zOut))
-                    void *(sqlite3_vfs *, const char *) xDlOpen = 0x609a00a4c930 (void *unixDlOpen(sqlite3_vfs *NotUsed, const char *zFilename))
-                    void(sqlite3_vfs *, int, char *) xDlError = 0x609a00bcf730 (void unixDlError(sqlite3_vfs *NotUsed, int nBuf, char *zBufOut))
-                    (void())(sqlite3_vfs *, void *, const char *) xDlSym = 0x609a00a4c920 ((void()) unixDlSym(sqlite3_vfs *NotUsed, void *p, const char *zSym))
-                    void(sqlite3_vfs *, void *) xDlClose = 0x609a00a9f630 (void unixDlClose(sqlite3_vfs *NotUsed, void *pHandle))
-                    int(sqlite3_vfs *, int, char *) xRandomness = 0x609a00bf1ee0 (int unixRandomness(sqlite3_vfs *NotUsed, int nBuf, char *zBuf))
-                    int(sqlite3_vfs *, int) xSleep = 0x609a00a4c7d0 (int unixSleep(sqlite3_vfs *NotUsed, int microseconds))
-                    int(sqlite3_vfs *, double *) xCurrentTime = 0x609a00ad6bc0 (int unixCurrentTime(sqlite3_vfs *NotUsed, double *prNow))
-                    int(sqlite3_vfs *, int, char *) xGetLastError = 0x609a00a85aa0 (int unixGetLastError(sqlite3_vfs *NotUsed, int NotUsed2, char *NotUsed3))
-                    int(sqlite3_vfs *, sqlite3_int64 *) xCurrentTimeInt64 = 0x609a00a95a40 (int unixCurrentTimeInt64(sqlite3_vfs *NotUsed, sqlite3_int64 *piNow))
-                    int(sqlite3_vfs *, const char *, void()) xSetSystemCall = 0x609a00a9b2c0 (int unixSetSystemCall(sqlite3_vfs *pNotUsed, const char *zName, void() pNewFunc))
-                    (void())(sqlite3_vfs *, const char *) xGetSystemCall = 0x609a00a9b100 ((void()) unixGetSystemCall(sqlite3_vfs *pNotUsed, const char *zName))
-                    const char *(sqlite3_vfs *, const char *) xNextSystemCall = 0x609a00a9ae60 (const char *unixNextSystemCall(sqlite3_vfs *p, const char *zName))
+                    const char *zName = 0x558f468486c0 ("unix-dotfile")
+                    void *pAppData = 0x558f4687a940
+                    int(sqlite3_vfs *, const char *, sqlite3_file *, int, int *) xOpen = 0x558f46535780 (int unixOpen(sqlite3_vfs *pVfs, const char *zPath, sqlite3_file *pFile, int flags, int *pOutFlags))
+                    int(sqlite3_vfs *, const char *, int) xDelete = 0x558f46415330 (int unixDelete(sqlite3_vfs *NotUsed, const char *zPath, int dirSync))
+                    int(sqlite3_vfs *, const char *, int, int *) xAccess = 0x558f462caf30 (int unixAccess(sqlite3_vfs *NotUsed, const char *zPath, int flags, int *pResOut))
+                    int(sqlite3_vfs *, const char *, int, char *) xFullPathname = 0x558f46416d10 (int unixFullPathname(sqlite3_vfs *pVfs, const char *zPath, int nOut, char *zOut))
+                    void *(sqlite3_vfs *, const char *) xDlOpen = 0x558f46257b80 (void *unixDlOpen(sqlite3_vfs *NotUsed, const char *zFilename))
+                    void(sqlite3_vfs *, int, char *) xDlError = 0x558f463f1870 (void unixDlError(sqlite3_vfs *NotUsed, int nBuf, char *zBufOut))
+                    (void())(sqlite3_vfs *, void *, const char *) xDlSym = 0x558f46257b70 ((void()) unixDlSym(sqlite3_vfs *NotUsed, void *p, const char *zSym))
+                    void(sqlite3_vfs *, void *) xDlClose = 0x558f462b58b0 (void unixDlClose(sqlite3_vfs *NotUsed, void *pHandle))
+                    int(sqlite3_vfs *, int, char *) xRandomness = 0x558f464135d0 (int unixRandomness(sqlite3_vfs *NotUsed, int nBuf, char *zBuf))
+                    int(sqlite3_vfs *, int) xSleep = 0x558f46257a20 (int unixSleep(sqlite3_vfs *NotUsed, int microseconds))
+                    int(sqlite3_vfs *, double *) xCurrentTime = 0x558f462ed2f0 (int unixCurrentTime(sqlite3_vfs *NotUsed, double *prNow))
+                    int(sqlite3_vfs *, int, char *) xGetLastError = 0x558f46299ff0 (int unixGetLastError(sqlite3_vfs *NotUsed, int NotUsed2, char *NotUsed3))
+                    int(sqlite3_vfs *, sqlite3_int64 *) xCurrentTimeInt64 = 0x558f462abf30 (int unixCurrentTimeInt64(sqlite3_vfs *NotUsed, sqlite3_int64 *piNow))
+                    int(sqlite3_vfs *, const char *, void()) xSetSystemCall = 0x558f462b10e0 (int unixSetSystemCall(sqlite3_vfs *pNotUsed, const char *zName, void() pNewFunc))
+                    (void())(sqlite3_vfs *, const char *) xGetSystemCall = 0x558f462b0f20 ((void()) unixGetSystemCall(sqlite3_vfs *pNotUsed, const char *zName))
+                    const char *(sqlite3_vfs *, const char *) xNextSystemCall = 0x558f462b0c90 (const char *unixNextSystemCall(sqlite3_vfs *p, const char *zName))
                 })
-                const char *zName = 0x609a0102f180 ("unix-excl")
-                void *pAppData = 0x609a01077b40
-                int(sqlite3_vfs *, const char *, sqlite3_file *, int, int *) xOpen = 0x609a00d15c20 (int unixOpen(sqlite3_vfs *pVfs, const char *zPath, sqlite3_file *pFile, int flags, int *pOutFlags))
-                int(sqlite3_vfs *, const char *, int) xDelete = 0x609a00bf3a40 (int unixDelete(sqlite3_vfs *NotUsed, const char *zPath, int dirSync))
-                int(sqlite3_vfs *, const char *, int, int *) xAccess = 0x609a00ab3f20 (int unixAccess(sqlite3_vfs *NotUsed, const char *zPath, int flags, int *pResOut))
-                int(sqlite3_vfs *, const char *, int, char *) xFullPathname = 0x609a00bf58c0 (int unixFullPathname(sqlite3_vfs *pVfs, const char *zPath, int nOut, char *zOut))
-                void *(sqlite3_vfs *, const char *) xDlOpen = 0x609a00a4c930 (void *unixDlOpen(sqlite3_vfs *NotUsed, const char *zFilename))
-                void(sqlite3_vfs *, int, char *) xDlError = 0x609a00bcf730 (void unixDlError(sqlite3_vfs *NotUsed, int nBuf, char *zBufOut))
-                (void())(sqlite3_vfs *, void *, const char *) xDlSym = 0x609a00a4c920 ((void()) unixDlSym(sqlite3_vfs *NotUsed, void *p, const char *zSym))
-                void(sqlite3_vfs *, void *) xDlClose = 0x609a00a9f630 (void unixDlClose(sqlite3_vfs *NotUsed, void *pHandle))
-                int(sqlite3_vfs *, int, char *) xRandomness = 0x609a00bf1ee0 (int unixRandomness(sqlite3_vfs *NotUsed, int nBuf, char *zBuf))
-                int(sqlite3_vfs *, int) xSleep = 0x609a00a4c7d0 (int unixSleep(sqlite3_vfs *NotUsed, int microseconds))
-                int(sqlite3_vfs *, double *) xCurrentTime = 0x609a00ad6bc0 (int unixCurrentTime(sqlite3_vfs *NotUsed, double *prNow))
-                int(sqlite3_vfs *, int, char *) xGetLastError = 0x609a00a85aa0 (int unixGetLastError(sqlite3_vfs *NotUsed, int NotUsed2, char *NotUsed3))
-                int(sqlite3_vfs *, sqlite3_int64 *) xCurrentTimeInt64 = 0x609a00a95a40 (int unixCurrentTimeInt64(sqlite3_vfs *NotUsed, sqlite3_int64 *piNow))
-                int(sqlite3_vfs *, const char *, void()) xSetSystemCall = 0x609a00a9b2c0 (int unixSetSystemCall(sqlite3_vfs *pNotUsed, const char *zName, void() pNewFunc))
-                (void())(sqlite3_vfs *, const char *) xGetSystemCall = 0x609a00a9b100 ((void()) unixGetSystemCall(sqlite3_vfs *pNotUsed, const char *zName))
-                const char *(sqlite3_vfs *, const char *) xNextSystemCall = 0x609a00a9ae60 (const char *unixNextSystemCall(sqlite3_vfs *p, const char *zName))
+                const char *zName = 0x558f46837ea0 ("unix-excl")
+                void *pAppData = 0x558f4687ab40
+                int(sqlite3_vfs *, const char *, sqlite3_file *, int, int *) xOpen = 0x558f46535780 (int unixOpen(sqlite3_vfs *pVfs, const char *zPath, sqlite3_file *pFile, int flags, int *pOutFlags))
+                int(sqlite3_vfs *, const char *, int) xDelete = 0x558f46415330 (int unixDelete(sqlite3_vfs *NotUsed, const char *zPath, int dirSync))
+                int(sqlite3_vfs *, const char *, int, int *) xAccess = 0x558f462caf30 (int unixAccess(sqlite3_vfs *NotUsed, const char *zPath, int flags, int *pResOut))
+                int(sqlite3_vfs *, const char *, int, char *) xFullPathname = 0x558f46416d10 (int unixFullPathname(sqlite3_vfs *pVfs, const char *zPath, int nOut, char *zOut))
+                void *(sqlite3_vfs *, const char *) xDlOpen = 0x558f46257b80 (void *unixDlOpen(sqlite3_vfs *NotUsed, const char *zFilename))
+                void(sqlite3_vfs *, int, char *) xDlError = 0x558f463f1870 (void unixDlError(sqlite3_vfs *NotUsed, int nBuf, char *zBufOut))
+                (void())(sqlite3_vfs *, void *, const char *) xDlSym = 0x558f46257b70 ((void()) unixDlSym(sqlite3_vfs *NotUsed, void *p, const char *zSym))
+                void(sqlite3_vfs *, void *) xDlClose = 0x558f462b58b0 (void unixDlClose(sqlite3_vfs *NotUsed, void *pHandle))
+                int(sqlite3_vfs *, int, char *) xRandomness = 0x558f464135d0 (int unixRandomness(sqlite3_vfs *NotUsed, int nBuf, char *zBuf))
+                int(sqlite3_vfs *, int) xSleep = 0x558f46257a20 (int unixSleep(sqlite3_vfs *NotUsed, int microseconds))
+                int(sqlite3_vfs *, double *) xCurrentTime = 0x558f462ed2f0 (int unixCurrentTime(sqlite3_vfs *NotUsed, double *prNow))
+                int(sqlite3_vfs *, int, char *) xGetLastError = 0x558f46299ff0 (int unixGetLastError(sqlite3_vfs *NotUsed, int NotUsed2, char *NotUsed3))
+                int(sqlite3_vfs *, sqlite3_int64 *) xCurrentTimeInt64 = 0x558f462abf30 (int unixCurrentTimeInt64(sqlite3_vfs *NotUsed, sqlite3_int64 *piNow))
+                int(sqlite3_vfs *, const char *, void()) xSetSystemCall = 0x558f462b10e0 (int unixSetSystemCall(sqlite3_vfs *pNotUsed, const char *zName, void() pNewFunc))
+                (void())(sqlite3_vfs *, const char *) xGetSystemCall = 0x558f462b0f20 ((void()) unixGetSystemCall(sqlite3_vfs *pNotUsed, const char *zName))
+                const char *(sqlite3_vfs *, const char *) xNextSystemCall = 0x558f462b0c90 (const char *unixNextSystemCall(sqlite3_vfs *p, const char *zName))
             })
-            const char *zName = 0x609a01036d60 ("memdb")
-            void *pAppData = 0x609a01405d40
-            int(sqlite3_vfs *, const char *, sqlite3_file *, int, int *) xOpen = 0x609a00d19200 (int memdbOpen(sqlite3_vfs *pVfs, const char *zName, sqlite3_file *pFd, int flags, int *pOutFlags))
+            const char *zName = 0x558f4683fa80 ("memdb")
+            void *pAppData = 0x558f46be8be0
+            int(sqlite3_vfs *, const char *, sqlite3_file *, int, int *) xOpen = 0x558f46538cd0 (int memdbOpen(sqlite3_vfs *pVfs, const char *zName, sqlite3_file *pFd, int flags, int *pOutFlags))
             int(sqlite3_vfs *, const char *, int) xDelete = NULL
-            int(sqlite3_vfs *, const char *, int, int *) xAccess = 0x609a00a57c60 (int memdbAccess(sqlite3_vfs *pVfs, const char *zPath, int flags, int *pResOut))
-            int(sqlite3_vfs *, const char *, int, char *) xFullPathname = 0x609a00bcec80 (int memdbFullPathname(sqlite3_vfs *pVfs, const char *zPath, int nOut, char *zOut))
-            void *(sqlite3_vfs *, const char *) xDlOpen = 0x609a00a57cc0 (void *memdbDlOpen(sqlite3_vfs *pVfs, const char *zPath))
-            void(sqlite3_vfs *, int, char *) xDlError = 0x609a00a57dd0 (void memdbDlError(sqlite3_vfs *pVfs, int nByte, char *zErrMsg))
-            (void())(sqlite3_vfs *, void *, const char *) xDlSym = 0x609a00a57ef0 ((void()) memdbDlSym(sqlite3_vfs *pVfs, void *p, const char *zSym))
-            void(sqlite3_vfs *, void *) xDlClose = 0x609a00a58010 (void memdbDlClose(sqlite3_vfs *pVfs, void *pHandle))
-            int(sqlite3_vfs *, int, char *) xRandomness = 0x609a00a58120 (int memdbRandomness(sqlite3_vfs *pVfs, int nByte, char *zBufOut))
-            int(sqlite3_vfs *, int) xSleep = 0x609a00a58240 (int memdbSleep(sqlite3_vfs *pVfs, int nMicro))
+            int(sqlite3_vfs *, const char *, int, int *) xAccess = 0x558f46263d70 (int memdbAccess(sqlite3_vfs *pVfs, const char *zPath, int flags, int *pResOut))
+            int(sqlite3_vfs *, const char *, int, char *) xFullPathname = 0x558f463f0c30 (int memdbFullPathname(sqlite3_vfs *pVfs, const char *zPath, int nOut, char *zOut))
+            void *(sqlite3_vfs *, const char *) xDlOpen = 0x558f46263dd0 (void *memdbDlOpen(sqlite3_vfs *pVfs, const char *zPath))
+            void(sqlite3_vfs *, int, char *) xDlError = 0x558f46263f60 (void memdbDlError(sqlite3_vfs *pVfs, int nByte, char *zErrMsg))
+            (void())(sqlite3_vfs *, void *, const char *) xDlSym = 0x558f46264130 ((void()) memdbDlSym(sqlite3_vfs *pVfs, void *p, const char *zSym))
+            void(sqlite3_vfs *, void *) xDlClose = 0x558f46264300 (void memdbDlClose(sqlite3_vfs *pVfs, void *pHandle))
+            int(sqlite3_vfs *, int, char *) xRandomness = 0x558f46264490 (int memdbRandomness(sqlite3_vfs *pVfs, int nByte, char *zBufOut))
+            int(sqlite3_vfs *, int) xSleep = 0x558f46264660 (int memdbSleep(sqlite3_vfs *pVfs, int nMicro))
             int(sqlite3_vfs *, double *) xCurrentTime = NULL
-            int(sqlite3_vfs *, int, char *) xGetLastError = 0x609a00a58350 (int memdbGetLastError(sqlite3_vfs *pVfs, int a, char *b))
-            int(sqlite3_vfs *, sqlite3_int64 *) xCurrentTimeInt64 = 0x609a00a58480 (int memdbCurrentTimeInt64(sqlite3_vfs *pVfs, sqlite3_int64 *p))
+            int(sqlite3_vfs *, int, char *) xGetLastError = 0x558f462647f0 (int memdbGetLastError(sqlite3_vfs *pVfs, int a, char *b))
+            int(sqlite3_vfs *, sqlite3_int64 *) xCurrentTimeInt64 = 0x558f462649d0 (int memdbCurrentTimeInt64(sqlite3_vfs *pVfs, sqlite3_int64 *p))
             int(sqlite3_vfs *, const char *, void()) xSetSystemCall = NULL
             (void())(sqlite3_vfs *, const char *) xGetSystemCall = NULL
             const char *(sqlite3_vfs *, const char *) xNextSystemCall = NULL
         })
-        const char *zName = 0x609a0103fca0 ("unix")
-        void *pAppData = 0x609a01077b40
-        int(sqlite3_vfs *, const char *, sqlite3_file *, int, int *) xOpen = 0x609a00d15c20 (int unixOpen(sqlite3_vfs *pVfs, const char *zPath, sqlite3_file *pFile, int flags, int *pOutFlags))
-        int(sqlite3_vfs *, const char *, int) xDelete = 0x609a00bf3a40 (int unixDelete(sqlite3_vfs *NotUsed, const char *zPath, int dirSync))
-        int(sqlite3_vfs *, const char *, int, int *) xAccess = 0x609a00ab3f20 (int unixAccess(sqlite3_vfs *NotUsed, const char *zPath, int flags, int *pResOut))
-        int(sqlite3_vfs *, const char *, int, char *) xFullPathname = 0x609a00bf58c0 (int unixFullPathname(sqlite3_vfs *pVfs, const char *zPath, int nOut, char *zOut))
-        void *(sqlite3_vfs *, const char *) xDlOpen = 0x609a00a4c930 (void *unixDlOpen(sqlite3_vfs *NotUsed, const char *zFilename))
-        void(sqlite3_vfs *, int, char *) xDlError = 0x609a00bcf730 (void unixDlError(sqlite3_vfs *NotUsed, int nBuf, char *zBufOut))
-        (void())(sqlite3_vfs *, void *, const char *) xDlSym = 0x609a00a4c920 ((void()) unixDlSym(sqlite3_vfs *NotUsed, void *p, const char *zSym))
-        void(sqlite3_vfs *, void *) xDlClose = 0x609a00a9f630 (void unixDlClose(sqlite3_vfs *NotUsed, void *pHandle))
-        int(sqlite3_vfs *, int, char *) xRandomness = 0x609a00bf1ee0 (int unixRandomness(sqlite3_vfs *NotUsed, int nBuf, char *zBuf))
-        int(sqlite3_vfs *, int) xSleep = 0x609a00a4c7d0 (int unixSleep(sqlite3_vfs *NotUsed, int microseconds))
-        int(sqlite3_vfs *, double *) xCurrentTime = 0x609a00ad6bc0 (int unixCurrentTime(sqlite3_vfs *NotUsed, double *prNow))
-        int(sqlite3_vfs *, int, char *) xGetLastError = 0x609a00a85aa0 (int unixGetLastError(sqlite3_vfs *NotUsed, int NotUsed2, char *NotUsed3))
-        int(sqlite3_vfs *, sqlite3_int64 *) xCurrentTimeInt64 = 0x609a00a95a40 (int unixCurrentTimeInt64(sqlite3_vfs *NotUsed, sqlite3_int64 *piNow))
-        int(sqlite3_vfs *, const char *, void()) xSetSystemCall = 0x609a00a9b2c0 (int unixSetSystemCall(sqlite3_vfs *pNotUsed, const char *zName, void() pNewFunc))
-        (void())(sqlite3_vfs *, const char *) xGetSystemCall = 0x609a00a9b100 ((void()) unixGetSystemCall(sqlite3_vfs *pNotUsed, const char *zName))
-        const char *(sqlite3_vfs *, const char *) xNextSystemCall = 0x609a00a9ae60 (const char *unixNextSystemCall(sqlite3_vfs *p, const char *zName))
+        const char *zName = 0x558f46848640 ("unix")
+        void *pAppData = 0x558f4687ab40
+        int(sqlite3_vfs *, const char *, sqlite3_file *, int, int *) xOpen = 0x558f46535780 (int unixOpen(sqlite3_vfs *pVfs, const char *zPath, sqlite3_file *pFile, int flags, int *pOutFlags))
+        int(sqlite3_vfs *, const char *, int) xDelete = 0x558f46415330 (int unixDelete(sqlite3_vfs *NotUsed, const char *zPath, int dirSync))
+        int(sqlite3_vfs *, const char *, int, int *) xAccess = 0x558f462caf30 (int unixAccess(sqlite3_vfs *NotUsed, const char *zPath, int flags, int *pResOut))
+        int(sqlite3_vfs *, const char *, int, char *) xFullPathname = 0x558f46416d10 (int unixFullPathname(sqlite3_vfs *pVfs, const char *zPath, int nOut, char *zOut))
+        void *(sqlite3_vfs *, const char *) xDlOpen = 0x558f46257b80 (void *unixDlOpen(sqlite3_vfs *NotUsed, const char *zFilename))
+        void(sqlite3_vfs *, int, char *) xDlError = 0x558f463f1870 (void unixDlError(sqlite3_vfs *NotUsed, int nBuf, char *zBufOut))
+        (void())(sqlite3_vfs *, void *, const char *) xDlSym = 0x558f46257b70 ((void()) unixDlSym(sqlite3_vfs *NotUsed, void *p, const char *zSym))
+        void(sqlite3_vfs *, void *) xDlClose = 0x558f462b58b0 (void unixDlClose(sqlite3_vfs *NotUsed, void *pHandle))
+        int(sqlite3_vfs *, int, char *) xRandomness = 0x558f464135d0 (int unixRandomness(sqlite3_vfs *NotUsed, int nBuf, char *zBuf))
+        int(sqlite3_vfs *, int) xSleep = 0x558f46257a20 (int unixSleep(sqlite3_vfs *NotUsed, int microseconds))
+        int(sqlite3_vfs *, double *) xCurrentTime = 0x558f462ed2f0 (int unixCurrentTime(sqlite3_vfs *NotUsed, double *prNow))
+        int(sqlite3_vfs *, int, char *) xGetLastError = 0x558f46299ff0 (int unixGetLastError(sqlite3_vfs *NotUsed, int NotUsed2, char *NotUsed3))
+        int(sqlite3_vfs *, sqlite3_int64 *) xCurrentTimeInt64 = 0x558f462abf30 (int unixCurrentTimeInt64(sqlite3_vfs *NotUsed, sqlite3_int64 *piNow))
+        int(sqlite3_vfs *, const char *, void()) xSetSystemCall = 0x558f462b10e0 (int unixSetSystemCall(sqlite3_vfs *pNotUsed, const char *zName, void() pNewFunc))
+        (void())(sqlite3_vfs *, const char *) xGetSystemCall = 0x558f462b0f20 ((void()) unixGetSystemCall(sqlite3_vfs *pNotUsed, const char *zName))
+        const char *(sqlite3_vfs *, const char *) xNextSystemCall = 0x558f462b0c90 (const char *unixNextSystemCall(sqlite3_vfs *p, const char *zName))
     })
     Vdbe *pVdbe = NULL
-    CollSeq *pDfltColl = 0x50d000000048 ({
-        char *zName = 0x50d0000000c0 ("BINARY")
+    CollSeq *pDfltColl = 0x7cb7991e0048 ({
+        char *zName = 0x7cb7991e00c0 ("BINARY")
         u8 enc = 1
         void *pUser = NULL
-        int(void *, int, const void *, int, const void *) xCmp = 0x609a00a9f650 (int binCollFunc(void *NotUsed, int nKey1, const void *pKey1, int nKey2, const void *pKey2))
+        int(void *, int, const void *, int, const void *) xCmp = 0x558f462b58d0 (int binCollFunc(void *NotUsed, int nKey1, const void *pKey1, int nKey2, const void *pKey2))
         void(void *) xDel = NULL
     })
-    sqlite3_mutex *mutex = 0x504000000058 ({
+    sqlite3_mutex *mutex = 0x7c27991e0058 ({
         pthread_mutex_t mutex = <union> {
             __pthread_mutex_s __data = {
                 int __lock = 0
@@ -258,13 +258,13 @@ Sqlite's database: <#0> {
             long int __align = 0
         }
     })
-    Db *aDb = 0x518000000320 ({
-        char *zDbSName = 0x609a01023700 ("main")
-        Btree *pBt = 0x507000000028 (<#2> {
-            sqlite3 *db = 0x518000000088 (<points to #0>)
-            BtShared *pBt = 0x50e000000048 ({
-                Pager *pPager = 0x518000000488 ({
-                    sqlite3_vfs *pVfs = 0x609a01405d40 (<points to #1>)
+    Db *aDb = 0x7d67991e0320 ({
+        char *zDbSName = 0x558f4682c100 ("main")
+        Btree *pBt = 0x7c57991e0028 (<#2> {
+            sqlite3 *db = 0x7d67991e0088 (<points to #0>)
+            BtShared *pBt = 0x7cc7991e0048 ({
+                Pager *pPager = 0x7d67991e0488 ({
+                    sqlite3_vfs *pVfs = 0x558f46be8be0 (<points to #1>)
                     u8 exclusiveMode = 0
                     u8 journalMode = 0
                     u8 useJournal = 1
@@ -295,33 +295,33 @@ Sqlite's database: <#0> {
                     u32 cksumInit = 0
                     u32 nSubRec = 0
                     Bitvec *pInJournal = NULL
-                    sqlite3_file *fd = 0x518000000610 ({
-                        const sqlite3_io_methods *pMethods = 0x609a01077b80 ({
+                    sqlite3_file *fd = 0x7d67991e0610 ({
+                        const sqlite3_io_methods *pMethods = 0x558f4687ab80 ({
                             int iVersion = 3
-                            int(sqlite3_file *) xClose = 0x609a00bf0f50 (int unixClose(sqlite3_file *id))
-                            int(sqlite3_file *, void *, int, sqlite3_int64) xRead = 0x609a00a9d220 (int unixRead(sqlite3_file *id, void *pBuf, int amt, sqlite3_int64 offset))
-                            int(sqlite3_file *, const void *, int, sqlite3_int64) xWrite = 0x609a00ad3c50 (int unixWrite(sqlite3_file *id, const void *pBuf, int amt, sqlite3_int64 offset))
-                            int(sqlite3_file *, sqlite3_int64) xTruncate = 0x609a00bf2290 (int unixTruncate(sqlite3_file *id, i64 nByte))
-                            int(sqlite3_file *, int) xSync = 0x609a00bf2710 (int unixSync(sqlite3_file *id, int flags))
-                            int(sqlite3_file *, sqlite3_int64 *) xFileSize = 0x609a00a85710 (int unixFileSize(sqlite3_file *id, i64 *pSize))
-                            int(sqlite3_file *, int) xLock = 0x609a00b0f550 (int unixLock(sqlite3_file *id, int eFileLock))
-                            int(sqlite3_file *, int) xUnlock = 0x609a00befd70 (int unixUnlock(sqlite3_file *id, int eFileLock))
-                            int(sqlite3_file *, int *) xCheckReservedLock = 0x609a00a85b00 (int unixCheckReservedLock(sqlite3_file *id, int *pResOut))
-                            int(sqlite3_file *, int, void *) xFileControl = 0x609a00d0f4d0 (int unixFileControl(sqlite3_file *id, int op, void *pArg))
-                            int(sqlite3_file *) xSectorSize = 0x609a00a571a0 (int unixSectorSize(sqlite3_file *id))
-                            int(sqlite3_file *) xDeviceCharacteristics = 0x609a00a57210 (int unixDeviceCharacteristics(sqlite3_file *id))
-                            int(sqlite3_file *, int, int, int, volatile void **) xShmMap = 0x609a00d19d70 (int unixShmMap(sqlite3_file *fd, int iRegion, int szRegion, int bExtend, volatile void **pp))
-                            int(sqlite3_file *, int, int, int) xShmLock = 0x609a00a9daf0 (int unixShmLock(sqlite3_file *fd, int ofst, int n, int flags))
-                            void(sqlite3_file *) xShmBarrier = 0x609a00adcc80 (void unixShmBarrier(sqlite3_file *fd))
-                            int(sqlite3_file *, int) xShmUnmap = 0x609a00bf0770 (int unixShmUnmap(sqlite3_file *fd, int deleteFlag))
-                            int(sqlite3_file *, sqlite3_int64, int, void **) xFetch = 0x609a00bf3680 (int unixFetch(sqlite3_file *fd, i64 iOff, int nAmt, void **pp))
-                            int(sqlite3_file *, sqlite3_int64, void *) xUnfetch = 0x609a00a578b0 (int unixUnfetch(sqlite3_file *fd, i64 iOff, void *p))
+                            int(sqlite3_file *) xClose = 0x558f464125b0 (int unixClose(sqlite3_file *id))
+                            int(sqlite3_file *, void *, int, sqlite3_int64) xRead = 0x558f462b3250 (int unixRead(sqlite3_file *id, void *pBuf, int amt, sqlite3_int64 offset))
+                            int(sqlite3_file *, const void *, int, sqlite3_int64) xWrite = 0x558f462ea400 (int unixWrite(sqlite3_file *id, const void *pBuf, int amt, sqlite3_int64 offset))
+                            int(sqlite3_file *, sqlite3_int64) xTruncate = 0x558f46413980 (int unixTruncate(sqlite3_file *id, i64 nByte))
+                            int(sqlite3_file *, int) xSync = 0x558f46413e20 (int unixSync(sqlite3_file *id, int flags))
+                            int(sqlite3_file *, sqlite3_int64 *) xFileSize = 0x558f46299c60 (int unixFileSize(sqlite3_file *id, i64 *pSize))
+                            int(sqlite3_file *, int) xLock = 0x558f4632b4c0 (int unixLock(sqlite3_file *id, int eFileLock))
+                            int(sqlite3_file *, int) xUnlock = 0x558f46411480 (int unixUnlock(sqlite3_file *id, int eFileLock))
+                            int(sqlite3_file *, int *) xCheckReservedLock = 0x558f4629a050 (int unixCheckReservedLock(sqlite3_file *id, int *pResOut))
+                            int(sqlite3_file *, int, void *) xFileControl = 0x558f4652e780 (int unixFileControl(sqlite3_file *id, int op, void *pArg))
+                            int(sqlite3_file *) xSectorSize = 0x558f46263210 (int unixSectorSize(sqlite3_file *id))
+                            int(sqlite3_file *) xDeviceCharacteristics = 0x558f46263290 (int unixDeviceCharacteristics(sqlite3_file *id))
+                            int(sqlite3_file *, int, int, int, volatile void **) xShmMap = 0x558f46539810 (int unixShmMap(sqlite3_file *fd, int iRegion, int szRegion, int bExtend, volatile void **pp))
+                            int(sqlite3_file *, int, int, int) xShmLock = 0x558f462b3ae0 (int unixShmLock(sqlite3_file *fd, int ofst, int n, int flags))
+                            void(sqlite3_file *) xShmBarrier = 0x558f462f3c90 (void unixShmBarrier(sqlite3_file *fd))
+                            int(sqlite3_file *, int) xShmUnmap = 0x558f46411de0 (int unixShmUnmap(sqlite3_file *fd, int deleteFlag))
+                            int(sqlite3_file *, sqlite3_int64, int, void **) xFetch = 0x558f46414df0 (int unixFetch(sqlite3_file *fd, i64 iOff, int nAmt, void **pp))
+                            int(sqlite3_file *, sqlite3_int64, void *) xUnfetch = 0x558f46263a00 (int unixUnfetch(sqlite3_file *fd, i64 iOff, void *p))
                         })
                     })
-                    sqlite3_file *jfd = 0x518000000700 ({
+                    sqlite3_file *jfd = 0x7d67991e0700 ({
                         const sqlite3_io_methods *pMethods = NULL
                     })
-                    sqlite3_file *sjfd = 0x518000000688 ({
+                    sqlite3_file *sjfd = 0x7d67991e0688 ({
                         const sqlite3_io_methods *pMethods = NULL
                     })
                     i64 journalOff = 0
@@ -342,15 +342,15 @@ Sqlite's database: <#0> {
                     Pgno lckPgno = 262145
                     i64 pageSize = 4096
                     i64 journalSizeLimit = -1
-                    char *zFilename = 0x518000000784 ("/home/tx/projects/uprintf/test.db")
-                    char *zJournal = 0x5180000007a7 ("/home/tx/projects/uprintf/test.db-journal")
-                    int(void *) xBusyHandler = 0x609a00a7bc50 (int btreeInvokeBusyHandler(void *pArg))
-                    void *pBusyHandlerArg = 0x50e000000048
+                    char *zFilename = 0x7d67991e0784 ("/projects/uprintf/test.db")
+                    char *zJournal = 0x7d67991e07a7 ("/projects/uprintf/test.db-journal")
+                    int(void *) xBusyHandler = 0x558f4628e8a0 (int btreeInvokeBusyHandler(void *pArg))
+                    void *pBusyHandlerArg = 0x7cc7991e0048
                     u32[] aStat = [0 <repeats 4 times>]
-                    void(DbPage *) xReiniter = 0x609a00be5050 (void pageReinit(DbPage *pData))
-                    int(Pager *, Pgno, DbPage **, int) xGet = 0x609a00cb0190 (int getPageNormal(Pager *pPager, Pgno pgno, DbPage **ppPage, int flags))
-                    char *pTmpSpace = 0x521000000108 ("��������������������������������������������������������������������������������������������������������������������������������������������������������������������������������������������������������"...)
-                    PCache *pPCache = 0x5180000005c0 ({
+                    void(DbPage *) xReiniter = 0x558f46406680 (void pageReinit(DbPage *pData))
+                    int(Pager *, Pgno, DbPage **, int) xGet = 0x558f464cfd90 (int getPageNormal(Pager *pPager, Pgno pgno, DbPage **ppPage, int flags))
+                    char *pTmpSpace = 0x7df7991e0108 ("��������������������������������������������������������������������������������������������������������������������������������������������������������������������������������������������������������"...)
+                    PCache *pPCache = 0x7d67991e05c0 ({
                         PgHdr *pDirty = NULL
                         PgHdr *pDirtyTail = NULL
                         PgHdr *pSynced = NULL
@@ -361,14 +361,14 @@ Sqlite's database: <#0> {
                         int szExtra = 136
                         u8 bPurgeable = 1
                         u8 eCreate = 2
-                        int(void *, PgHdr *) xStress = 0x609a00d303e0 (int pagerStress(void *p, PgHdr *pPg))
-                        void *pStress = 0x518000000488
-                        sqlite3_pcache *pCache = 0x50f000000048 ({})
+                        int(void *, PgHdr *) xStress = 0x558f465502b0 (int pagerStress(void *p, PgHdr *pPg))
+                        void *pStress = 0x7d67991e0488
+                        sqlite3_pcache *pCache = 0x7cd7991e0048 ({})
                     })
                     Wal *pWal = NULL
-                    char *zWal = 0x5180000007d1 ("/home/tx/projects/uprintf/test.db-wal")
+                    char *zWal = 0x7d67991e07d1 ("/projects/uprintf/test.db-wal")
                 })
-                sqlite3 *db = 0x518000000088 (<points to #0>)
+                sqlite3 *db = 0x7d67991e0088 (<points to #0>)
                 BtCursor *pCursor = NULL
                 MemPage *pPage1 = NULL
                 u8 openFlags = 0
@@ -378,7 +378,7 @@ Sqlite's database: <#0> {
                 u8 inTransaction = 0
                 u8 max1bytePayload = 0
                 u8 nReserveWanted = 0
-                u16 btsFlags = 0
+                u16 btsFlags = 2
                 u16 maxLocal = 0
                 u16 minLocal = 0
                 u16 maxLeaf = 0
@@ -387,8 +387,8 @@ Sqlite's database: <#0> {
                 u32 usableSize = 4096
                 int nTransaction = 0
                 u32 nPage = 0
-                void *pSchema = 0x50c000000048
-                void(void *) xFreeSchema = 0x609a00aee880 (void sqlite3SchemaClear(void *p))
+                void *pSchema = 0x7ca7991e0048
+                void(void *) xFreeSchema = 0x558f46307070 (void sqlite3SchemaClear(void *p))
                 sqlite3_mutex *mutex = NULL
                 Bitvec *pHasContent = NULL
                 int nRef = 1
@@ -408,7 +408,7 @@ Sqlite's database: <#0> {
             Btree *pNext = NULL
             Btree *pPrev = NULL
             BtLock lock = {
-                Btree *pBtree = 0x507000000028 (<points to #2>)
+                Btree *pBtree = 0x7c57991e0028 (<points to #2>)
                 Pgno iTable = 1
                 u8 eLock = 0
                 BtLock *pNext = NULL
@@ -416,7 +416,7 @@ Sqlite's database: <#0> {
         })
         u8 safety_level = 3
         u8 bSyncSet = 0
-        Schema *pSchema = 0x50c000000048 ({
+        Schema *pSchema = 0x7ca7991e0048 ({
             int schema_cookie = 0
             int iGeneration = 0
             Hash tblHash = {
@@ -488,7 +488,7 @@ Sqlite's database: <#0> {
         unsigned int orphanTrigger = 0 <1 bit>
         unsigned int imposterTable = 0 <1 bit>
         unsigned int reopenMemdb = 0 <1 bit>
-        const char **azInit = 0x609a01408440
+        const char **azInit = 0x558f46beb260
     }
     int nVdbeActive = 0
     int nVdbeRead = 0
@@ -514,7 +514,7 @@ Sqlite's database: <#0> {
     void(void *) xAutovacDestr = NULL
     unsigned int(void *, const char *, u32, u32, u32) xAutovacPages = NULL
     Parse *pParse = NULL
-    int(void *, sqlite3 *, const char *, int) xWalCallback = 0x609a00f0def0 (int sqlite3WalDefaultHook(void *pClientData, sqlite3 *db, const char *zDb, int nFrame))
+    int(void *, sqlite3 *, const char *, int) xWalCallback = 0x558f46723900 (int sqlite3WalDefaultHook(void *pClientData, sqlite3 *db, const char *zDb, int nFrame))
     void *pWalArg = 0x3e8
     void(void *, sqlite3 *, int, const char *) xCollNeeded = NULL
     void(void *, sqlite3 *, int, const void *) xCollNeeded16 = NULL
@@ -531,15 +531,15 @@ Sqlite's database: <#0> {
         u8 bMalloced = 1
         u32 nSlot = 123
         u32[] anStat = [0, 0, 0]
-        LookasideSlot *pInit = 0x52e000008bf8 ({
-            LookasideSlot *pNext = 0x52e000008748 ({
-                LookasideSlot *pNext = 0x52e000008298 ({
-                    LookasideSlot *pNext = 0x52e000007de8 ({
-                        LookasideSlot *pNext = 0x52e000007938 ({
-                            LookasideSlot *pNext = 0x52e000007488 ({
-                                LookasideSlot *pNext = 0x52e000006fd8 ({
-                                    LookasideSlot *pNext = 0x52e000006b28 ({
-                                        LookasideSlot *pNext = 0x52e000006678 ({...})
+        LookasideSlot *pInit = 0x7ec7991e8bf8 ({
+            LookasideSlot *pNext = 0x7ec7991e8748 ({
+                LookasideSlot *pNext = 0x7ec7991e8298 ({
+                    LookasideSlot *pNext = 0x7ec7991e7de8 ({
+                        LookasideSlot *pNext = 0x7ec7991e7938 ({
+                            LookasideSlot *pNext = 0x7ec7991e7488 ({
+                                LookasideSlot *pNext = 0x7ec7991e6fd8 ({
+                                    LookasideSlot *pNext = 0x7ec7991e6b28 ({
+                                        LookasideSlot *pNext = 0x7ec7991e6678 ({...})
                                     })
                                 })
                             })
@@ -549,15 +549,15 @@ Sqlite's database: <#0> {
             })
         })
         LookasideSlot *pFree = NULL
-        LookasideSlot *pSmallInit = 0x52e00000bea8 ({
-            LookasideSlot *pNext = 0x52e00000be28 ({
-                LookasideSlot *pNext = 0x52e00000bda8 ({
-                    LookasideSlot *pNext = 0x52e00000bd28 ({
-                        LookasideSlot *pNext = 0x52e00000bca8 ({
-                            LookasideSlot *pNext = 0x52e00000bc28 ({
-                                LookasideSlot *pNext = 0x52e00000bba8 ({
-                                    LookasideSlot *pNext = 0x52e00000bb28 ({
-                                        LookasideSlot *pNext = 0x52e00000baa8 ({...})
+        LookasideSlot *pSmallInit = 0x7ec7991ebea8 ({
+            LookasideSlot *pNext = 0x7ec7991ebe28 ({
+                LookasideSlot *pNext = 0x7ec7991ebda8 ({
+                    LookasideSlot *pNext = 0x7ec7991ebd28 ({
+                        LookasideSlot *pNext = 0x7ec7991ebca8 ({
+                            LookasideSlot *pNext = 0x7ec7991ebc28 ({
+                                LookasideSlot *pNext = 0x7ec7991ebba8 ({
+                                    LookasideSlot *pNext = 0x7ec7991ebb28 ({
+                                        LookasideSlot *pNext = 0x7ec7991ebaa8 ({...})
                                     })
                                 })
                             })
@@ -567,10 +567,10 @@ Sqlite's database: <#0> {
             })
         })
         LookasideSlot *pSmallFree = NULL
-        void *pMiddle = 0x52e0000090a8
-        void *pStart = 0x52e000000408
-        void *pEnd = 0x52e00000bf28
-        void *pTrueEnd = 0x52e00000bf28
+        void *pMiddle = 0x7ec7991e90a8
+        void *pStart = 0x7ec7991e0408
+        void *pEnd = 0x7ec7991ebf28
+        void *pTrueEnd = 0x7ec7991ebf28
     }
     int(void *, int, const char *, const char *, const char *, const char *) xAuth = NULL
     void *pAuthArg = NULL
@@ -581,16 +581,16 @@ Sqlite's database: <#0> {
     Hash aModule = {
         unsigned int htsize = 0
         unsigned int count = 2
-        HashElem *first = 0x504000000218 (<#3> {
-            HashElem *next = 0x5040000001d8 ({
+        HashElem *first = 0x7c27991e0218 (<#3> {
+            HashElem *next = 0x7c27991e01d8 ({
                 HashElem *next = NULL
-                HashElem *prev = 0x504000000218 (<points to #3>)
-                void *data = 0x507000000098
-                const char *pKey = 0x5070000000c8 ("json_each")
+                HashElem *prev = 0x7c27991e0218 (<points to #3>)
+                void *data = 0x7c57991e0098
+                const char *pKey = 0x7c57991e00c8 ("json_each")
             })
             HashElem *prev = NULL
-            void *data = 0x507000000108
-            const char *pKey = 0x507000000138 ("json_tree")
+            void *data = 0x7c57991e0108
+            const char *pKey = 0x7c57991e0138 ("json_tree")
         })
         _ht *ht = NULL
     }
@@ -600,32 +600,32 @@ Sqlite's database: <#0> {
     Hash aFunc = {
         unsigned int htsize = 0
         unsigned int count = 1
-        HashElem *first = 0x504000000198 ({
+        HashElem *first = 0x7c27991e0198 ({
             HashElem *next = NULL
             HashElem *prev = NULL
-            void *data = 0x5080000000a8
-            const char *pKey = 0x5080000000f0 ("match")
+            void *data = 0x7c67991e00a8
+            const char *pKey = 0x7c67991e00f0 ("match")
         })
         _ht *ht = NULL
     }
     Hash aCollSeq = {
         unsigned int htsize = 0
         unsigned int count = 3
-        HashElem *first = 0x504000000118 (<#4> {
-            HashElem *next = 0x5040000000d8 (<#5> {
-                HashElem *next = 0x504000000098 ({
+        HashElem *first = 0x7c27991e0118 (<#4> {
+            HashElem *next = 0x7c27991e00d8 (<#5> {
+                HashElem *next = 0x7c27991e0098 ({
                     HashElem *next = NULL
-                    HashElem *prev = 0x5040000000d8 (<points to #5>)
-                    void *data = 0x50d000000048
-                    const char *pKey = 0x50d0000000c0 ("BINARY")
+                    HashElem *prev = 0x7c27991e00d8 (<points to #5>)
+                    void *data = 0x7cb7991e0048
+                    const char *pKey = 0x7cb7991e00c0 ("BINARY")
                 })
-                HashElem *prev = 0x504000000118 (<points to #4>)
-                void *data = 0x50d000000118
-                const char *pKey = 0x50d000000190 ("NOCASE")
+                HashElem *prev = 0x7c27991e0118 (<points to #4>)
+                void *data = 0x7cb7991e0118
+                const char *pKey = 0x7cb7991e0190 ("NOCASE")
             })
             HashElem *prev = NULL
-            void *data = 0x50d0000001e8
-            const char *pKey = 0x50d000000260 ("RTRIM")
+            void *data = 0x7cb7991e01e8
+            const char *pKey = 0x7cb7991e0260 ("RTRIM")
         })
         _ht *ht = NULL
     }
@@ -636,11 +636,11 @@ Sqlite's database: <#0> {
     }
     Db[] aDbStatic = [
         {
-            char *zDbSName = 0x609a01023700 ("main")
-            Btree *pBt = 0x507000000028 (<points to #2>)
+            char *zDbSName = 0x558f4682c100 ("main")
+            Btree *pBt = 0x7c57991e0028 (<points to #2>)
             u8 safety_level = 3
             u8 bSyncSet = 0
-            Schema *pSchema = 0x50c000000048 ({
+            Schema *pSchema = 0x7ca7991e0048 ({
                 int schema_cookie = 0
                 int iGeneration = 0
                 Hash tblHash = {
@@ -675,11 +675,11 @@ Sqlite's database: <#0> {
             })
         },
         {
-            char *zDbSName = 0x609a01024d40 ("temp")
+            char *zDbSName = 0x558f4682d7a0 ("temp")
             Btree *pBt = NULL
             u8 safety_level = 1
             u8 bSyncSet = 0
-            Schema *pSchema = 0x50c000000108 ({
+            Schema *pSchema = 0x7ca7991e0108 ({
                 int schema_cookie = 0
                 int iGeneration = 0
                 Hash tblHash = {
@@ -724,35 +724,40 @@ Sqlite's database: <#0> {
     int *pnBytesFreed = NULL
     DbClientData *pDbData = NULL
 }
-  ```
+num 1
+num 2
+num 3
+num 4
+num 5
+```
 </details>
 
 <details>
   <summary>vorbis</summary>
 
-  ```c
+```c
 Vorbis data: {
     unsigned int sample_rate = 44100
     int channels = 2
-    unsigned int setup_memory_required = 193864
+    unsigned int setup_memory_required = 178512
     unsigned int temp_memory_required = 4096
     unsigned int setup_temp_memory_required = 7209
-    char *vendor = 0x504000000010 ("Xiph.Org libVorbis I 20120203 (Omnipresent)")
-    int comment_list_length = 3
-    char **comment_list = 0x503000000100
-    FILE *f = 0x515000000080 (<ignored>)
+    char *vendor = 0x7b5c561e0010 ("Lavf58.20.100")
+    int comment_list_length = 1
+    char **comment_list = 0x7b5c561e0030
+    FILE *f = 0x7c8c561e0300 (<ignored>)
     uint32 f_start = 0
     int close_on_free = 1
     uint8 *stream = NULL
     uint8 *stream_start = NULL
     uint8 *stream_end = NULL
-    uint32 stream_len = 1032948
+    uint32 stream_len = 4115
     uint8 push_mode = 0
-    uint32 first_audio_page_offset = 4465
+    uint32 first_audio_page_offset = 3998
     ProbedPage p_first = {
-        uint32 page_start = 4465
-        uint32 page_end = 8913
-        uint32 last_decoded_sample = 22080
+        uint32 page_start = 3998
+        uint32 page_end = 4115
+        uint32 last_decoded_sample = 44100
     }
     ProbedPage p_last = {
         uint32 page_start = 0
@@ -770,11 +775,11 @@ Vorbis data: {
     int[] blocksize = [256, 2048]
     int blocksize_0 = 256
     int blocksize_1 = 2048
-    int codebook_count = 42
-    Codebook *codebooks = 0x532000000800 ({
+    int codebook_count = 38
+    Codebook *codebooks = 0x7e5c561e0800 ({
         int dimensions = 1
-        int entries = 8
-        uint8 *codeword_lengths = 0x502000000030 ("")
+        int entries = 64
+        uint8 *codeword_lengths = 0x7b9c561e0080 ("\n\a\b\r\t\a\v\n\b\b\f\a\t\b\b\b\r\a\a\b\a\f\f\n\a\b\t\a\t\f\t\n��n̹�n��")
         float minimum_value = 0.000000
         float delta_value = 0.000000
         uint8 value_bits = 0
@@ -783,81 +788,69 @@ Vorbis data: {
         uint8 sparse = 0
         uint32 lookup_values = 0
         codetype *multiplicands = NULL
-        uint32 *codewords = 0x503000000190 (0)
-        int16[] fast_huffman = [0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 3, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 6, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 7, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 6, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 3, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 6, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 7, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 6, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 3, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 6, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 7, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 6, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 3, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 6, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 7, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 6, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 3, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 6, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 7, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 6, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 3, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 6, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 7, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 6, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 3, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 6, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 7, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 6, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 3, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 6, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 7, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 6, 0, 4, 0, 1, 0, 4, 0, 2, 0, 4, 0, 1, 0, 4, 0, 5, 0, 4]
-        uint32 *sorted_codewords = NULL
-        int *sorted_values = NULL
-        int sorted_entries = 0
+        uint32 *codewords = 0x7c4c561e0040 (0)
+        int16[] fast_huffman = [0, 37, 22, 42, 20, 38, 34, 54, 17, 37, 26, 43, 21, 38, 39, 58, 6, 37, 22, 42, 25, 38, 35, 55, 18, 37, 33, 53, 21, 38, 41, 59, 5, 37, 22, 42, 24, 38, 34, 54, 17, 37, 26, 50, 21, 38, 39, 58, 10, 37, 22, 42, 25, 38, 36, 57, 18, 37, 33, 53, 21, 38, 41, 59, 1, 37, 22, 42, 20, 38, 34, 54, 17, 37, 26, 49, 21, 38, 39, 58, 8, 37, 22, 42, 25, 38, 40, 55, 18, 37, 33, 53, 21, 38, 41, 59, 5, 37, 22, 42, 32, 38, 34, 54, 17, 37, 26, 52, 21, 38, 39, 58, 16, 37, 22, 42, 25, 38, 36, 57, 18, 37, 33, 53, 21, 38, 41, 59, 2, 37, 22, 42, 20, 38, 34, 54, 17, 37, 26, 43, 21, 38, 39, 58, 6, 37, 22, 42, 25, 38, 35, 55, 18, 37, 33, 53, 21, 38, 41, 59, 5, 37, 22, 42, 27, 38, 34, 54, 17, 37, 26, 56, 21, 38, 39, 58, 23, 37, 22, 42, 25, 38, 36, 57, 18, 37, 33, 53, 21, 38, 41, 59, 1, 37, 22, 42, 20, 38, 34, 54, 17, 37, 26, 49, 21, 38, 39, 58, 9, 37, 22, 42, 25, 38, 48, 55, 18, 37, 33, 53, 21, 38, 41, 59, 5, 37, 22, 42, 32, 38, 34, 54, 17, 37, 26, 52, 21, 38, 39, 58, 16, 37, 22, 42, 25, 38, 36, 57, 18, 37, 33, 53, 21, 38, 41, 59, 4, 37, 22, 42, 20, 38, 34, 54, 17, 37, 26, 43, 21, 38, 39, 58, 6, 37, 22, 42, 25, 38, 35, 55, 18, 37, 33, 53, 21, 38, 41, 59, 5, 37, 22, 42, 24, 38, 34, 54, 17, 37, 26, 50, 21, 38, 39, 58, 10, 37, 22, 42, 25, 38, 36, 57, 18, 37, 33, 53, 21, 38, 41, 59, 1, 37, 22, 42, 20, 38, 34, 54, 17, 37, 26, 49, 21, 38, 39, 58, 19, 37, 22, 42, 25, 38, 40, 55, 18, 37, 33, 53, 21, 38, 41, 59, 5, 37, 22, 42, 32, 38, 34, 54, 17, 37, 26, 52, 21, 38, 39, 58, 16, 37, 22, 42, 25, 38, 36, 57, 18, 37, 33, 53, 21, 38, 41, 59, 2, 37, 22, 42, 20, 38, 34, 54, 17, 37, 26, 43, 21, 38, 39, 58, 6, 37, 22, 42, 25, 38, 35, 55, 18, 37, 33, 53, 21, 38, 41, 59, 5, 37, 22, 42, 27, 38, 34, 54, 17, 37, 26, 62, 21, 38, 39, 58, 23, 37, 22, 42, 25, 38, 36, 57, 18, 37, 33, 53, 21, 38, 41, 59, 1, 37, 22, 42, 20, 38, 34, 54, 17, 37, 26, 49, 21, 38, 39, 58, 9, 37, 22, 42, 25, 38, 51, 55, 18, 37, 33, 53, 21, 38, 41, 59, 5, 37, 22, 42, 32, 38, 34, 54, 17, 37, 26, 52, 21, 38, 39, 58, 16, 37, 22, 42, 25, 38, 36, 57, 18, 37, 33, 53, 21, 38, 41, 59, -1, 37, 22, 42, 20, 38, 34, 54, 17, 37, 26, 43, 21, 38, 39, 58, 6, 37, 22, 42, 25, 38, 35, 55, 18, 37, 33, 53, 21, 38, 41, 59, 5, 37, 22, 42, 24, 38, 34, 54, 17, 37, 26, 50, 21, 38, 39, 58, 10, 37, 22, 42, 25, 38, 36, 57, 18, 37, 33, 53, 21, 38, 41, 59, 1, 37, 22, 42, 20, 38, 34, 54, 17, 37, 26, 49, 21, 38, 39, 58, -1, 37, 22, 42, 25, 38, 40, 55, 18, 37, 33, 53, 21, 38, 41, 59, 5, 37, 22, 42, 32, 38, 34, 54, 17, 37, 26, 52, 21, 38, 39, 58, 16, 37, 22, 42, 25, 38, 36, 57, 18, 37, 33, 53, 21, 38, 41, 59, 2, 37, 22, 42, 20, 38, 34, 54, 17, 37, 26, 43, 21, 38, 39, 58, 6, 37, 22, 42, 25, 38, 35, 55, 18, 37, 33, 53, 21, 38, 41, 59, 5, 37, 22, 42, 27, 38, 34, 54, 17, 37, 26, 56, 21, 38, 39, 58, 23, 37, 22, 42, 25, 38, 36, 57, 18, 37, 33, 53, 21, 38, 41, 59, 1, 37, 22, 42, 20, 38, 34, 54, 17, 37, 26, 49, 21, 38, 39, 58, 9, 37, 22, 42, 25, 38, 63, 55, 18, 37, 33, 53, 21, 38, 41, 59, 5, 37, 22, 42, 32, 38, 34, 54, 17, 37, 26, 52, 21, 38, 39, 58, 16, 37, 22, 42, 25, 38, 36, 57, 18, 37, 33, 53, 21, 38, 41, 59, 4, 37, 22, 42, 20, 38, 34, 54, 17, 37, 26, 43, 21, 38, 39, 58, 6, 37, 22, 42, 25, 38, 35, 55, 18, 37, 33, 53, 21, 38, 41, 59, 5, 37, 22, 42, 24, 38, 34, 54, 17, 37, 26, 50, 21, 38, 39, 58, 10, 37, 22, 42, 25, 38, 36, 57, 18, 37, 33, 53, 21, 38, 41, 59, 1, 37, 22, 42, 20, 38, 34, 54, 17, 37, 26, 49, 21, 38, 39, 58, 19, 37, 22, 42, 25, 38, 40, 55, 18, 37, 33, 53, 21, 38, 41, 59, 5, 37, 22, 42, 32, 38, 34, 54, 17, 37, 26, 52, 21, 38, 39, 58, 16, 37, 22, 42, 25, 38, 36, 57, 18, 37, 33, 53, 21, 38, 41, 59, 2, 37, 22, 42, 20, 38, 34, 54, 17, 37, 26, 43, 21, 38, 39, 58, 6, 37, 22, 42, 25, 38, 35, 55, 18, 37, 33, 53, 21, 38, 41, 59, 5, 37, 22, 42, 27, 38, 34, 54, 17, 37, 26, 62, 21, 38, 39, 58, 23, 37, 22, 42, 25, 38, 36, 57, 18, 37, 33, 53, 21, 38, 41, 59, 1, 37, 22, 42, 20, 38, 34, 54, 17, 37, 26, 49, 21, 38, 39, 58, 9, 37, 22, 42, 25, 38, 51, 55, 18, 37, 33, 53, 21, 38, 41, 59, 5, 37, 22, 42, 32, 38, 34, 54, 17, 37, 26, 52, 21, 38, 39, 58, 16, 37, 22, 42, 25, 38, 36, 57, 18, 37, 33, 53, 21, 38, 41, 59]
+        uint32 *sorted_codewords = 0x7bac561e0020 (4194304)
+        int *sorted_values = 0x7bac561e0094 (3)
+        int sorted_entries = 17
     })
     int floor_count = 2
     uint16[] floor_types = [1, 1, 0 <repeats 62 times>]
-    Floor *floor_config = 0x51f000000080 (<union> {
+    Floor *floor_config = 0x7d2c561e0080 (<union> {
         Floor0 floor0 = {
-            uint8 order = 6
-            uint16 rate = 257
-            uint16 bark_map_size = 770
-            uint8 amplitude_bits = 3
+            uint8 order = 2
+            uint16 rate = 48641
+            uint16 bark_map_size = 48830
+            uint8 amplitude_bits = 190
             uint8 amplitude_offset = 190
             uint8 number_of_books = 190
             uint8[] book_list = [190 <repeats 16 times>]
         }
         Floor1 floor1 = {
-            uint8 partitions = 6
-            uint8[] partition_class_list = [0, 1, 1, 2, 3, 3, 190 <repeats 26 times>]
-            uint8[] class_dimensions = [2, 3, 3, 3, 190 <repeats 12 times>]
-            uint8[] class_subclasses = [0, 1, 2, 2, 190 <repeats 12 times>]
-            uint8[] class_masterbooks = [190, 0, 1, 2, 190 <repeats 12 times>]
+            uint8 partitions = 2
+            uint8[] partition_class_list = [0, 1, 190 <repeats 30 times>]
+            uint8[] class_dimensions = [3, 4, 190 <repeats 14 times>]
+            uint8[] class_subclasses = [2, 2, 190 <repeats 14 times>]
+            uint8[] class_masterbooks = [0, 1, 190 <repeats 14 times>]
             int16[][] subclass_books = [
-                [3, -16706 <repeats 7 times>],
-                [4, 5, -16706 <repeats 6 times>],
-                [-1, 6, 7, 8, -16706 <repeats 4 times>],
-                [-1, 9, 10, 11, -16706 <repeats 4 times>],
-                [-16706 <repeats 8 times>] <repeats 12 times>
+                [-1, 2, 3, 4, -16706 <repeats 4 times>],
+                [-1, 5, 6, 7, -16706 <repeats 4 times>],
+                [-16706 <repeats 8 times>] <repeats 14 times>
             ]
-            uint16[] Xlist = [0, 128, 12, 46, 4, 8, 16, 23, 33, 70, 2, 6, 10, 14, 19, 28, 39, 58, 90, 48830 <repeats 231 times>]
-            uint8[] sorted_order = [0, 10, 4, 11, 5, 12, 2, 13, 6, 14, 7, 15, 8, 16, 3, 17, 9, 18, 1, 190 <repeats 231 times>]
+            uint16[] Xlist = [0, 128, 14, 4, 58, 2, 8, 28, 90, 48830 <repeats 241 times>]
+            uint8[] sorted_order = [0, 5, 3, 6, 2, 7, 4, 8, 1, 190 <repeats 241 times>]
             uint8[][] neighbors = [
                 [190, 190],
                 [190, 190],
                 [0, 1],
-                [2, 1],
                 [0, 2],
-                [4, 2],
-                [2, 3],
-                [6, 3],
-                [7, 3],
-                [3, 1],
-                [0, 4],
-                [4, 5],
-                [5, 2],
-                [2, 6],
-                [6, 7],
-                [7, 8],
-                [8, 3],
-                [3, 9],
-                [9, 1],
-                [190, 190] <repeats 231 times>
+                [2, 1],
+                [0, 3],
+                [3, 2],
+                [2, 4],
+                [4, 1],
+                [190, 190] <repeats 241 times>
             ]
-            uint8 floor1_multiplier = 2
+            uint8 floor1_multiplier = 4
             uint8 rangebits = 7
-            int values = 19
+            int values = 9
         }
     })
     int residue_count = 2
     uint16[] residue_types = [2, 2, 0 <repeats 62 times>]
-    Residue *residue_config = 0x5060000005c0 ({
+    Residue *residue_config = 0x7b9c561e0560 ({
         uint32 begin = 0
-        uint32 end = 240
+        uint32 end = 208
         uint32 part_size = 16
         uint8 classifications = 10
-        uint8 classbook = 27
-        uint8 **classdata = 0x518000001080
-        int16[] *residue_books = 0x50e0000003c0 ([-1 <repeats 8 times>])
+        uint8 classbook = 23
+        uint8 **classdata = 0x7cbc561e1080
+        int16[] *residue_books = 0x7c1c561e03c0 ([-1 <repeats 8 times>])
     })
     int mapping_count = 2
-    Mapping *mapping = 0x5080000004a0 ({
+    Mapping *mapping = 0x7bbc561e04a0 ({
         uint16 coupling_steps = 1
-        MappingChannel *chan = 0x502000001ab0 ({
+        MappingChannel *chan = 0x7b5c561e1b30 ({
             uint8 magnitude = 0
             uint8 angle = 1
             uint8 mux = 0
@@ -888,33 +881,33 @@ Vorbis data: {
         } <repeats 62 times>
     ]
     uint32 total_samples = 0
-    float[] channel_buffers = [0x525000000100 (-0.000001), 0x525000002900 (0.000001), NULL <repeats 14 times>]
+    float[] channel_buffers = [0x7d8c561e0100 (0.000000), 0x7d8c561e2900 (0.000000), NULL <repeats 14 times>]
     float[] outputs = [NULL <repeats 16 times>]
-    float[] previous_window = [0x521000001500 (0.000001), 0x521000002900 (-0.000000), NULL <repeats 14 times>]
+    float[] previous_window = [0x7d4c561e1500 (0.000000), 0x7d4c561e2900 (0.000000), NULL <repeats 14 times>]
     int previous_length = 128
-    int16[] finalY = [0x506000000620 (26), 0x506000000680 (26), NULL <repeats 14 times>]
+    int16[] finalY = [0x7b9c561e05c0 (-16706), 0x7b9c561e0620 (-16706), NULL <repeats 14 times>]
     uint32 current_loc = 0
     int current_loc_valid = 1
-    float[] A = [0x515000001c00 (1.000000), 0x521000003d00 (1.000000)]
-    float[] B = [0x515000001e80 (0.499991), 0x521000005100 (0.500000)]
-    float[] C = [0x5110000020c0 (0.999699), 0x51d000001480 (0.999995)]
-    float[] window = [0x515000002100 (0.000059), 0x521000006500 (0.000001)]
-    uint16[] bit_reverse = [0x5060000006e0 (0), 0x515000002380 (0)]
+    float[] A = [0x7c8c561e1480 (1.000000), 0x7d4c561e3d00 (1.000000)]
+    float[] B = [0x7c8c561e1700 (0.499991), 0x7d4c561e5100 (0.500000)]
+    float[] C = [0x7c4c561e1bc0 (0.999699), 0x7d0c561e1480 (0.999995)]
+    float[] window = [0x7c8c561e1980 (0.000059), 0x7d4c561e6500 (0.000001)]
+    uint16[] bit_reverse = [0x7b9c561e0680 (0), 0x7c8c561e1c00 (0)]
     uint32 serial = 0
     int last_page = 2
-    int segment_count = 35
-    uint8[] segments = [22, 255, 25, 127, 72 ('H'), 93 (']'), 233, 255, 101 ('e'), 71 ('G'), 65 ('A'), 115 ('s'), 82 ('R'), 103 ('g'), 245, 255, 107 ('k'), 72 ('H'), 63 ('?'), 62 ('>'), 62 ('>'), 113 ('q'), 79 ('O'), 94 ('^'), 234, 255, 107 ('k'), 71 ('G'), 64 ('@'), 118 ('v'), 87 ('W'), 93 (']'), 218, 255, 113 ('q'), 0 <repeats 220 times>]
-    uint8 page_flag = 0
+    int segment_count = 45
+    uint8[] segments = [1 <repeats 45 times>, 0 <repeats 210 times>]
+    uint8 page_flag = 4
     uint8 bytes_in_seg = 0
     uint8 first_decode = 0
     int next_seg = 1
     int last_seg = 1
     int last_seg_which = 0
     uint32 acc = 0
-    int valid_bits = 3
-    int packet_bytes = 22
-    int end_seg_with_known_loc = 34
-    uint32 known_loc_for_packet = 22080
+    int valid_bits = 4
+    int packet_bytes = 1
+    int end_seg_with_known_loc = 44
+    uint32 known_loc_for_packet = 44100
     int discard_samples_deferred = 0
     uint32 samples_output = 0
     int page_crc_tests = -1
@@ -930,109 +923,278 @@ Vorbis data: {
     int channel_buffer_start = 0
     int channel_buffer_end = 0
 }
-  ```
+```
 </details>
 
 <details>
   <summary>uprintf</summary>
 
-  ```c
+```c
 uprintf's state: {
-    uint32_t capacity = 128
-    uint32_t length = 111
-    _upf_type_map_entry *data = 0x7a8aeed108e8 ({
-        const uint8_t *die = 0x7a8aeb686851 (14)
-        _upf_type *type_ptr = 0x7a8aeed0d8b8 ({
-            const char *name = 0x7a8aeb6d6ef4 ("_upf_arena_region")
-            _upf_type_kind kind = _UPF_TK_POINTER (4)
-            int modifiers = 0
-            size_t size = 8
-            union as = <union> {
-                struct cstruct = {
-                    _upf_member_vec members = {
-                        uint32_t capacity = 4006665512
-                        uint32_t length = 31370
-                        _upf_member *data = NULL
+    _upf_arena arena = {
+        _upf_arena_region *head = 0x7bc1c77e00a0 ({
+            uint8_t *data = 0x7f91c9442800 (56)
+            size_t capacity = 262140
+            size_t length = 164760
+            _upf_arena_region *prev = 0x7bc1c77e0070 ({
+                uint8_t *data = 0x7f91c9484800 (111)
+                size_t capacity = 131070
+                size_t length = 131008
+                _upf_arena_region *prev = 0x7bc1c77e0040 ({
+                    uint8_t *data = 0x7ea1c77f4800 (214)
+                    size_t capacity = 65535
+                    size_t length = 65472
+                    _upf_arena_region *prev = NULL
+                })
+            })
+        })
+    }
+    _Bool is_init = true
+    const uint8_t *base = 0x5573c3030000 (127)
+    uint8_t *file = 0x7f91c88a3000 (127)
+    off_t file_size = 1428112
+    _Bool is64bit = false
+    uint8_t offset_size = 4
+    uint8_t address_size = 8
+    const uint8_t *die = 0x7f91c899425b (67)
+    size_t die_size = 226631
+    const uint8_t *abbrev = 0x7f91c89cb7a2 (1)
+    const char *str = 0x7f91c89e1f03 ("_UPF_TOK_ASSIGNMENT")
+    const char *line_str = 0x7f91c89e3d4b ("/projects/uprintf")
+    const uint8_t *str_offsets = NULL
+    const uint8_t *addr = NULL
+    const uint8_t *rnglists = 0x7f91c89f5eed (233)
+    _upf_type_map_vec type_map = {
+        uint32_t capacity = 128
+        uint32_t length = 120
+        _upf_type_map_entry *data = 0x7f91c9467df0 ({
+            const uint8_t *die = 0x7f91c8994db1 (15)
+            _upf_type *type_ptr = 0x7f91c9464dc0 ({
+                const char *name = 0x7f91c89e25a6 ("_upf_arena_region")
+                _upf_type_kind kind = _UPF_TK_POINTER (4)
+                int modifiers = 0
+                size_t size = 8
+                union as = <union> {
+                    struct cstruct = {
+                        _upf_member_vec members = {
+                            uint32_t capacity = 3376828976
+                            uint32_t length = 32657
+                            _upf_member *data = NULL
+                        }
+                    }
+                    struct cenum = {
+                        _upf_type *underlying_type = 0x7f91c9465230 (<#0> {
+                            const char *name = 0x7f91c89e25a6 ("_upf_arena_region")
+                            _upf_type_kind kind = _UPF_TK_STRUCT (0)
+                            int modifiers = 0
+                            size_t size = 32
+                            union as = <union> {
+                                struct cstruct = {
+                                    _upf_member_vec members = {
+                                        uint32_t capacity = 4
+                                        uint32_t length = 4
+                                        _upf_member *data = 0x7f91c9465080 ({...})
+                                    }
+                                }
+                                struct cenum = {
+                                    _upf_type *underlying_type = 0x400000004 (<out-of-bounds>)
+                                    _upf_enum_vec enums = {
+                                        uint32_t capacity = 3376828544
+                                        uint32_t length = 32657
+                                        _upf_enum *data = NULL
+                                    }
+                                }
+                                struct array = {
+                                    _upf_type *element_type = 0x400000004 (<out-of-bounds>)
+                                    _upf_size_t_vec lengths = {
+                                        uint32_t capacity = 3376828544
+                                        uint32_t length = 32657
+                                        size_t *data = NULL
+                                    }
+                                }
+                                struct pointer = {
+                                    _upf_type *type = 0x400000004 (<out-of-bounds>)
+                                }
+                                struct function = {
+                                    _upf_type *return_type = 0x400000004 (<out-of-bounds>)
+                                    _upf_type_ptr_vec arg_types = {
+                                        uint32_t capacity = 3376828544
+                                        uint32_t length = 32657
+                                        _upf_type **data = NULL
+                                    }
+                                }
+                            }
+                        })
+                        _upf_enum_vec enums = {
+                            uint32_t capacity = 0
+                            uint32_t length = 0
+                            _upf_enum *data = NULL
+                        }
+                    }
+                    struct array = {
+                        _upf_type *element_type = 0x7f91c9465230 (<points to #0>)
+                        _upf_size_t_vec lengths = {
+                            uint32_t capacity = 0
+                            uint32_t length = 0
+                            size_t *data = NULL
+                        }
+                    }
+                    struct pointer = {
+                        _upf_type *type = 0x7f91c9465230 (<points to #0>)
+                    }
+                    struct function = {
+                        _upf_type *return_type = 0x7f91c9465230 (<points to #0>)
+                        _upf_type_ptr_vec arg_types = {
+                            uint32_t capacity = 0
+                            uint32_t length = 0
+                            _upf_type **data = NULL
+                        }
                     }
                 }
-                struct cenum = {
-                    _upf_type *underlying_type = 0x7a8aeed0dd28 (<#0> {
-                        const char *name = 0x7a8aeb6d6ef4 ("_upf_arena_region")
-                        _upf_type_kind kind = _UPF_TK_STRUCT (0)
-                        int modifiers = 0
-                        size_t size = 32
-                        union as = <union> {
-                            struct cstruct = {
-                                _upf_member_vec members = {
-                                    uint32_t capacity = 4
-                                    uint32_t length = 4
-                                    _upf_member *data = 0x7a8aeed0db78 ({
-                                        const char *name = 0x7a8aeb6d6eba ("data")
-                                        _upf_type *type = 0x7a8aeed0d928 ({...})
-                                        size_t offset = 0
-                                        int bit_size = 0
-                                    })
-                                }
-                            }
-                            struct cenum = {
-                                _upf_type *underlying_type = 0x400000004 (<out-of-bounds>)
-                                _upf_enum_vec enums = {
-                                    uint32_t capacity = 4006665080
-                                    uint32_t length = 31370
-                                    _upf_enum *data = NULL
-                                }
-                            }
-                            struct array = {
-                                _upf_type *element_type = 0x400000004 (<out-of-bounds>)
-                                _upf_size_t_vec lengths = {
-                                    uint32_t capacity = 4006665080
-                                    uint32_t length = 31370
-                                    size_t *data = NULL
-                                }
-                            }
-                            struct pointer = {
-                                _upf_type *type = 0x400000004 (<out-of-bounds>)
-                            }
-                            struct function = {
-                                _upf_type *return_type = 0x400000004 (<out-of-bounds>)
-                                _upf_type_ptr_vec arg_types = {
-                                    uint32_t capacity = 4006665080
-                                    uint32_t length = 31370
-                                    _upf_type **data = NULL
-                                }
-                            }
+            })
+        })
+    }
+    _upf_cu_vec cus = {
+        uint32_t capacity = 4
+        uint32_t length = 1
+        _upf_cu *data = 0x7f91c9463b80 (<#1> {
+            const uint8_t *base = 0x7f91c899425b (67)
+            _upf_scope scope = {
+                _upf_range_vec ranges = {
+                    uint32_t capacity = 16
+                    uint32_t length = 12
+                    _upf_range *data = 0x7ea1c77fd780 ({
+                        uint64_t start = 357376
+                        uint64_t end = 534429
+                    })
+                }
+                _upf_named_type_vec vars = {
+                    uint32_t capacity = 8
+                    uint32_t length = 6
+                    _upf_named_type *data = 0x7ea1c77fe8c0 ({
+                        const uint8_t *die = 0x7f91c8994298 (78)
+                        const char *name = 0x7f91c89e2a21 ("_upf_test_status")
+                    })
+                }
+                _upf_scope_vec scopes = {
+                    uint32_t capacity = 64
+                    uint32_t length = 62
+                    _upf_scope *data = 0x7f91c9455000 ({
+                        _upf_range_vec ranges = {
+                            uint32_t capacity = 4
+                            uint32_t length = 1
+                            _upf_range *data = 0x7ea1c77ffbc0 ({
+                                uint64_t start = 357008
+                                uint64_t end = 357060
+                            })
+                        }
+                        _upf_named_type_vec vars = {
+                            uint32_t capacity = 0
+                            uint32_t length = 0
+                            _upf_named_type *data = NULL
+                        }
+                        _upf_scope_vec scopes = {
+                            uint32_t capacity = 0
+                            uint32_t length = 0
+                            _upf_scope *data = NULL
                         }
                     })
-                    _upf_enum_vec enums = {
-                        uint32_t capacity = 0
-                        uint32_t length = 0
-                        _upf_enum *data = NULL
-                    }
-                }
-                struct array = {
-                    _upf_type *element_type = 0x7a8aeed0dd28 (<points to #0>)
-                    _upf_size_t_vec lengths = {
-                        uint32_t capacity = 0
-                        uint32_t length = 0
-                        size_t *data = NULL
-                    }
-                }
-                struct pointer = {
-                    _upf_type *type = 0x7a8aeed0dd28 (<points to #0>)
-                }
-                struct function = {
-                    _upf_type *return_type = 0x7a8aeed0dd28 (<points to #0>)
-                    _upf_type_ptr_vec arg_types = {
-                        uint32_t capacity = 0
-                        uint32_t length = 0
-                        _upf_type **data = NULL
-                    }
                 }
             }
+            uint64_t addr_base = 0
+            uint64_t str_offsets_base = 18446744073709551615
+            uint64_t rnglists_base = 18446744073709551615
+            _upf_abbrev_vec abbrevs = {
+                uint32_t capacity = 128
+                uint32_t length = 103
+                _upf_abbrev *data = 0x7ea1c77f9b00 ({
+                    uint64_t code = 1
+                    uint64_t tag = 73
+                    _Bool has_children = false
+                    _upf_attr_vec attrs = {
+                        uint32_t capacity = 4
+                        uint32_t length = 2
+                        _upf_attr *data = 0x7ea1c77f49c0 ({
+                            uint64_t name = 2
+                            uint64_t form = 24
+                            int64_t implicit_const = 0
+                        })
+                    }
+                })
+            }
+            _upf_named_type_vec types = {
+                uint32_t capacity = 128
+                uint32_t length = 123
+                _upf_named_type *data = 0x7ea1c77fe0c0 ({
+                    const uint8_t *die = 0x7f91c8994285 (34)
+                    const char *name = 0x7f91c89e3393 ("long unsigned int")
+                })
+            }
+            _upf_function_vec functions = {
+                uint32_t capacity = 256
+                uint32_t length = 167
+                _upf_function *data = 0x7f91c945f6c0 ({
+                    const char *name = 0x7f91c89e3278 ("strncmp")
+                    const uint8_t *return_type_die = 0x7f91c8994298 (78)
+                    _upf_named_type_vec args = {
+                        uint32_t capacity = 4
+                        uint32_t length = 3
+                        _upf_named_type *data = 0x7ea1c77fe940 ({
+                            const uint8_t *die = 0x7f91c89942b2 (15)
+                            const char *name = NULL
+                        })
+                    }
+                    _Bool is_variadic = false
+                    uint64_t pc = 18446744073709551615
+                })
+            }
         })
-    })
+    }
+    _upf_extern_function_vec extern_functions = {
+        uint32_t capacity = 16
+        uint32_t length = 9
+        _upf_extern_function *data = 0x7ea1c77f48c0 ({
+            const char *name = 0x5573c3030ad6 ("__asan_init")
+            uint64_t pc = 140264126743472
+        })
+    }
+    int circular_id = 2
+    _upf_range_vec addresses = {
+        uint32_t capacity = 128
+        uint32_t length = 84
+        _upf_range *data = 0x7f91c9464540 ({
+            uint64_t start = 2147446784
+            uint64_t end = 2415882240
+        })
+    }
+    char *buffer = 0x7e21c77e0200 (<out-of-bounds>)
+    int size = 16384
+    char *ptr = 0x7e21c77e2aa6 (<out-of-bounds>)
+    int free = 5930
+    jmp_buf jmp_buf = [
+        {
+            __jmp_buf __jmpbuf = [0, -5632166102439442772, 140735390699128, 1, 5, 1, -5632166102246504788, -1959623151220046164]
+            int __mask_was_saved = 0
+            __sigset_t __saved_mask = {
+                long unsigned int[] __val = [0 <repeats 16 times>]
+            }
+        }
+    ]
+    const char *file_path = 0x5573c30b7de0 ("examples/uprintf.c")
+    int line = 5
+    _upf_token_vec tokens = {
+        uint32_t capacity = 4
+        uint32_t length = 2
+        _upf_token *data = 0x7f91c9464d70 ({
+            _upf_token_kind kind = _UPF_TOK_AMPERSAND (26)
+            const char *string = 0x5573c30b83e0 ("&")
+        })
+    }
+    size_t tokens_idx = 2
+    uint64_t current_pc = 357052
+    _upf_cu *current_cu = 0x7f91c9463b80 (<points to #1>)
 }
-  ```
+```
 </details>
 
 ## Requirements

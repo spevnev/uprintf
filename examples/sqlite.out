@@ -1,129 +1,129 @@
 Sqlite's database: <#0> {
-    sqlite3_vfs *pVfs = 0x609a01405d40 (<#1> {
+    sqlite3_vfs *pVfs = 0x558f46be8be0 (<#1> {
         int iVersion = 3
         int szOsFile = 120
         int mxPathname = 512
-        sqlite3_vfs *pNext = 0x609a01408040 ({
+        sqlite3_vfs *pNext = 0x558f46beae60 ({
             int iVersion = 2
             int szOsFile = 120
             int mxPathname = 1024
-            sqlite3_vfs *pNext = 0x609a01405f38 ({
+            sqlite3_vfs *pNext = 0x558f46be8dd8 ({
                 int iVersion = 3
                 int szOsFile = 120
                 int mxPathname = 512
-                sqlite3_vfs *pNext = 0x609a01405e90 ({
+                sqlite3_vfs *pNext = 0x558f46be8d30 ({
                     int iVersion = 3
                     int szOsFile = 120
                     int mxPathname = 512
-                    sqlite3_vfs *pNext = 0x609a01405de8 ({
+                    sqlite3_vfs *pNext = 0x558f46be8c88 ({
                         int iVersion = 3
                         int szOsFile = 120
                         int mxPathname = 512
                         sqlite3_vfs *pNext = NULL
-                        const char *zName = 0x609a0103fce0 ("unix-none")
-                        void *pAppData = 0x609a01077a40
-                        int(sqlite3_vfs *, const char *, sqlite3_file *, int, int *) xOpen = 0x609a00d15c20 (int unixOpen(sqlite3_vfs *pVfs, const char *zPath, sqlite3_file *pFile, int flags, int *pOutFlags))
-                        int(sqlite3_vfs *, const char *, int) xDelete = 0x609a00bf3a40 (int unixDelete(sqlite3_vfs *NotUsed, const char *zPath, int dirSync))
-                        int(sqlite3_vfs *, const char *, int, int *) xAccess = 0x609a00ab3f20 (int unixAccess(sqlite3_vfs *NotUsed, const char *zPath, int flags, int *pResOut))
-                        int(sqlite3_vfs *, const char *, int, char *) xFullPathname = 0x609a00bf58c0 (int unixFullPathname(sqlite3_vfs *pVfs, const char *zPath, int nOut, char *zOut))
-                        void *(sqlite3_vfs *, const char *) xDlOpen = 0x609a00a4c930 (void *unixDlOpen(sqlite3_vfs *NotUsed, const char *zFilename))
-                        void(sqlite3_vfs *, int, char *) xDlError = 0x609a00bcf730 (void unixDlError(sqlite3_vfs *NotUsed, int nBuf, char *zBufOut))
-                        (void())(sqlite3_vfs *, void *, const char *) xDlSym = 0x609a00a4c920 ((void()) unixDlSym(sqlite3_vfs *NotUsed, void *p, const char *zSym))
-                        void(sqlite3_vfs *, void *) xDlClose = 0x609a00a9f630 (void unixDlClose(sqlite3_vfs *NotUsed, void *pHandle))
-                        int(sqlite3_vfs *, int, char *) xRandomness = 0x609a00bf1ee0 (int unixRandomness(sqlite3_vfs *NotUsed, int nBuf, char *zBuf))
-                        int(sqlite3_vfs *, int) xSleep = 0x609a00a4c7d0 (int unixSleep(sqlite3_vfs *NotUsed, int microseconds))
-                        int(sqlite3_vfs *, double *) xCurrentTime = 0x609a00ad6bc0 (int unixCurrentTime(sqlite3_vfs *NotUsed, double *prNow))
-                        int(sqlite3_vfs *, int, char *) xGetLastError = 0x609a00a85aa0 (int unixGetLastError(sqlite3_vfs *NotUsed, int NotUsed2, char *NotUsed3))
-                        int(sqlite3_vfs *, sqlite3_int64 *) xCurrentTimeInt64 = 0x609a00a95a40 (int unixCurrentTimeInt64(sqlite3_vfs *NotUsed, sqlite3_int64 *piNow))
-                        int(sqlite3_vfs *, const char *, void()) xSetSystemCall = 0x609a00a9b2c0 (int unixSetSystemCall(sqlite3_vfs *pNotUsed, const char *zName, void() pNewFunc))
-                        (void())(sqlite3_vfs *, const char *) xGetSystemCall = 0x609a00a9b100 ((void()) unixGetSystemCall(sqlite3_vfs *pNotUsed, const char *zName))
-                        const char *(sqlite3_vfs *, const char *) xNextSystemCall = 0x609a00a9ae60 (const char *unixNextSystemCall(sqlite3_vfs *p, const char *zName))
+                        const char *zName = 0x558f46848680 ("unix-none")
+                        void *pAppData = 0x558f4687aa40
+                        int(sqlite3_vfs *, const char *, sqlite3_file *, int, int *) xOpen = 0x558f46535780 (int unixOpen(sqlite3_vfs *pVfs, const char *zPath, sqlite3_file *pFile, int flags, int *pOutFlags))
+                        int(sqlite3_vfs *, const char *, int) xDelete = 0x558f46415330 (int unixDelete(sqlite3_vfs *NotUsed, const char *zPath, int dirSync))
+                        int(sqlite3_vfs *, const char *, int, int *) xAccess = 0x558f462caf30 (int unixAccess(sqlite3_vfs *NotUsed, const char *zPath, int flags, int *pResOut))
+                        int(sqlite3_vfs *, const char *, int, char *) xFullPathname = 0x558f46416d10 (int unixFullPathname(sqlite3_vfs *pVfs, const char *zPath, int nOut, char *zOut))
+                        void *(sqlite3_vfs *, const char *) xDlOpen = 0x558f46257b80 (void *unixDlOpen(sqlite3_vfs *NotUsed, const char *zFilename))
+                        void(sqlite3_vfs *, int, char *) xDlError = 0x558f463f1870 (void unixDlError(sqlite3_vfs *NotUsed, int nBuf, char *zBufOut))
+                        (void())(sqlite3_vfs *, void *, const char *) xDlSym = 0x558f46257b70 ((void()) unixDlSym(sqlite3_vfs *NotUsed, void *p, const char *zSym))
+                        void(sqlite3_vfs *, void *) xDlClose = 0x558f462b58b0 (void unixDlClose(sqlite3_vfs *NotUsed, void *pHandle))
+                        int(sqlite3_vfs *, int, char *) xRandomness = 0x558f464135d0 (int unixRandomness(sqlite3_vfs *NotUsed, int nBuf, char *zBuf))
+                        int(sqlite3_vfs *, int) xSleep = 0x558f46257a20 (int unixSleep(sqlite3_vfs *NotUsed, int microseconds))
+                        int(sqlite3_vfs *, double *) xCurrentTime = 0x558f462ed2f0 (int unixCurrentTime(sqlite3_vfs *NotUsed, double *prNow))
+                        int(sqlite3_vfs *, int, char *) xGetLastError = 0x558f46299ff0 (int unixGetLastError(sqlite3_vfs *NotUsed, int NotUsed2, char *NotUsed3))
+                        int(sqlite3_vfs *, sqlite3_int64 *) xCurrentTimeInt64 = 0x558f462abf30 (int unixCurrentTimeInt64(sqlite3_vfs *NotUsed, sqlite3_int64 *piNow))
+                        int(sqlite3_vfs *, const char *, void()) xSetSystemCall = 0x558f462b10e0 (int unixSetSystemCall(sqlite3_vfs *pNotUsed, const char *zName, void() pNewFunc))
+                        (void())(sqlite3_vfs *, const char *) xGetSystemCall = 0x558f462b0f20 ((void()) unixGetSystemCall(sqlite3_vfs *pNotUsed, const char *zName))
+                        const char *(sqlite3_vfs *, const char *) xNextSystemCall = 0x558f462b0c90 (const char *unixNextSystemCall(sqlite3_vfs *p, const char *zName))
                     })
-                    const char *zName = 0x609a0103fd20 ("unix-dotfile")
-                    void *pAppData = 0x609a01077940
-                    int(sqlite3_vfs *, const char *, sqlite3_file *, int, int *) xOpen = 0x609a00d15c20 (int unixOpen(sqlite3_vfs *pVfs, const char *zPath, sqlite3_file *pFile, int flags, int *pOutFlags))
-                    int(sqlite3_vfs *, const char *, int) xDelete = 0x609a00bf3a40 (int unixDelete(sqlite3_vfs *NotUsed, const char *zPath, int dirSync))
-                    int(sqlite3_vfs *, const char *, int, int *) xAccess = 0x609a00ab3f20 (int unixAccess(sqlite3_vfs *NotUsed, const char *zPath, int flags, int *pResOut))
-                    int(sqlite3_vfs *, const char *, int, char *) xFullPathname = 0x609a00bf58c0 (int unixFullPathname(sqlite3_vfs *pVfs, const char *zPath, int nOut, char *zOut))
-                    void *(sqlite3_vfs *, const char *) xDlOpen = 0x609a00a4c930 (void *unixDlOpen(sqlite3_vfs *NotUsed, const char *zFilename))
-                    void(sqlite3_vfs *, int, char *) xDlError = 0x609a00bcf730 (void unixDlError(sqlite3_vfs *NotUsed, int nBuf, char *zBufOut))
-                    (void())(sqlite3_vfs *, void *, const char *) xDlSym = 0x609a00a4c920 ((void()) unixDlSym(sqlite3_vfs *NotUsed, void *p, const char *zSym))
-                    void(sqlite3_vfs *, void *) xDlClose = 0x609a00a9f630 (void unixDlClose(sqlite3_vfs *NotUsed, void *pHandle))
-                    int(sqlite3_vfs *, int, char *) xRandomness = 0x609a00bf1ee0 (int unixRandomness(sqlite3_vfs *NotUsed, int nBuf, char *zBuf))
-                    int(sqlite3_vfs *, int) xSleep = 0x609a00a4c7d0 (int unixSleep(sqlite3_vfs *NotUsed, int microseconds))
-                    int(sqlite3_vfs *, double *) xCurrentTime = 0x609a00ad6bc0 (int unixCurrentTime(sqlite3_vfs *NotUsed, double *prNow))
-                    int(sqlite3_vfs *, int, char *) xGetLastError = 0x609a00a85aa0 (int unixGetLastError(sqlite3_vfs *NotUsed, int NotUsed2, char *NotUsed3))
-                    int(sqlite3_vfs *, sqlite3_int64 *) xCurrentTimeInt64 = 0x609a00a95a40 (int unixCurrentTimeInt64(sqlite3_vfs *NotUsed, sqlite3_int64 *piNow))
-                    int(sqlite3_vfs *, const char *, void()) xSetSystemCall = 0x609a00a9b2c0 (int unixSetSystemCall(sqlite3_vfs *pNotUsed, const char *zName, void() pNewFunc))
-                    (void())(sqlite3_vfs *, const char *) xGetSystemCall = 0x609a00a9b100 ((void()) unixGetSystemCall(sqlite3_vfs *pNotUsed, const char *zName))
-                    const char *(sqlite3_vfs *, const char *) xNextSystemCall = 0x609a00a9ae60 (const char *unixNextSystemCall(sqlite3_vfs *p, const char *zName))
+                    const char *zName = 0x558f468486c0 ("unix-dotfile")
+                    void *pAppData = 0x558f4687a940
+                    int(sqlite3_vfs *, const char *, sqlite3_file *, int, int *) xOpen = 0x558f46535780 (int unixOpen(sqlite3_vfs *pVfs, const char *zPath, sqlite3_file *pFile, int flags, int *pOutFlags))
+                    int(sqlite3_vfs *, const char *, int) xDelete = 0x558f46415330 (int unixDelete(sqlite3_vfs *NotUsed, const char *zPath, int dirSync))
+                    int(sqlite3_vfs *, const char *, int, int *) xAccess = 0x558f462caf30 (int unixAccess(sqlite3_vfs *NotUsed, const char *zPath, int flags, int *pResOut))
+                    int(sqlite3_vfs *, const char *, int, char *) xFullPathname = 0x558f46416d10 (int unixFullPathname(sqlite3_vfs *pVfs, const char *zPath, int nOut, char *zOut))
+                    void *(sqlite3_vfs *, const char *) xDlOpen = 0x558f46257b80 (void *unixDlOpen(sqlite3_vfs *NotUsed, const char *zFilename))
+                    void(sqlite3_vfs *, int, char *) xDlError = 0x558f463f1870 (void unixDlError(sqlite3_vfs *NotUsed, int nBuf, char *zBufOut))
+                    (void())(sqlite3_vfs *, void *, const char *) xDlSym = 0x558f46257b70 ((void()) unixDlSym(sqlite3_vfs *NotUsed, void *p, const char *zSym))
+                    void(sqlite3_vfs *, void *) xDlClose = 0x558f462b58b0 (void unixDlClose(sqlite3_vfs *NotUsed, void *pHandle))
+                    int(sqlite3_vfs *, int, char *) xRandomness = 0x558f464135d0 (int unixRandomness(sqlite3_vfs *NotUsed, int nBuf, char *zBuf))
+                    int(sqlite3_vfs *, int) xSleep = 0x558f46257a20 (int unixSleep(sqlite3_vfs *NotUsed, int microseconds))
+                    int(sqlite3_vfs *, double *) xCurrentTime = 0x558f462ed2f0 (int unixCurrentTime(sqlite3_vfs *NotUsed, double *prNow))
+                    int(sqlite3_vfs *, int, char *) xGetLastError = 0x558f46299ff0 (int unixGetLastError(sqlite3_vfs *NotUsed, int NotUsed2, char *NotUsed3))
+                    int(sqlite3_vfs *, sqlite3_int64 *) xCurrentTimeInt64 = 0x558f462abf30 (int unixCurrentTimeInt64(sqlite3_vfs *NotUsed, sqlite3_int64 *piNow))
+                    int(sqlite3_vfs *, const char *, void()) xSetSystemCall = 0x558f462b10e0 (int unixSetSystemCall(sqlite3_vfs *pNotUsed, const char *zName, void() pNewFunc))
+                    (void())(sqlite3_vfs *, const char *) xGetSystemCall = 0x558f462b0f20 ((void()) unixGetSystemCall(sqlite3_vfs *pNotUsed, const char *zName))
+                    const char *(sqlite3_vfs *, const char *) xNextSystemCall = 0x558f462b0c90 (const char *unixNextSystemCall(sqlite3_vfs *p, const char *zName))
                 })
-                const char *zName = 0x609a0102f180 ("unix-excl")
-                void *pAppData = 0x609a01077b40
-                int(sqlite3_vfs *, const char *, sqlite3_file *, int, int *) xOpen = 0x609a00d15c20 (int unixOpen(sqlite3_vfs *pVfs, const char *zPath, sqlite3_file *pFile, int flags, int *pOutFlags))
-                int(sqlite3_vfs *, const char *, int) xDelete = 0x609a00bf3a40 (int unixDelete(sqlite3_vfs *NotUsed, const char *zPath, int dirSync))
-                int(sqlite3_vfs *, const char *, int, int *) xAccess = 0x609a00ab3f20 (int unixAccess(sqlite3_vfs *NotUsed, const char *zPath, int flags, int *pResOut))
-                int(sqlite3_vfs *, const char *, int, char *) xFullPathname = 0x609a00bf58c0 (int unixFullPathname(sqlite3_vfs *pVfs, const char *zPath, int nOut, char *zOut))
-                void *(sqlite3_vfs *, const char *) xDlOpen = 0x609a00a4c930 (void *unixDlOpen(sqlite3_vfs *NotUsed, const char *zFilename))
-                void(sqlite3_vfs *, int, char *) xDlError = 0x609a00bcf730 (void unixDlError(sqlite3_vfs *NotUsed, int nBuf, char *zBufOut))
-                (void())(sqlite3_vfs *, void *, const char *) xDlSym = 0x609a00a4c920 ((void()) unixDlSym(sqlite3_vfs *NotUsed, void *p, const char *zSym))
-                void(sqlite3_vfs *, void *) xDlClose = 0x609a00a9f630 (void unixDlClose(sqlite3_vfs *NotUsed, void *pHandle))
-                int(sqlite3_vfs *, int, char *) xRandomness = 0x609a00bf1ee0 (int unixRandomness(sqlite3_vfs *NotUsed, int nBuf, char *zBuf))
-                int(sqlite3_vfs *, int) xSleep = 0x609a00a4c7d0 (int unixSleep(sqlite3_vfs *NotUsed, int microseconds))
-                int(sqlite3_vfs *, double *) xCurrentTime = 0x609a00ad6bc0 (int unixCurrentTime(sqlite3_vfs *NotUsed, double *prNow))
-                int(sqlite3_vfs *, int, char *) xGetLastError = 0x609a00a85aa0 (int unixGetLastError(sqlite3_vfs *NotUsed, int NotUsed2, char *NotUsed3))
-                int(sqlite3_vfs *, sqlite3_int64 *) xCurrentTimeInt64 = 0x609a00a95a40 (int unixCurrentTimeInt64(sqlite3_vfs *NotUsed, sqlite3_int64 *piNow))
-                int(sqlite3_vfs *, const char *, void()) xSetSystemCall = 0x609a00a9b2c0 (int unixSetSystemCall(sqlite3_vfs *pNotUsed, const char *zName, void() pNewFunc))
-                (void())(sqlite3_vfs *, const char *) xGetSystemCall = 0x609a00a9b100 ((void()) unixGetSystemCall(sqlite3_vfs *pNotUsed, const char *zName))
-                const char *(sqlite3_vfs *, const char *) xNextSystemCall = 0x609a00a9ae60 (const char *unixNextSystemCall(sqlite3_vfs *p, const char *zName))
+                const char *zName = 0x558f46837ea0 ("unix-excl")
+                void *pAppData = 0x558f4687ab40
+                int(sqlite3_vfs *, const char *, sqlite3_file *, int, int *) xOpen = 0x558f46535780 (int unixOpen(sqlite3_vfs *pVfs, const char *zPath, sqlite3_file *pFile, int flags, int *pOutFlags))
+                int(sqlite3_vfs *, const char *, int) xDelete = 0x558f46415330 (int unixDelete(sqlite3_vfs *NotUsed, const char *zPath, int dirSync))
+                int(sqlite3_vfs *, const char *, int, int *) xAccess = 0x558f462caf30 (int unixAccess(sqlite3_vfs *NotUsed, const char *zPath, int flags, int *pResOut))
+                int(sqlite3_vfs *, const char *, int, char *) xFullPathname = 0x558f46416d10 (int unixFullPathname(sqlite3_vfs *pVfs, const char *zPath, int nOut, char *zOut))
+                void *(sqlite3_vfs *, const char *) xDlOpen = 0x558f46257b80 (void *unixDlOpen(sqlite3_vfs *NotUsed, const char *zFilename))
+                void(sqlite3_vfs *, int, char *) xDlError = 0x558f463f1870 (void unixDlError(sqlite3_vfs *NotUsed, int nBuf, char *zBufOut))
+                (void())(sqlite3_vfs *, void *, const char *) xDlSym = 0x558f46257b70 ((void()) unixDlSym(sqlite3_vfs *NotUsed, void *p, const char *zSym))
+                void(sqlite3_vfs *, void *) xDlClose = 0x558f462b58b0 (void unixDlClose(sqlite3_vfs *NotUsed, void *pHandle))
+                int(sqlite3_vfs *, int, char *) xRandomness = 0x558f464135d0 (int unixRandomness(sqlite3_vfs *NotUsed, int nBuf, char *zBuf))
+                int(sqlite3_vfs *, int) xSleep = 0x558f46257a20 (int unixSleep(sqlite3_vfs *NotUsed, int microseconds))
+                int(sqlite3_vfs *, double *) xCurrentTime = 0x558f462ed2f0 (int unixCurrentTime(sqlite3_vfs *NotUsed, double *prNow))
+                int(sqlite3_vfs *, int, char *) xGetLastError = 0x558f46299ff0 (int unixGetLastError(sqlite3_vfs *NotUsed, int NotUsed2, char *NotUsed3))
+                int(sqlite3_vfs *, sqlite3_int64 *) xCurrentTimeInt64 = 0x558f462abf30 (int unixCurrentTimeInt64(sqlite3_vfs *NotUsed, sqlite3_int64 *piNow))
+                int(sqlite3_vfs *, const char *, void()) xSetSystemCall = 0x558f462b10e0 (int unixSetSystemCall(sqlite3_vfs *pNotUsed, const char *zName, void() pNewFunc))
+                (void())(sqlite3_vfs *, const char *) xGetSystemCall = 0x558f462b0f20 ((void()) unixGetSystemCall(sqlite3_vfs *pNotUsed, const char *zName))
+                const char *(sqlite3_vfs *, const char *) xNextSystemCall = 0x558f462b0c90 (const char *unixNextSystemCall(sqlite3_vfs *p, const char *zName))
             })
-            const char *zName = 0x609a01036d60 ("memdb")
-            void *pAppData = 0x609a01405d40
-            int(sqlite3_vfs *, const char *, sqlite3_file *, int, int *) xOpen = 0x609a00d19200 (int memdbOpen(sqlite3_vfs *pVfs, const char *zName, sqlite3_file *pFd, int flags, int *pOutFlags))
+            const char *zName = 0x558f4683fa80 ("memdb")
+            void *pAppData = 0x558f46be8be0
+            int(sqlite3_vfs *, const char *, sqlite3_file *, int, int *) xOpen = 0x558f46538cd0 (int memdbOpen(sqlite3_vfs *pVfs, const char *zName, sqlite3_file *pFd, int flags, int *pOutFlags))
             int(sqlite3_vfs *, const char *, int) xDelete = NULL
-            int(sqlite3_vfs *, const char *, int, int *) xAccess = 0x609a00a57c60 (int memdbAccess(sqlite3_vfs *pVfs, const char *zPath, int flags, int *pResOut))
-            int(sqlite3_vfs *, const char *, int, char *) xFullPathname = 0x609a00bcec80 (int memdbFullPathname(sqlite3_vfs *pVfs, const char *zPath, int nOut, char *zOut))
-            void *(sqlite3_vfs *, const char *) xDlOpen = 0x609a00a57cc0 (void *memdbDlOpen(sqlite3_vfs *pVfs, const char *zPath))
-            void(sqlite3_vfs *, int, char *) xDlError = 0x609a00a57dd0 (void memdbDlError(sqlite3_vfs *pVfs, int nByte, char *zErrMsg))
-            (void())(sqlite3_vfs *, void *, const char *) xDlSym = 0x609a00a57ef0 ((void()) memdbDlSym(sqlite3_vfs *pVfs, void *p, const char *zSym))
-            void(sqlite3_vfs *, void *) xDlClose = 0x609a00a58010 (void memdbDlClose(sqlite3_vfs *pVfs, void *pHandle))
-            int(sqlite3_vfs *, int, char *) xRandomness = 0x609a00a58120 (int memdbRandomness(sqlite3_vfs *pVfs, int nByte, char *zBufOut))
-            int(sqlite3_vfs *, int) xSleep = 0x609a00a58240 (int memdbSleep(sqlite3_vfs *pVfs, int nMicro))
+            int(sqlite3_vfs *, const char *, int, int *) xAccess = 0x558f46263d70 (int memdbAccess(sqlite3_vfs *pVfs, const char *zPath, int flags, int *pResOut))
+            int(sqlite3_vfs *, const char *, int, char *) xFullPathname = 0x558f463f0c30 (int memdbFullPathname(sqlite3_vfs *pVfs, const char *zPath, int nOut, char *zOut))
+            void *(sqlite3_vfs *, const char *) xDlOpen = 0x558f46263dd0 (void *memdbDlOpen(sqlite3_vfs *pVfs, const char *zPath))
+            void(sqlite3_vfs *, int, char *) xDlError = 0x558f46263f60 (void memdbDlError(sqlite3_vfs *pVfs, int nByte, char *zErrMsg))
+            (void())(sqlite3_vfs *, void *, const char *) xDlSym = 0x558f46264130 ((void()) memdbDlSym(sqlite3_vfs *pVfs, void *p, const char *zSym))
+            void(sqlite3_vfs *, void *) xDlClose = 0x558f46264300 (void memdbDlClose(sqlite3_vfs *pVfs, void *pHandle))
+            int(sqlite3_vfs *, int, char *) xRandomness = 0x558f46264490 (int memdbRandomness(sqlite3_vfs *pVfs, int nByte, char *zBufOut))
+            int(sqlite3_vfs *, int) xSleep = 0x558f46264660 (int memdbSleep(sqlite3_vfs *pVfs, int nMicro))
             int(sqlite3_vfs *, double *) xCurrentTime = NULL
-            int(sqlite3_vfs *, int, char *) xGetLastError = 0x609a00a58350 (int memdbGetLastError(sqlite3_vfs *pVfs, int a, char *b))
-            int(sqlite3_vfs *, sqlite3_int64 *) xCurrentTimeInt64 = 0x609a00a58480 (int memdbCurrentTimeInt64(sqlite3_vfs *pVfs, sqlite3_int64 *p))
+            int(sqlite3_vfs *, int, char *) xGetLastError = 0x558f462647f0 (int memdbGetLastError(sqlite3_vfs *pVfs, int a, char *b))
+            int(sqlite3_vfs *, sqlite3_int64 *) xCurrentTimeInt64 = 0x558f462649d0 (int memdbCurrentTimeInt64(sqlite3_vfs *pVfs, sqlite3_int64 *p))
             int(sqlite3_vfs *, const char *, void()) xSetSystemCall = NULL
             (void())(sqlite3_vfs *, const char *) xGetSystemCall = NULL
             const char *(sqlite3_vfs *, const char *) xNextSystemCall = NULL
         })
-        const char *zName = 0x609a0103fca0 ("unix")
-        void *pAppData = 0x609a01077b40
-        int(sqlite3_vfs *, const char *, sqlite3_file *, int, int *) xOpen = 0x609a00d15c20 (int unixOpen(sqlite3_vfs *pVfs, const char *zPath, sqlite3_file *pFile, int flags, int *pOutFlags))
-        int(sqlite3_vfs *, const char *, int) xDelete = 0x609a00bf3a40 (int unixDelete(sqlite3_vfs *NotUsed, const char *zPath, int dirSync))
-        int(sqlite3_vfs *, const char *, int, int *) xAccess = 0x609a00ab3f20 (int unixAccess(sqlite3_vfs *NotUsed, const char *zPath, int flags, int *pResOut))
-        int(sqlite3_vfs *, const char *, int, char *) xFullPathname = 0x609a00bf58c0 (int unixFullPathname(sqlite3_vfs *pVfs, const char *zPath, int nOut, char *zOut))
-        void *(sqlite3_vfs *, const char *) xDlOpen = 0x609a00a4c930 (void *unixDlOpen(sqlite3_vfs *NotUsed, const char *zFilename))
-        void(sqlite3_vfs *, int, char *) xDlError = 0x609a00bcf730 (void unixDlError(sqlite3_vfs *NotUsed, int nBuf, char *zBufOut))
-        (void())(sqlite3_vfs *, void *, const char *) xDlSym = 0x609a00a4c920 ((void()) unixDlSym(sqlite3_vfs *NotUsed, void *p, const char *zSym))
-        void(sqlite3_vfs *, void *) xDlClose = 0x609a00a9f630 (void unixDlClose(sqlite3_vfs *NotUsed, void *pHandle))
-        int(sqlite3_vfs *, int, char *) xRandomness = 0x609a00bf1ee0 (int unixRandomness(sqlite3_vfs *NotUsed, int nBuf, char *zBuf))
-        int(sqlite3_vfs *, int) xSleep = 0x609a00a4c7d0 (int unixSleep(sqlite3_vfs *NotUsed, int microseconds))
-        int(sqlite3_vfs *, double *) xCurrentTime = 0x609a00ad6bc0 (int unixCurrentTime(sqlite3_vfs *NotUsed, double *prNow))
-        int(sqlite3_vfs *, int, char *) xGetLastError = 0x609a00a85aa0 (int unixGetLastError(sqlite3_vfs *NotUsed, int NotUsed2, char *NotUsed3))
-        int(sqlite3_vfs *, sqlite3_int64 *) xCurrentTimeInt64 = 0x609a00a95a40 (int unixCurrentTimeInt64(sqlite3_vfs *NotUsed, sqlite3_int64 *piNow))
-        int(sqlite3_vfs *, const char *, void()) xSetSystemCall = 0x609a00a9b2c0 (int unixSetSystemCall(sqlite3_vfs *pNotUsed, const char *zName, void() pNewFunc))
-        (void())(sqlite3_vfs *, const char *) xGetSystemCall = 0x609a00a9b100 ((void()) unixGetSystemCall(sqlite3_vfs *pNotUsed, const char *zName))
-        const char *(sqlite3_vfs *, const char *) xNextSystemCall = 0x609a00a9ae60 (const char *unixNextSystemCall(sqlite3_vfs *p, const char *zName))
+        const char *zName = 0x558f46848640 ("unix")
+        void *pAppData = 0x558f4687ab40
+        int(sqlite3_vfs *, const char *, sqlite3_file *, int, int *) xOpen = 0x558f46535780 (int unixOpen(sqlite3_vfs *pVfs, const char *zPath, sqlite3_file *pFile, int flags, int *pOutFlags))
+        int(sqlite3_vfs *, const char *, int) xDelete = 0x558f46415330 (int unixDelete(sqlite3_vfs *NotUsed, const char *zPath, int dirSync))
+        int(sqlite3_vfs *, const char *, int, int *) xAccess = 0x558f462caf30 (int unixAccess(sqlite3_vfs *NotUsed, const char *zPath, int flags, int *pResOut))
+        int(sqlite3_vfs *, const char *, int, char *) xFullPathname = 0x558f46416d10 (int unixFullPathname(sqlite3_vfs *pVfs, const char *zPath, int nOut, char *zOut))
+        void *(sqlite3_vfs *, const char *) xDlOpen = 0x558f46257b80 (void *unixDlOpen(sqlite3_vfs *NotUsed, const char *zFilename))
+        void(sqlite3_vfs *, int, char *) xDlError = 0x558f463f1870 (void unixDlError(sqlite3_vfs *NotUsed, int nBuf, char *zBufOut))
+        (void())(sqlite3_vfs *, void *, const char *) xDlSym = 0x558f46257b70 ((void()) unixDlSym(sqlite3_vfs *NotUsed, void *p, const char *zSym))
+        void(sqlite3_vfs *, void *) xDlClose = 0x558f462b58b0 (void unixDlClose(sqlite3_vfs *NotUsed, void *pHandle))
+        int(sqlite3_vfs *, int, char *) xRandomness = 0x558f464135d0 (int unixRandomness(sqlite3_vfs *NotUsed, int nBuf, char *zBuf))
+        int(sqlite3_vfs *, int) xSleep = 0x558f46257a20 (int unixSleep(sqlite3_vfs *NotUsed, int microseconds))
+        int(sqlite3_vfs *, double *) xCurrentTime = 0x558f462ed2f0 (int unixCurrentTime(sqlite3_vfs *NotUsed, double *prNow))
+        int(sqlite3_vfs *, int, char *) xGetLastError = 0x558f46299ff0 (int unixGetLastError(sqlite3_vfs *NotUsed, int NotUsed2, char *NotUsed3))
+        int(sqlite3_vfs *, sqlite3_int64 *) xCurrentTimeInt64 = 0x558f462abf30 (int unixCurrentTimeInt64(sqlite3_vfs *NotUsed, sqlite3_int64 *piNow))
+        int(sqlite3_vfs *, const char *, void()) xSetSystemCall = 0x558f462b10e0 (int unixSetSystemCall(sqlite3_vfs *pNotUsed, const char *zName, void() pNewFunc))
+        (void())(sqlite3_vfs *, const char *) xGetSystemCall = 0x558f462b0f20 ((void()) unixGetSystemCall(sqlite3_vfs *pNotUsed, const char *zName))
+        const char *(sqlite3_vfs *, const char *) xNextSystemCall = 0x558f462b0c90 (const char *unixNextSystemCall(sqlite3_vfs *p, const char *zName))
     })
     Vdbe *pVdbe = NULL
-    CollSeq *pDfltColl = 0x50d000000048 ({
-        char *zName = 0x50d0000000c0 ("BINARY")
+    CollSeq *pDfltColl = 0x7cb7991e0048 ({
+        char *zName = 0x7cb7991e00c0 ("BINARY")
         u8 enc = 1
         void *pUser = NULL
-        int(void *, int, const void *, int, const void *) xCmp = 0x609a00a9f650 (int binCollFunc(void *NotUsed, int nKey1, const void *pKey1, int nKey2, const void *pKey2))
+        int(void *, int, const void *, int, const void *) xCmp = 0x558f462b58d0 (int binCollFunc(void *NotUsed, int nKey1, const void *pKey1, int nKey2, const void *pKey2))
         void(void *) xDel = NULL
     })
-    sqlite3_mutex *mutex = 0x504000000058 ({
+    sqlite3_mutex *mutex = 0x7c27991e0058 ({
         pthread_mutex_t mutex = <union> {
             __pthread_mutex_s __data = {
                 int __lock = 0
@@ -142,13 +142,13 @@ Sqlite's database: <#0> {
             long int __align = 0
         }
     })
-    Db *aDb = 0x518000000320 ({
-        char *zDbSName = 0x609a01023700 ("main")
-        Btree *pBt = 0x507000000028 (<#2> {
-            sqlite3 *db = 0x518000000088 (<points to #0>)
-            BtShared *pBt = 0x50e000000048 ({
-                Pager *pPager = 0x518000000488 ({
-                    sqlite3_vfs *pVfs = 0x609a01405d40 (<points to #1>)
+    Db *aDb = 0x7d67991e0320 ({
+        char *zDbSName = 0x558f4682c100 ("main")
+        Btree *pBt = 0x7c57991e0028 (<#2> {
+            sqlite3 *db = 0x7d67991e0088 (<points to #0>)
+            BtShared *pBt = 0x7cc7991e0048 ({
+                Pager *pPager = 0x7d67991e0488 ({
+                    sqlite3_vfs *pVfs = 0x558f46be8be0 (<points to #1>)
                     u8 exclusiveMode = 0
                     u8 journalMode = 0
                     u8 useJournal = 1
@@ -179,33 +179,33 @@ Sqlite's database: <#0> {
                     u32 cksumInit = 0
                     u32 nSubRec = 0
                     Bitvec *pInJournal = NULL
-                    sqlite3_file *fd = 0x518000000610 ({
-                        const sqlite3_io_methods *pMethods = 0x609a01077b80 ({
+                    sqlite3_file *fd = 0x7d67991e0610 ({
+                        const sqlite3_io_methods *pMethods = 0x558f4687ab80 ({
                             int iVersion = 3
-                            int(sqlite3_file *) xClose = 0x609a00bf0f50 (int unixClose(sqlite3_file *id))
-                            int(sqlite3_file *, void *, int, sqlite3_int64) xRead = 0x609a00a9d220 (int unixRead(sqlite3_file *id, void *pBuf, int amt, sqlite3_int64 offset))
-                            int(sqlite3_file *, const void *, int, sqlite3_int64) xWrite = 0x609a00ad3c50 (int unixWrite(sqlite3_file *id, const void *pBuf, int amt, sqlite3_int64 offset))
-                            int(sqlite3_file *, sqlite3_int64) xTruncate = 0x609a00bf2290 (int unixTruncate(sqlite3_file *id, i64 nByte))
-                            int(sqlite3_file *, int) xSync = 0x609a00bf2710 (int unixSync(sqlite3_file *id, int flags))
-                            int(sqlite3_file *, sqlite3_int64 *) xFileSize = 0x609a00a85710 (int unixFileSize(sqlite3_file *id, i64 *pSize))
-                            int(sqlite3_file *, int) xLock = 0x609a00b0f550 (int unixLock(sqlite3_file *id, int eFileLock))
-                            int(sqlite3_file *, int) xUnlock = 0x609a00befd70 (int unixUnlock(sqlite3_file *id, int eFileLock))
-                            int(sqlite3_file *, int *) xCheckReservedLock = 0x609a00a85b00 (int unixCheckReservedLock(sqlite3_file *id, int *pResOut))
-                            int(sqlite3_file *, int, void *) xFileControl = 0x609a00d0f4d0 (int unixFileControl(sqlite3_file *id, int op, void *pArg))
-                            int(sqlite3_file *) xSectorSize = 0x609a00a571a0 (int unixSectorSize(sqlite3_file *id))
-                            int(sqlite3_file *) xDeviceCharacteristics = 0x609a00a57210 (int unixDeviceCharacteristics(sqlite3_file *id))
-                            int(sqlite3_file *, int, int, int, volatile void **) xShmMap = 0x609a00d19d70 (int unixShmMap(sqlite3_file *fd, int iRegion, int szRegion, int bExtend, volatile void **pp))
-                            int(sqlite3_file *, int, int, int) xShmLock = 0x609a00a9daf0 (int unixShmLock(sqlite3_file *fd, int ofst, int n, int flags))
-                            void(sqlite3_file *) xShmBarrier = 0x609a00adcc80 (void unixShmBarrier(sqlite3_file *fd))
-                            int(sqlite3_file *, int) xShmUnmap = 0x609a00bf0770 (int unixShmUnmap(sqlite3_file *fd, int deleteFlag))
-                            int(sqlite3_file *, sqlite3_int64, int, void **) xFetch = 0x609a00bf3680 (int unixFetch(sqlite3_file *fd, i64 iOff, int nAmt, void **pp))
-                            int(sqlite3_file *, sqlite3_int64, void *) xUnfetch = 0x609a00a578b0 (int unixUnfetch(sqlite3_file *fd, i64 iOff, void *p))
+                            int(sqlite3_file *) xClose = 0x558f464125b0 (int unixClose(sqlite3_file *id))
+                            int(sqlite3_file *, void *, int, sqlite3_int64) xRead = 0x558f462b3250 (int unixRead(sqlite3_file *id, void *pBuf, int amt, sqlite3_int64 offset))
+                            int(sqlite3_file *, const void *, int, sqlite3_int64) xWrite = 0x558f462ea400 (int unixWrite(sqlite3_file *id, const void *pBuf, int amt, sqlite3_int64 offset))
+                            int(sqlite3_file *, sqlite3_int64) xTruncate = 0x558f46413980 (int unixTruncate(sqlite3_file *id, i64 nByte))
+                            int(sqlite3_file *, int) xSync = 0x558f46413e20 (int unixSync(sqlite3_file *id, int flags))
+                            int(sqlite3_file *, sqlite3_int64 *) xFileSize = 0x558f46299c60 (int unixFileSize(sqlite3_file *id, i64 *pSize))
+                            int(sqlite3_file *, int) xLock = 0x558f4632b4c0 (int unixLock(sqlite3_file *id, int eFileLock))
+                            int(sqlite3_file *, int) xUnlock = 0x558f46411480 (int unixUnlock(sqlite3_file *id, int eFileLock))
+                            int(sqlite3_file *, int *) xCheckReservedLock = 0x558f4629a050 (int unixCheckReservedLock(sqlite3_file *id, int *pResOut))
+                            int(sqlite3_file *, int, void *) xFileControl = 0x558f4652e780 (int unixFileControl(sqlite3_file *id, int op, void *pArg))
+                            int(sqlite3_file *) xSectorSize = 0x558f46263210 (int unixSectorSize(sqlite3_file *id))
+                            int(sqlite3_file *) xDeviceCharacteristics = 0x558f46263290 (int unixDeviceCharacteristics(sqlite3_file *id))
+                            int(sqlite3_file *, int, int, int, volatile void **) xShmMap = 0x558f46539810 (int unixShmMap(sqlite3_file *fd, int iRegion, int szRegion, int bExtend, volatile void **pp))
+                            int(sqlite3_file *, int, int, int) xShmLock = 0x558f462b3ae0 (int unixShmLock(sqlite3_file *fd, int ofst, int n, int flags))
+                            void(sqlite3_file *) xShmBarrier = 0x558f462f3c90 (void unixShmBarrier(sqlite3_file *fd))
+                            int(sqlite3_file *, int) xShmUnmap = 0x558f46411de0 (int unixShmUnmap(sqlite3_file *fd, int deleteFlag))
+                            int(sqlite3_file *, sqlite3_int64, int, void **) xFetch = 0x558f46414df0 (int unixFetch(sqlite3_file *fd, i64 iOff, int nAmt, void **pp))
+                            int(sqlite3_file *, sqlite3_int64, void *) xUnfetch = 0x558f46263a00 (int unixUnfetch(sqlite3_file *fd, i64 iOff, void *p))
                         })
                     })
-                    sqlite3_file *jfd = 0x518000000700 ({
+                    sqlite3_file *jfd = 0x7d67991e0700 ({
                         const sqlite3_io_methods *pMethods = NULL
                     })
-                    sqlite3_file *sjfd = 0x518000000688 ({
+                    sqlite3_file *sjfd = 0x7d67991e0688 ({
                         const sqlite3_io_methods *pMethods = NULL
                     })
                     i64 journalOff = 0
@@ -226,15 +226,15 @@ Sqlite's database: <#0> {
                     Pgno lckPgno = 262145
                     i64 pageSize = 4096
                     i64 journalSizeLimit = -1
-                    char *zFilename = 0x518000000784 ("/home/tx/projects/uprintf/test.db")
-                    char *zJournal = 0x5180000007a7 ("/home/tx/projects/uprintf/test.db-journal")
-                    int(void *) xBusyHandler = 0x609a00a7bc50 (int btreeInvokeBusyHandler(void *pArg))
-                    void *pBusyHandlerArg = 0x50e000000048
+                    char *zFilename = 0x7d67991e0784 ("/projects/uprintf/test.db")
+                    char *zJournal = 0x7d67991e07a7 ("/projects/uprintf/test.db-journal")
+                    int(void *) xBusyHandler = 0x558f4628e8a0 (int btreeInvokeBusyHandler(void *pArg))
+                    void *pBusyHandlerArg = 0x7cc7991e0048
                     u32[] aStat = [0 <repeats 4 times>]
-                    void(DbPage *) xReiniter = 0x609a00be5050 (void pageReinit(DbPage *pData))
-                    int(Pager *, Pgno, DbPage **, int) xGet = 0x609a00cb0190 (int getPageNormal(Pager *pPager, Pgno pgno, DbPage **ppPage, int flags))
-                    char *pTmpSpace = 0x521000000108 ("¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾¾"...)
-                    PCache *pPCache = 0x5180000005c0 ({
+                    void(DbPage *) xReiniter = 0x558f46406680 (void pageReinit(DbPage *pData))
+                    int(Pager *, Pgno, DbPage **, int) xGet = 0x558f464cfd90 (int getPageNormal(Pager *pPager, Pgno pgno, DbPage **ppPage, int flags))
+                    char *pTmpSpace = 0x7df7991e0108 ("ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½"...)
+                    PCache *pPCache = 0x7d67991e05c0 ({
                         PgHdr *pDirty = NULL
                         PgHdr *pDirtyTail = NULL
                         PgHdr *pSynced = NULL
@@ -245,14 +245,14 @@ Sqlite's database: <#0> {
                         int szExtra = 136
                         u8 bPurgeable = 1
                         u8 eCreate = 2
-                        int(void *, PgHdr *) xStress = 0x609a00d303e0 (int pagerStress(void *p, PgHdr *pPg))
-                        void *pStress = 0x518000000488
-                        sqlite3_pcache *pCache = 0x50f000000048 ({})
+                        int(void *, PgHdr *) xStress = 0x558f465502b0 (int pagerStress(void *p, PgHdr *pPg))
+                        void *pStress = 0x7d67991e0488
+                        sqlite3_pcache *pCache = 0x7cd7991e0048 ({})
                     })
                     Wal *pWal = NULL
-                    char *zWal = 0x5180000007d1 ("/home/tx/projects/uprintf/test.db-wal")
+                    char *zWal = 0x7d67991e07d1 ("/projects/uprintf/test.db-wal")
                 })
-                sqlite3 *db = 0x518000000088 (<points to #0>)
+                sqlite3 *db = 0x7d67991e0088 (<points to #0>)
                 BtCursor *pCursor = NULL
                 MemPage *pPage1 = NULL
                 u8 openFlags = 0
@@ -262,7 +262,7 @@ Sqlite's database: <#0> {
                 u8 inTransaction = 0
                 u8 max1bytePayload = 0
                 u8 nReserveWanted = 0
-                u16 btsFlags = 0
+                u16 btsFlags = 2
                 u16 maxLocal = 0
                 u16 minLocal = 0
                 u16 maxLeaf = 0
@@ -271,8 +271,8 @@ Sqlite's database: <#0> {
                 u32 usableSize = 4096
                 int nTransaction = 0
                 u32 nPage = 0
-                void *pSchema = 0x50c000000048
-                void(void *) xFreeSchema = 0x609a00aee880 (void sqlite3SchemaClear(void *p))
+                void *pSchema = 0x7ca7991e0048
+                void(void *) xFreeSchema = 0x558f46307070 (void sqlite3SchemaClear(void *p))
                 sqlite3_mutex *mutex = NULL
                 Bitvec *pHasContent = NULL
                 int nRef = 1
@@ -292,7 +292,7 @@ Sqlite's database: <#0> {
             Btree *pNext = NULL
             Btree *pPrev = NULL
             BtLock lock = {
-                Btree *pBtree = 0x507000000028 (<points to #2>)
+                Btree *pBtree = 0x7c57991e0028 (<points to #2>)
                 Pgno iTable = 1
                 u8 eLock = 0
                 BtLock *pNext = NULL
@@ -300,7 +300,7 @@ Sqlite's database: <#0> {
         })
         u8 safety_level = 3
         u8 bSyncSet = 0
-        Schema *pSchema = 0x50c000000048 ({
+        Schema *pSchema = 0x7ca7991e0048 ({
             int schema_cookie = 0
             int iGeneration = 0
             Hash tblHash = {
@@ -372,7 +372,7 @@ Sqlite's database: <#0> {
         unsigned int orphanTrigger = 0 <1 bit>
         unsigned int imposterTable = 0 <1 bit>
         unsigned int reopenMemdb = 0 <1 bit>
-        const char **azInit = 0x609a01408440
+        const char **azInit = 0x558f46beb260
     }
     int nVdbeActive = 0
     int nVdbeRead = 0
@@ -398,7 +398,7 @@ Sqlite's database: <#0> {
     void(void *) xAutovacDestr = NULL
     unsigned int(void *, const char *, u32, u32, u32) xAutovacPages = NULL
     Parse *pParse = NULL
-    int(void *, sqlite3 *, const char *, int) xWalCallback = 0x609a00f0def0 (int sqlite3WalDefaultHook(void *pClientData, sqlite3 *db, const char *zDb, int nFrame))
+    int(void *, sqlite3 *, const char *, int) xWalCallback = 0x558f46723900 (int sqlite3WalDefaultHook(void *pClientData, sqlite3 *db, const char *zDb, int nFrame))
     void *pWalArg = 0x3e8
     void(void *, sqlite3 *, int, const char *) xCollNeeded = NULL
     void(void *, sqlite3 *, int, const void *) xCollNeeded16 = NULL
@@ -415,15 +415,15 @@ Sqlite's database: <#0> {
         u8 bMalloced = 1
         u32 nSlot = 123
         u32[] anStat = [0, 0, 0]
-        LookasideSlot *pInit = 0x52e000008bf8 ({
-            LookasideSlot *pNext = 0x52e000008748 ({
-                LookasideSlot *pNext = 0x52e000008298 ({
-                    LookasideSlot *pNext = 0x52e000007de8 ({
-                        LookasideSlot *pNext = 0x52e000007938 ({
-                            LookasideSlot *pNext = 0x52e000007488 ({
-                                LookasideSlot *pNext = 0x52e000006fd8 ({
-                                    LookasideSlot *pNext = 0x52e000006b28 ({
-                                        LookasideSlot *pNext = 0x52e000006678 ({...})
+        LookasideSlot *pInit = 0x7ec7991e8bf8 ({
+            LookasideSlot *pNext = 0x7ec7991e8748 ({
+                LookasideSlot *pNext = 0x7ec7991e8298 ({
+                    LookasideSlot *pNext = 0x7ec7991e7de8 ({
+                        LookasideSlot *pNext = 0x7ec7991e7938 ({
+                            LookasideSlot *pNext = 0x7ec7991e7488 ({
+                                LookasideSlot *pNext = 0x7ec7991e6fd8 ({
+                                    LookasideSlot *pNext = 0x7ec7991e6b28 ({
+                                        LookasideSlot *pNext = 0x7ec7991e6678 ({...})
                                     })
                                 })
                             })
@@ -433,15 +433,15 @@ Sqlite's database: <#0> {
             })
         })
         LookasideSlot *pFree = NULL
-        LookasideSlot *pSmallInit = 0x52e00000bea8 ({
-            LookasideSlot *pNext = 0x52e00000be28 ({
-                LookasideSlot *pNext = 0x52e00000bda8 ({
-                    LookasideSlot *pNext = 0x52e00000bd28 ({
-                        LookasideSlot *pNext = 0x52e00000bca8 ({
-                            LookasideSlot *pNext = 0x52e00000bc28 ({
-                                LookasideSlot *pNext = 0x52e00000bba8 ({
-                                    LookasideSlot *pNext = 0x52e00000bb28 ({
-                                        LookasideSlot *pNext = 0x52e00000baa8 ({...})
+        LookasideSlot *pSmallInit = 0x7ec7991ebea8 ({
+            LookasideSlot *pNext = 0x7ec7991ebe28 ({
+                LookasideSlot *pNext = 0x7ec7991ebda8 ({
+                    LookasideSlot *pNext = 0x7ec7991ebd28 ({
+                        LookasideSlot *pNext = 0x7ec7991ebca8 ({
+                            LookasideSlot *pNext = 0x7ec7991ebc28 ({
+                                LookasideSlot *pNext = 0x7ec7991ebba8 ({
+                                    LookasideSlot *pNext = 0x7ec7991ebb28 ({
+                                        LookasideSlot *pNext = 0x7ec7991ebaa8 ({...})
                                     })
                                 })
                             })
@@ -451,10 +451,10 @@ Sqlite's database: <#0> {
             })
         })
         LookasideSlot *pSmallFree = NULL
-        void *pMiddle = 0x52e0000090a8
-        void *pStart = 0x52e000000408
-        void *pEnd = 0x52e00000bf28
-        void *pTrueEnd = 0x52e00000bf28
+        void *pMiddle = 0x7ec7991e90a8
+        void *pStart = 0x7ec7991e0408
+        void *pEnd = 0x7ec7991ebf28
+        void *pTrueEnd = 0x7ec7991ebf28
     }
     int(void *, int, const char *, const char *, const char *, const char *) xAuth = NULL
     void *pAuthArg = NULL
@@ -465,16 +465,16 @@ Sqlite's database: <#0> {
     Hash aModule = {
         unsigned int htsize = 0
         unsigned int count = 2
-        HashElem *first = 0x504000000218 (<#3> {
-            HashElem *next = 0x5040000001d8 ({
+        HashElem *first = 0x7c27991e0218 (<#3> {
+            HashElem *next = 0x7c27991e01d8 ({
                 HashElem *next = NULL
-                HashElem *prev = 0x504000000218 (<points to #3>)
-                void *data = 0x507000000098
-                const char *pKey = 0x5070000000c8 ("json_each")
+                HashElem *prev = 0x7c27991e0218 (<points to #3>)
+                void *data = 0x7c57991e0098
+                const char *pKey = 0x7c57991e00c8 ("json_each")
             })
             HashElem *prev = NULL
-            void *data = 0x507000000108
-            const char *pKey = 0x507000000138 ("json_tree")
+            void *data = 0x7c57991e0108
+            const char *pKey = 0x7c57991e0138 ("json_tree")
         })
         _ht *ht = NULL
     }
@@ -484,32 +484,32 @@ Sqlite's database: <#0> {
     Hash aFunc = {
         unsigned int htsize = 0
         unsigned int count = 1
-        HashElem *first = 0x504000000198 ({
+        HashElem *first = 0x7c27991e0198 ({
             HashElem *next = NULL
             HashElem *prev = NULL
-            void *data = 0x5080000000a8
-            const char *pKey = 0x5080000000f0 ("match")
+            void *data = 0x7c67991e00a8
+            const char *pKey = 0x7c67991e00f0 ("match")
         })
         _ht *ht = NULL
     }
     Hash aCollSeq = {
         unsigned int htsize = 0
         unsigned int count = 3
-        HashElem *first = 0x504000000118 (<#4> {
-            HashElem *next = 0x5040000000d8 (<#5> {
-                HashElem *next = 0x504000000098 ({
+        HashElem *first = 0x7c27991e0118 (<#4> {
+            HashElem *next = 0x7c27991e00d8 (<#5> {
+                HashElem *next = 0x7c27991e0098 ({
                     HashElem *next = NULL
-                    HashElem *prev = 0x5040000000d8 (<points to #5>)
-                    void *data = 0x50d000000048
-                    const char *pKey = 0x50d0000000c0 ("BINARY")
+                    HashElem *prev = 0x7c27991e00d8 (<points to #5>)
+                    void *data = 0x7cb7991e0048
+                    const char *pKey = 0x7cb7991e00c0 ("BINARY")
                 })
-                HashElem *prev = 0x504000000118 (<points to #4>)
-                void *data = 0x50d000000118
-                const char *pKey = 0x50d000000190 ("NOCASE")
+                HashElem *prev = 0x7c27991e0118 (<points to #4>)
+                void *data = 0x7cb7991e0118
+                const char *pKey = 0x7cb7991e0190 ("NOCASE")
             })
             HashElem *prev = NULL
-            void *data = 0x50d0000001e8
-            const char *pKey = 0x50d000000260 ("RTRIM")
+            void *data = 0x7cb7991e01e8
+            const char *pKey = 0x7cb7991e0260 ("RTRIM")
         })
         _ht *ht = NULL
     }
@@ -520,11 +520,11 @@ Sqlite's database: <#0> {
     }
     Db[] aDbStatic = [
         {
-            char *zDbSName = 0x609a01023700 ("main")
-            Btree *pBt = 0x507000000028 (<points to #2>)
+            char *zDbSName = 0x558f4682c100 ("main")
+            Btree *pBt = 0x7c57991e0028 (<points to #2>)
             u8 safety_level = 3
             u8 bSyncSet = 0
-            Schema *pSchema = 0x50c000000048 ({
+            Schema *pSchema = 0x7ca7991e0048 ({
                 int schema_cookie = 0
                 int iGeneration = 0
                 Hash tblHash = {
@@ -559,11 +559,11 @@ Sqlite's database: <#0> {
             })
         },
         {
-            char *zDbSName = 0x609a01024d40 ("temp")
+            char *zDbSName = 0x558f4682d7a0 ("temp")
             Btree *pBt = NULL
             u8 safety_level = 1
             u8 bSyncSet = 0
-            Schema *pSchema = 0x50c000000108 ({
+            Schema *pSchema = 0x7ca7991e0108 ({
                 int schema_cookie = 0
                 int iGeneration = 0
                 Hash tblHash = {
