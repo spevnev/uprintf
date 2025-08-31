@@ -213,6 +213,7 @@ int dl_iterate_phdr(int (*callback)(struct dl_phdr_info *info, size_t size, void
 #define DW_AT_abstract_origin 0x31
 #define DW_AT_count 0x37
 #define DW_AT_data_member_location 0x38
+#define DW_AT_declaration 0x3c
 #define DW_AT_encoding 0x3e
 #define DW_AT_type 0x49
 #define DW_AT_ranges 0x55
@@ -424,6 +425,7 @@ struct _upf_type {
     size_t size;
     union {
         struct {
+            bool is_declaration;
             _upf_member_vec members;
         } cstruct;
         struct {
@@ -1067,6 +1069,12 @@ static uint64_t _upf_get_addr(const _upf_cu *cu, const uint8_t *die, uint64_t fo
     _UPF_ERROR("Invalid DWARF address type(form): %lu.", form);
 }
 
+static bool _upf_get_flag(const uint8_t *die, uint64_t form) {
+    if (form == DW_FORM_flag_present) return true;
+    if (form == DW_FORM_flag) return *die;
+    _UPF_ERROR("Invalid DWARF flag type(form): %lu.", form);
+}
+
 static const uint8_t *_upf_skip_die(const uint8_t *die, const _upf_abbrev *abbrev) {
     _UPF_ASSERT(die != NULL && abbrev != NULL);
 
@@ -1343,6 +1351,7 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
     uint64_t subtype_offset = UINT64_MAX;
     size_t size = UINT64_MAX;
     int64_t encoding = 0;
+    bool is_declaration = false;
     for (uint32_t i = 0; i < abbrev->attrs.length; i++) {
         _upf_attr attr = abbrev->attrs.data[i];
 
@@ -1358,6 +1367,8 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
             }
         } else if (attr.name == DW_AT_encoding) {
             encoding = _upf_get_data(die, attr);
+        } else if (attr.name == DW_AT_declaration) {
+            is_declaration = _upf_get_flag(die, attr.form);
         }
         die += _upf_get_attr_size(die, attr.form);
     }
@@ -1504,6 +1515,9 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                 .name = name ? name : (is_struct ? "struct" : "union"),
                 .kind = is_struct ? _UPF_TK_STRUCT : _UPF_TK_UNION,
                 .size = size,
+                .as.cstruct = {
+                    .is_declaration = is_declaration,
+                },
             };
 
             if (!abbrev->has_children) return _upf_add_type(die_base, type);
@@ -3222,6 +3236,7 @@ static void _upf_print_type(_upf_indexed_struct_vec *circular, const uint8_t *da
 
             if (members.length == 0) {
                 _upf_bprintf("{}");
+                if (type->as.cstruct.is_declaration) _upf_bprintf(" <opaque>");
                 return;
             }
 
