@@ -1,6 +1,6 @@
 # Universal printf
 
-*uprintf* is a header-only library for printing anything in C.
+*uprintf* is a header-only library for printing any type in C.
 
 ## Examples
 
@@ -51,12 +51,12 @@ Examples and their outputs can be found in [examples](examples), and can be buil
 
 1. [Download](https://raw.githubusercontent.com/spevnev/uprintf/refs/heads/main/uprintf.h) the library, or clone the repo
 
-2. Define `UPRINTF_IMPLEMENTATION` in *one* of the files:
+2. Define `UPRINTF_IMPLEMENTATION` in one of the files:
     ```c
     #define UPRINTF_IMPLEMENTATION
     #include "uprintf.h"
     ```
-    The implementation must be included in only one of the files. \
+    The implementation must be included in **only one** of the files. \
     A rarely modified file should be used because it increases the build time. \
     [Options](#options) can be defined before the implementation.
 
@@ -68,7 +68,7 @@ Examples and their outputs can be found in [examples](examples), and can be buil
 
 ### Options
 
-Options must be defined *before the implementation*:
+Options must be defined **before** the implementation:
 
 ```c
 #define OPTION_NAME VALUE

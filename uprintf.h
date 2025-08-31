@@ -533,6 +533,8 @@ typedef enum {
     _UPF_TOK_TYPE_QUALIFIER,
     _UPF_TOK_ATOMIC,
     _UPF_TOK_GENERIC,
+    _UPF_TOK_SIZEOF,
+    _UPF_TOK_ALIGNOF,
     _UPF_TOK_OPEN_PAREN,
     _UPF_TOK_CLOSE_PAREN,
     _UPF_TOK_OPEN_BRACKET,
@@ -2356,6 +2358,9 @@ static void _upf_tokenize(const char *string) {
         {_UPF_TOK_TYPE_QUALIFIER, "restrict"},
         {_UPF_TOK_ATOMIC, "_Atomic"},
         {_UPF_TOK_GENERIC, "_Generic"},
+        {_UPF_TOK_SIZEOF, "sizeof"},
+        {_UPF_TOK_ALIGNOF, "_Alignof"},
+        {_UPF_TOK_ALIGNOF, "alignof"},
     };
 
     const char *ch = string;
@@ -2722,6 +2727,22 @@ static _upf_type *_upf_identifier(void) {
 
 static _upf_type *_upf_generic(void) { _UPF_ERROR("Generics are not supported at %s:%d.", _upf_state.file_path, _upf_state.line); }
 
+static _upf_type *_upf_sizeof(void) {
+    _upf_consume_token();
+    if (_upf_match_token(_UPF_TOK_OPEN_PAREN)) {
+        _upf_consume_parens(_UPF_TOK_OPEN_PAREN, _UPF_TOK_CLOSE_PAREN);
+    } else {
+        _upf_parse(_UPF_PREC_UNARY);
+    }
+    return _upf_get_number_type();
+}
+
+static _upf_type *_upf_alignof(void) {
+    _upf_consume_token();
+    _upf_consume_parens(_UPF_TOK_OPEN_PAREN, _UPF_TOK_CLOSE_PAREN);
+    return _upf_get_number_type();
+}
+
 static _upf_type *_upf_unary(void) {
     _upf_token unop = _upf_consume_token();
     _upf_type *type = _upf_parse(_UPF_PREC_UNARY);
@@ -2849,6 +2870,8 @@ static const _upf_parse_rule _upf_parse_rules[_UPF_TOK_COUNT] = {
     [_UPF_TOK_STRING]       = { _upf_string,      NULL,            _UPF_PREC_NONE       },
     [_UPF_TOK_IDENTIFIER]   = { _upf_identifier,  NULL,            _UPF_PREC_NONE       },
     [_UPF_TOK_GENERIC]      = { _upf_generic,     NULL,            _UPF_PREC_NONE       },
+    [_UPF_TOK_SIZEOF]       = { _upf_sizeof,      NULL,            _UPF_PREC_NONE       },
+    [_UPF_TOK_ALIGNOF]      = { _upf_alignof,     NULL,            _UPF_PREC_NONE       },
     [_UPF_TOK_UNARY]        = { _upf_unary,       NULL,            _UPF_PREC_NONE       },
     [_UPF_TOK_OPEN_PAREN]   = { _upf_paren,       _upf_call,       _UPF_PREC_POSTFIX    },
     [_UPF_TOK_OPEN_BRACKET] = { NULL,             _upf_index,      _UPF_PREC_POSTFIX    },
