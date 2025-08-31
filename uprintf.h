@@ -2516,6 +2516,44 @@ static _upf_type *_upf_parse(_upf_parse_precedence precedence);
 
 static _upf_type *_upf_parse_expression(void) { return _upf_parse(_UPF_PREC_ASSIGNMENT); }
 
+static int _upf_parse_abstract_declarator(_upf_type **function_type, _upf_type ***function_return_type) {
+    _UPF_ASSERT(function_type != NULL && function_return_type != NULL);
+
+    int pointers = 0;
+    while (_upf_match_token(_UPF_TOK_STAR)) {
+        pointers++;
+        while (_upf_match_token(_UPF_TOK_TYPE_QUALIFIER)) continue;
+    }
+
+    if (!_upf_match_token(_UPF_TOK_OPEN_PAREN)) return pointers;
+    int sub_pointers = _upf_parse_abstract_declarator(function_type, function_return_type);
+    _upf_expect_token(_UPF_TOK_CLOSE_PAREN);
+
+    if (!_upf_match_token(_UPF_TOK_OPEN_PAREN)) return pointers + sub_pointers;
+    _upf_consume_parens(_UPF_TOK_OPEN_PAREN, _UPF_TOK_CLOSE_PAREN);
+
+    _UPF_ASSERT(sub_pointers > 0);
+    sub_pointers--;
+
+    _upf_type *current_function_type = _upf_add_type(NULL, (_upf_type) {
+                                                               .kind = _UPF_TK_FUNCTION,
+                                                               .size = sizeof(void *),
+                                                           });
+    _upf_type **current_function_return_type = &current_function_type->as.function.return_type;
+
+    while (sub_pointers-- > 0) current_function_type = _upf_get_pointer_to_type(current_function_type);
+
+    if (*function_type == NULL) {
+        *function_type = current_function_type;
+    } else {
+        _UPF_ASSERT(*function_return_type != NULL);
+        **function_return_type = current_function_type;
+    }
+
+    *function_return_type = current_function_return_type;
+    return pointers;
+}
+
 static _upf_type *_upf_parse_typename(void) {
     const char *type_specifiers[4];
     size_t type_specifiers_idx = 0;
@@ -2560,29 +2598,9 @@ static _upf_type *_upf_parse_typename(void) {
         }
     }
 
-    int pointer = 0;
-    while (_upf_match_token(_UPF_TOK_STAR)) {
-        pointer++;
-        while (_upf_match_token(_UPF_TOK_TYPE_QUALIFIER)) continue;
-    }
-
-    bool parsed_declarator = false;
-    while (!parsed_declarator) {
-        switch (_upf_peek_token().kind) {
-            case _UPF_TOK_OPEN_PAREN:
-                // TODO:
-                _UPF_ERROR("TODO");
-                break;
-            case _UPF_TOK_OPEN_BRACKET:
-                _upf_consume_token();
-                while (!_upf_match_token(_UPF_TOK_CLOSE_BRACKET)) _upf_consume_token();
-                pointer++;
-                break;
-            default:
-                parsed_declarator = true;
-                break;
-        }
-    }
+    _upf_type *function_type = NULL;
+    _upf_type **function_return_type = NULL;
+    int pointers = _upf_parse_abstract_declarator(&function_type, &function_return_type);
 
     _upf_type *type_ptr;
     if (identifier != NULL) {
@@ -2670,9 +2688,14 @@ static _upf_type *_upf_parse_typename(void) {
     }
 
     _UPF_ASSERT(type_ptr != NULL);
-    while (pointer > 0) {
+    while (pointers > 0) {
         type_ptr = _upf_get_pointer_to_type(type_ptr);
-        pointer--;
+        pointers--;
+    }
+
+    if (function_type != NULL) {
+        *function_return_type = type_ptr;
+        type_ptr = function_type;
     }
 
     return type_ptr;

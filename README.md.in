@@ -86,11 +86,6 @@ macro |  description | default
 
 ## Limitations
 
-- Casting to a function pointer:
-    ```c
-    uprintf("%S\n", (void (*)(void)) whatever);
-    ```
-
 - Incorrect type deduction when printing variables that get shadowed *later* in the same scope.
     ```c
     char var = 'c';

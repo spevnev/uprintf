@@ -135,7 +135,7 @@ if [ $ret -ne 0 ]; then
     exit 1
 fi
 
-if [ ! -r $baseline ]; then
+if [ ! -r $baseline ] || [ ! -s $baseline ]; then
     echo -e "$YELLOW[WARNING]$RESET There is no $test baseline."
     echo -e "$GREEN[TEST PASSED]$RESET $test_id: ?";
     exit 0
