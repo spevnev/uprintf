@@ -245,9 +245,9 @@ Sqlite's database: <#0> {
                         int szExtra = 136
                         u8 bPurgeable = 1
                         u8 eCreate = 2
-                        int(void *, PgHdr *) xStress = 0x558f465502b0 (int pagerStress(void *p, PgHdr *pPg))
-                        void *pStress = 0x7d67991e0488
-                        sqlite3_pcache *pCache = 0x7cd7991e0048 ({})
+                        int(void *, PgHdr *) xStress = 0x55eab364a590 (int pagerStress(void *p, PgHdr *pPg))
+                        void *pStress = 0x7d46b89e0488
+                        sqlite3_pcache *pCache = 0x7cb6b89e0048 ({} <opaque>)
                     })
                     Wal *pWal = NULL
                     char *zWal = 0x7d67991e07d1 ("/projects/uprintf/test.db-wal")

@@ -1,6 +1,6 @@
 # Universal printf
 
-*uprintf* is a header-only library for printing any type in C.
+*uprintf* is a header-only library for printing anything in C.
 
 ## Examples
 
@@ -64,7 +64,8 @@ Examples and their outputs can be found in [examples](examples), and can be buil
     ```c
     uprintf(fmt, ...);
     ```
-    `fmt` - a format string with placeholders (`%` followed by a letter, placeholder can be anything, e.g. examples use `%S`). Use `%%` to print `%`.
+    `fmt` - a format string with placeholders (`%` followed by any letter). Use `%%` to print `%`. \
+    For every placeholder, there must be an argument which is a **pointer** to the data that should be printed.
 
 ### Options
 
@@ -76,7 +77,7 @@ Options must be defined **before** the implementation:
 #include "uprintf.h"
 ```
 
-macro |  description | default
+option | description | default
 -|-|-
 `UPRINTF_INDENTATION_WIDTH` | The number of spaces to use for indentation | 4
 `UPRINTF_MAX_DEPTH` | Limits the nesting depth of structures. Negative values remove the limit | 10
@@ -115,7 +116,7 @@ On initialization:
 On each invokation:
 1. Find scopes based on the PC.
 2. Parse the arguments string.
-3. Find types of argument in the current scope.
+3. Find types of arguments in the current scope.
 4. Print data using type definition.
 
 ## Testing

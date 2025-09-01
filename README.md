@@ -361,9 +361,9 @@ Sqlite's database: <#0> {
                         int szExtra = 136
                         u8 bPurgeable = 1
                         u8 eCreate = 2
-                        int(void *, PgHdr *) xStress = 0x558f465502b0 (int pagerStress(void *p, PgHdr *pPg))
-                        void *pStress = 0x7d67991e0488
-                        sqlite3_pcache *pCache = 0x7cd7991e0048 ({})
+                        int(void *, PgHdr *) xStress = 0x55eab364a590 (int pagerStress(void *p, PgHdr *pPg))
+                        void *pStress = 0x7d46b89e0488
+                        sqlite3_pcache *pCache = 0x7cb6b89e0048 ({} <opaque>)
                     })
                     Wal *pWal = NULL
                     char *zWal = 0x7d67991e07d1 ("/projects/uprintf/test.db-wal")
@@ -1032,7 +1032,7 @@ uprintf's state: {
                         }
                     }
                     struct array = {
-                        _upf_type *element_type = 0x7f91c9465230 (<points to #0>)
+                        _upf_type *element_type = 0x7f34ffea18d8 (<points to #0>)
                         _upf_size_t_vec lengths = {
                             uint32_t capacity = 0
                             uint32_t length = 0
@@ -1040,10 +1040,10 @@ uprintf's state: {
                         }
                     }
                     struct pointer = {
-                        _upf_type *type = 0x7f91c9465230 (<points to #0>)
+                        _upf_type *type = 0x7f34ffea18d8 (<points to #0>)
                     }
                     struct function = {
-                        _upf_type *return_type = 0x7f91c9465230 (<points to #0>)
+                        _upf_type *return_type = 0x7f34ffea18d8 (<points to #0>)
                         _upf_type_ptr_vec arg_types = {
                             uint32_t capacity = 0
                             uint32_t length = 0
@@ -1054,38 +1054,43 @@ uprintf's state: {
             })
         })
     }
+    _upf_type_vec types = {
+        uint32_t capacity = 4
+        uint32_t length = 1
+        _upf_type **data = 0x7f34ffea72a0
+    }
     _upf_cu_vec cus = {
         uint32_t capacity = 4
         uint32_t length = 1
-        _upf_cu *data = 0x7f91c9463b80 (<#1> {
-            const uint8_t *base = 0x7f91c899425b (67)
+        _upf_cu *data = 0x7f34ffea0218 (<#1> {
+            const uint8_t *base = 0x7f34fec0611b (190)
             _upf_scope scope = {
                 _upf_range_vec ranges = {
                     uint32_t capacity = 16
                     uint32_t length = 12
-                    _upf_range *data = 0x7ea1c77fd780 ({
-                        uint64_t start = 357376
-                        uint64_t end = 534429
+                    _upf_range *data = 0x7e44fe1fd6d8 ({
+                        uint64_t start = 333360
+                        uint64_t end = 502059
                     })
                 }
                 _upf_named_type_vec vars = {
                     uint32_t capacity = 8
                     uint32_t length = 6
-                    _upf_named_type *data = 0x7ea1c77fe8c0 ({
-                        const uint8_t *die = 0x7f91c8994298 (78)
-                        const char *name = 0x7f91c89e2a21 ("_upf_test_status")
+                    _upf_named_type *data = 0x7e44fe1fe818 ({
+                        const uint8_t *die = 0x7f34fec06158 (77)
+                        const char *name = 0x7f34fec52840 ("_upf_test_status")
                     })
                 }
                 _upf_scope_vec scopes = {
-                    uint32_t capacity = 64
-                    uint32_t length = 62
-                    _upf_scope *data = 0x7f91c9455000 ({
+                    uint32_t capacity = 128
+                    uint32_t length = 65
+                    _upf_scope *data = 0x7f34ffe9e858 ({
                         _upf_range_vec ranges = {
                             uint32_t capacity = 4
                             uint32_t length = 1
-                            _upf_range *data = 0x7ea1c77ffbc0 ({
-                                uint64_t start = 357008
-                                uint64_t end = 357060
+                            _upf_range *data = 0x7e44fe1ffb18 ({
+                                uint64_t start = 332992
+                                uint64_t end = 333044
                             })
                         }
                         _upf_named_type_vec vars = {
@@ -1106,15 +1111,15 @@ uprintf's state: {
             uint64_t rnglists_base = 18446744073709551615
             _upf_abbrev_vec abbrevs = {
                 uint32_t capacity = 128
-                uint32_t length = 103
-                _upf_abbrev *data = 0x7ea1c77f9b00 ({
+                uint32_t length = 101
+                _upf_abbrev *data = 0x7e44fe1f9998 ({
                     uint64_t code = 1
                     uint64_t tag = 73
                     _Bool has_children = false
                     _upf_attr_vec attrs = {
                         uint32_t capacity = 4
                         uint32_t length = 2
-                        _upf_attr *data = 0x7ea1c77f49c0 ({
+                        _upf_attr *data = 0x7e44fe1f49d8 ({
                             uint64_t name = 2
                             uint64_t form = 24
                             int64_t implicit_const = 0
@@ -1125,22 +1130,22 @@ uprintf's state: {
             _upf_named_type_vec types = {
                 uint32_t capacity = 128
                 uint32_t length = 123
-                _upf_named_type *data = 0x7ea1c77fe0c0 ({
-                    const uint8_t *die = 0x7f91c8994285 (34)
-                    const char *name = 0x7f91c89e3393 ("long unsigned int")
+                _upf_named_type *data = 0x7e44fe1fe018 ({
+                    const uint8_t *die = 0x7f34fec06145 (34)
+                    const char *name = 0x7f34fec531a4 ("long unsigned int")
                 })
             }
             _upf_function_vec functions = {
                 uint32_t capacity = 256
-                uint32_t length = 167
-                _upf_function *data = 0x7f91c945f6c0 ({
-                    const char *name = 0x7f91c89e3278 ("strncmp")
-                    const uint8_t *return_type_die = 0x7f91c8994298 (78)
+                uint32_t length = 169
+                _upf_function *data = 0x7f34ffe9a6d8 ({
+                    const char *name = 0x7f34fec53010 ("strncmp")
+                    const uint8_t *return_type_die = 0x7f34fec06158 (77)
                     _upf_named_type_vec args = {
                         uint32_t capacity = 4
                         uint32_t length = 3
-                        _upf_named_type *data = 0x7ea1c77fe940 ({
-                            const uint8_t *die = 0x7f91c89942b2 (15)
+                        _upf_named_type *data = 0x7e44fe1fe898 ({
+                            const uint8_t *die = 0x7f34fec06172 (13)
                             const char *name = NULL
                         })
                     }
@@ -1153,46 +1158,46 @@ uprintf's state: {
     _upf_extern_function_vec extern_functions = {
         uint32_t capacity = 16
         uint32_t length = 9
-        _upf_extern_function *data = 0x7ea1c77f48c0 ({
-            const char *name = 0x5573c3030ad6 ("__asan_init")
-            uint64_t pc = 140264126743472
+        _upf_extern_function *data = 0x7e44fe1f48d8 ({
+            const char *name = 0x564bed9dbad6 ("__asan_init")
+            uint64_t pc = 139865611240368
         })
     }
     int circular_id = 2
     _upf_range_vec addresses = {
         uint32_t capacity = 128
-        uint32_t length = 84
-        _upf_range *data = 0x7f91c9464540 ({
+        uint32_t length = 85
+        _upf_range *data = 0x7f34ffea0bd8 ({
             uint64_t start = 2147446784
             uint64_t end = 2415882240
         })
     }
-    char *buffer = 0x7e21c77e0200 (<out-of-bounds>)
-    int size = 16384
-    char *ptr = 0x7e21c77e2aa6 (<out-of-bounds>)
-    int free = 5930
+    char *buffer = 0x7dc4fe1e0200 (<out-of-bounds>)
+    char *ptr = 0x7dc4fe1e2ad5 (<out-of-bounds>)
+    uint32_t size = 16384
+    uint32_t free = 5852
     jmp_buf jmp_buf = [
         {
-            __jmp_buf __jmpbuf = [0, -5632166102439442772, 140735390699128, 1, 5, 1, -5632166102246504788, -1959623151220046164]
+            __jmp_buf __jmpbuf = [0, -3760453226303410042, 140734485823144, 1, 5, 1, -3760453226114666362, -7441794944332025722]
             int __mask_was_saved = 0
             __sigset_t __saved_mask = {
                 long unsigned int[] __val = [0 <repeats 16 times>]
             }
         }
     ]
-    const char *file_path = 0x5573c30b7de0 ("examples/uprintf.c")
+    const char *file_path = 0x564beda5aec0 ("examples/uprintf.c")
     int line = 5
     _upf_token_vec tokens = {
         uint32_t capacity = 4
         uint32_t length = 2
-        _upf_token *data = 0x7f91c9464d70 ({
-            _upf_token_kind kind = _UPF_TOK_AMPERSAND (26)
-            const char *string = 0x5573c30b83e0 ("&")
+        _upf_token *data = 0x7f34ffea1408 ({
+            _upf_token_type type = _UPF_TT_AMPERSAND (28)
+            const char *string = 0x564beda5b4c0 ("&")
         })
     }
     size_t tokens_idx = 2
-    uint64_t current_pc = 357052
-    _upf_cu *current_cu = 0x7f91c9463b80 (<points to #1>)
+    uint64_t current_pc = 333036
+    _upf_cu *current_cu = 0x7f34ffea0218 (<points to #1>)
 }
 ```
 </details>
@@ -1208,12 +1213,12 @@ uprintf's state: {
 
 1. [Download](https://raw.githubusercontent.com/spevnev/uprintf/refs/heads/main/uprintf.h) the library, or clone the repo
 
-2. Define `UPRINTF_IMPLEMENTATION` in *one* of the files:
+2. Define `UPRINTF_IMPLEMENTATION` in one of the files:
     ```c
     #define UPRINTF_IMPLEMENTATION
     #include "uprintf.h"
     ```
-    The implementation must be included in only one of the files. \
+    The implementation must be included in **only one** of the files. \
     A rarely modified file should be used because it increases the build time. \
     [Options](#options) can be defined before the implementation.
 
@@ -1221,11 +1226,12 @@ uprintf's state: {
     ```c
     uprintf(fmt, ...);
     ```
-    `fmt` - a format string with placeholders (`%` followed by a letter, placeholder can be anything, e.g. examples use `%S`). Use `%%` to print `%`.
+    `fmt` - a format string with placeholders (`%` followed by any letter). Use `%%` to print `%`. \
+    For every placeholder, there must be an argument which is a **pointer** to the data that should be printed.
 
 ### Options
 
-Options must be defined *before the implementation*:
+Options must be defined **before** the implementation:
 
 ```c
 #define OPTION_NAME VALUE
@@ -1233,7 +1239,7 @@ Options must be defined *before the implementation*:
 #include "uprintf.h"
 ```
 
-macro |  description | default
+option | description | default
 -|-|-
 `UPRINTF_INDENTATION_WIDTH` | The number of spaces to use for indentation | 4
 `UPRINTF_MAX_DEPTH` | Limits the nesting depth of structures. Negative values remove the limit | 10
@@ -1242,11 +1248,6 @@ macro |  description | default
 `UPRINTF_MAX_STRING_LENGTH` | The length before the string gets truncated. Non-positive values remove the limit | 200
 
 ## Limitations
-
-- Casting to a function pointer:
-    ```c
-    uprintf("%S\n", (void (*)(void)) whatever);
-    ```
 
 - Incorrect type deduction when printing variables that get shadowed *later* in the same scope.
     ```c
@@ -1277,7 +1278,7 @@ On initialization:
 On each invokation:
 1. Find scopes based on the PC.
 2. Parse the arguments string.
-3. Find types of argument in the current scope.
+3. Find types of arguments in the current scope.
 4. Print data using type definition.
 
 ## Testing
