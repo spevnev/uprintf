@@ -431,6 +431,8 @@ struct _upf_type {
     } as;
 };
 
+_UPF_VECTOR_TYPEDEF(_upf_type_vec, _upf_type *);
+
 typedef struct {
     uint64_t start;
     uint64_t end;
@@ -598,6 +600,7 @@ struct _upf_state {
     const uint8_t *rnglists;
     // parsed DWARF info
     _upf_type_map_vec type_map;
+    _upf_type_vec types;
     _upf_cu_vec cus;
     _upf_extern_function_vec extern_functions;
     // sequential id for handling circular structs
@@ -1158,12 +1161,19 @@ static int _upf_get_type_modifier(uint64_t tag) {
     _UPF_ERROR("Invalid DWARF type modifier: %lu.", tag);
 }
 
-static _upf_type *_upf_add_type(const uint8_t *type_die, _upf_type type) {
-    if (type_die != NULL) {
-        for (uint32_t i = 0; i < _upf_state.type_map.length; i++) {
-            _upf_type_map_entry entry = _upf_state.type_map.data[i];
-            if (entry.die == type_die) return entry.type_ptr;
-        }
+static _upf_type *_upf_new_type(_upf_type type) {
+    _upf_type *type_ptr = _upf_alloc(sizeof(type));
+    memcpy(type_ptr, &type, sizeof(type));
+    _UPF_VECTOR_PUSH(&_upf_state.types, type_ptr);
+    return type_ptr;
+}
+
+static _upf_type *_upf_new_type2(const uint8_t *type_die, _upf_type type) {
+    _UPF_ASSERT(type_die != NULL);
+
+    for (uint32_t i = 0; i < _upf_state.type_map.length; i++) {
+        _upf_type_map_entry entry = _upf_state.type_map.data[i];
+        if (entry.die == type_die) return entry.type_ptr;
     }
 
     _upf_type *type_ptr = _upf_alloc(sizeof(type));
@@ -1192,14 +1202,13 @@ static _upf_type _upf_get_subarray(const _upf_type *array, int count) {
 }
 
 static _upf_type *_upf_get_pointer_to_type(_upf_type *type_ptr) {
-    _upf_type type = {
+    return _upf_new_type((_upf_type) {
         .kind = _UPF_TK_POINTER,
         .size = sizeof(void*),
         .as.pointer = {
             .type = type_ptr,
         },
-    };
-    return _upf_add_type(NULL, type);
+    });
 }
 
 static bool _upf_is_pointer(const _upf_type *type) {
@@ -1212,64 +1221,55 @@ static _upf_type *_upf_dereference_type(_upf_type *type_ptr) {
     _UPF_ASSERT(_upf_is_pointer(type_ptr));
     if (type_ptr->kind == _UPF_TK_POINTER) return type_ptr->as.pointer.type;
     if (type_ptr->as.array.lengths.length <= 1) return type_ptr->as.array.element_type;
-    return _upf_add_type(NULL, _upf_get_subarray(type_ptr, 1));
+    return _upf_new_type(_upf_get_subarray(type_ptr, 1));
 }
 
 static _upf_type *_upf_get_void_type(void) {
     static _upf_type *type_ptr = NULL;
-    if (type_ptr != NULL) return type_ptr;
-
-    _upf_type type = {
-        .name = "void",
-        .kind = _UPF_TK_VOID,
-        .size = 0,
-    };
-    type_ptr = _upf_add_type(NULL, type);
-
+    if (type_ptr == NULL) {
+        type_ptr = _upf_new_type((_upf_type) {
+            .name = "void",
+            .kind = _UPF_TK_VOID,
+            .size = 0,
+        });
+    }
     return type_ptr;
 }
 
 static _upf_type *_upf_get_bool_type(void) {
     static _upf_type *type_ptr = NULL;
-    if (type_ptr != NULL) return type_ptr;
-
-    _upf_type type = {
-        .name = "bool",
-        .kind = _UPF_TK_BOOL,
-        .size = sizeof(bool),
-    };
-    type_ptr = _upf_add_type(NULL, type);
-
+    if (type_ptr == NULL) {
+        type_ptr = _upf_new_type((_upf_type) {
+            .name = "bool",
+            .kind = _UPF_TK_BOOL,
+            .size = sizeof(bool),
+        });
+    }
     return type_ptr;
 }
 
 static _upf_type *_upf_get_cstr_type(void) {
     static _upf_type *type_ptr = NULL;
-    if (type_ptr != NULL) return type_ptr;
-
-    _upf_type const_char_type = {
-        .name = "char",
-        .kind = _UPF_TK_SCHAR,
-        .size = sizeof(char),
-        .modifiers = _UPF_MOD_CONST,
-    };
-    _upf_type *const_char_type_ptr = _upf_add_type(NULL, const_char_type);
-
-    type_ptr = _upf_get_pointer_to_type(const_char_type_ptr);
+    if (type_ptr == NULL) {
+        type_ptr = _upf_get_pointer_to_type(_upf_new_type((_upf_type) {
+            .name = "char",
+            .kind = _UPF_TK_SCHAR,
+            .size = sizeof(char),
+            .modifiers = _UPF_MOD_CONST,
+        }));
+    }
     return type_ptr;
 }
 
 static _upf_type *_upf_get_number_type(void) {
     static _upf_type *type_ptr = NULL;
-    if (type_ptr != NULL) return type_ptr;
-
-    _upf_type type = {
-        .name = "int",
-        .kind = _UPF_TK_S4,
-        .size = sizeof(int),
-    };
-    type_ptr = _upf_add_type(NULL, type);
-
+    if (type_ptr == NULL) {
+        type_ptr = _upf_new_type((_upf_type) {
+            .name = "int",
+            .kind = _UPF_TK_S4,
+            .size = sizeof(int),
+        });
+    }
     return type_ptr;
 }
 
@@ -1331,7 +1331,7 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
             int brackets = 0;
             bool is_static = true;
             size_t array_size = element_type->size;
-            if (!abbrev->has_children) return _upf_add_type(die_base, type);
+            if (!abbrev->has_children) return _upf_new_type2(die_base, type);
             while (true) {
                 die += _upf_get_abbrev(&abbrev, cu, die);
                 if (abbrev == NULL) break;
@@ -1391,7 +1391,7 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                 type.name = typename;
             }
 
-            return _upf_add_type(die_base, type);
+            return _upf_new_type2(die_base, type);
         }
         case DW_TAG_enumeration_type: {
             _UPF_ASSERT(subtype_offset != UINT64_MAX);
@@ -1407,7 +1407,7 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
 
             if (type.size == UINT64_MAX) type.size = type.as.cenum.underlying_type->size;
 
-            if (!abbrev->has_children) return _upf_add_type(die_base, type);
+            if (!abbrev->has_children) return _upf_new_type2(die_base, type);
             while (true) {
                 die += _upf_get_abbrev(&abbrev, cu, die);
                 if (abbrev == NULL) break;
@@ -1437,7 +1437,7 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                 _UPF_VECTOR_PUSH(&type.as.cenum.enums, cenum);
             }
 
-            return _upf_add_type(die_base, type);
+            return _upf_new_type2(die_base, type);
         }
         case DW_TAG_pointer_type: {
             _UPF_ASSERT(size == UINT64_MAX || size == sizeof(void *));
@@ -1450,7 +1450,7 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
 
             // Pointers must be added before parsing their data to prevent
             // self-referential structs from infinite recursion.
-            _upf_type *type_ptr = _upf_add_type(die_base, type);
+            _upf_type *type_ptr = _upf_new_type2(die_base, type);
 
             if (subtype_offset == UINT64_MAX) {
                 type_ptr->as.pointer.type = _upf_get_void_type();
@@ -1473,7 +1473,7 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                 },
             };
 
-            if (!abbrev->has_children) return _upf_add_type(die_base, type);
+            if (!abbrev->has_children) return _upf_new_type2(die_base, type);
             while (true) {
                 die += _upf_get_abbrev(&abbrev, cu, die);
                 if (abbrev == NULL) break;
@@ -1523,7 +1523,7 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                 _UPF_VECTOR_PUSH(&type.as.cstruct.members, member);
             }
 
-            return _upf_add_type(die_base, type);
+            return _upf_new_type2(die_base, type);
         }
         case DW_TAG_subroutine_type: {
             _upf_type type = {
@@ -1536,7 +1536,7 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                 type.as.function.return_type = _upf_parse_type(cu, cu->base + subtype_offset);
             }
 
-            if (!abbrev->has_children) return _upf_add_type(die_base, type);
+            if (!abbrev->has_children) return _upf_new_type2(die_base, type);
             while (true) {
                 die += _upf_get_abbrev(&abbrev, cu, die);
                 if (abbrev == NULL) break;
@@ -1557,7 +1557,7 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                 }
             }
 
-            return _upf_add_type(die_base, type);
+            return _upf_new_type2(die_base, type);
         }
         case DW_TAG_typedef: {
             _UPF_ASSERT(name != NULL);
@@ -1568,7 +1568,7 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                     .kind = _UPF_TK_VOID,
                     .size = 0,
                 };
-                return _upf_add_type(die_base, type);
+                return _upf_new_type2(die_base, type);
             }
 
             _upf_type type = *_upf_parse_type(cu, cu->base + subtype_offset);
@@ -1577,7 +1577,7 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
             if (type.kind == _UPF_TK_SCHAR && strcmp(name, "int8_t") == 0) type.kind = _UPF_TK_S1;
             else if (type.kind == _UPF_TK_UCHAR && strcmp(name, "uint8_t") == 0) type.kind = _UPF_TK_U1;
 
-            return _upf_add_type(die_base, type);
+            return _upf_new_type2(die_base, type);
         }
         case DW_TAG_base_type: {
             _UPF_ASSERT(name != NULL && size != UINT64_MAX && encoding != 0);
@@ -1588,7 +1588,7 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                 .size = size,
             };
 
-            return _upf_add_type(die_base, type);
+            return _upf_new_type2(die_base, type);
         }
         case DW_TAG_const_type:
         case DW_TAG_volatile_type:
@@ -1602,12 +1602,12 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                     .size = sizeof(void *),
                 };
 
-                return _upf_add_type(die_base, type);
+                return _upf_new_type2(die_base, type);
             } else {
                 _upf_type type = *_upf_parse_type(cu, cu->base + subtype_offset);
                 type.modifiers |= _upf_get_type_modifier(abbrev->tag);
 
-                return _upf_add_type(die_base, type);
+                return _upf_new_type2(die_base, type);
             }
         }
         default:
@@ -1623,7 +1623,7 @@ unknown_type:
         .modifiers = 0,
         .size = size,
     };
-    return _upf_add_type(die_base, type);
+    return _upf_new_type2(die_base, type);
 }
 
 static bool _upf_is_in_range(uint64_t pc, _upf_range_vec ranges) {
@@ -2469,15 +2469,14 @@ static _upf_type *_upf_get_function(const _upf_cu *cu, const char *function_name
 
         _upf_type *return_type
             = function->return_type_die == NULL ? _upf_get_void_type() : _upf_parse_type(_upf_state.current_cu, function->return_type_die);
-        _upf_type function_type = {
+        return _upf_new_type((_upf_type) {
             .name = function->name,
             .kind = _UPF_TK_FUNCTION,
             .size = sizeof(void *),
             .as.function = {
                 .return_type = return_type,
             },
-        };
-        return _upf_add_type(NULL, function_type);
+        });
     }
     return NULL;
 }
@@ -2506,10 +2505,10 @@ static int _upf_parse_abstract_declarator(_upf_type **function_type, _upf_type *
     _UPF_ASSERT(sub_pointers > 0);
     sub_pointers--;
 
-    _upf_type *current_function_type = _upf_add_type(NULL, (_upf_type) {
-                                                               .kind = _UPF_TK_FUNCTION,
-                                                               .size = sizeof(void *),
-                                                           });
+    _upf_type *current_function_type = _upf_new_type((_upf_type) {
+        .kind = _UPF_TK_FUNCTION,
+        .size = sizeof(void *),
+    });
     _upf_type **current_function_return_type = &current_function_type->as.function.return_type;
 
     while (sub_pointers-- > 0) current_function_type = _upf_get_pointer_to_type(current_function_type);
@@ -2655,7 +2654,7 @@ static _upf_type *_upf_parse_typename(void) {
         } else {
             _UPF_ERROR("Invalid integer type at %s:%d.", _upf_state.file_path, _upf_state.line);
         }
-        type_ptr = _upf_add_type(NULL, type);
+        type_ptr = _upf_new_type(type);
     }
 
     _UPF_ASSERT(type_ptr != NULL);
