@@ -606,9 +606,9 @@ struct _upf_state {
     _upf_range_vec addresses;
     // bprintf
     char *buffer;
-    int size;
     char *ptr;
-    int free;
+    uint32_t size;
+    uint32_t free;
     // error handling
     jmp_buf jmp_buf;
     const char *file_path;
@@ -1731,7 +1731,6 @@ static _upf_range_vec _upf_get_ranges(const _upf_cu *cu, const uint8_t *die, uin
                 return ranges;
         }
     }
-
     return ranges;
 }
 
@@ -2960,8 +2959,8 @@ static const void *_upf_get_memory_region_end(const void *ptr) {
     while (true) {                                                                                \
         int bytes = snprintf(_upf_state.ptr, _upf_state.free, __VA_ARGS__);                       \
         if (bytes < 0) _UPF_ERROR("Unexpected error occurred in snprintf: %s.", strerror(errno)); \
-        if (bytes >= _upf_state.free) {                                                           \
-            int used = _upf_state.size - _upf_state.free;                                         \
+        if ((uint32_t) bytes >= _upf_state.free) {                                                \
+            uint32_t used = _upf_state.size - _upf_state.free;                                    \
             _upf_state.size *= 2;                                                                 \
             _upf_state.buffer = (char *) realloc(_upf_state.buffer, _upf_state.size);             \
             if (_upf_state.buffer == NULL) _UPF_OUT_OF_MEMORY();                                  \
