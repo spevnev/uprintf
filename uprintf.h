@@ -40,13 +40,12 @@
 #ifndef UPRINTF_H
 #define UPRINTF_H
 
-void _upf_uprintf(const char *file, int line, const char *fmt, const char *args, ...);
-
-// If variadic arguments were to be stringified directly, the arguments which
-// use macros would stringify to the macro name instead of being expanded, but
-// by calling another macro the argument-macros will be expanded and stringified
-// to their real values.
+// If variadic arguments are stringified directly, the macros will stringify to
+// the macro name instead of being expanded. Passing them to another macro causes
+// them to get expanded before stringification.
 #define _upf_stringify_va_args(...) #__VA_ARGS__
+
+void _upf_uprintf(const char *file, int line, const char *fmt, const char *args, ...);
 
 // The noop instruction is required to keep the return PC within the scope of the
 // caller function. Otherwise, it might be optimized to return outside of it.
@@ -110,8 +109,8 @@ extern int _upf_test_status;
 
 // =================== DECLARATIONS =======================
 
-// Feature test macros might not work since the header could have already been included,
-// and expanded without macros, so the functions must be declared here.
+// Feature test macros might not work since the header could have already been
+// included and expanded without them, so the functions must be declared here.
 
 ssize_t readlink(const char *path, char *buf, size_t bufsiz);
 ssize_t getline(char **lineptr, size_t *n, FILE *stream);
@@ -328,15 +327,15 @@ int _upf_test_status = EXIT_SUCCESS;
 
 // ====================== TYPES ===========================
 
+_UPF_VECTOR_TYPEDEF(_upf_size_t_vec, size_t);
+_UPF_VECTOR_TYPEDEF(_upf_cstr_vec, const char *);
+
 typedef struct _upf_memory_region {
     struct _upf_memory_region *prev;
     size_t capacity;
     size_t length;
     uint8_t data[];
 } _upf_memory_region;
-
-_UPF_VECTOR_TYPEDEF(_upf_size_t_vec, size_t);
-_UPF_VECTOR_TYPEDEF(_upf_cstr_vec, const char *);
 
 typedef struct {
     uint64_t name;
@@ -1317,7 +1316,6 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
             _UPF_ASSERT(subtype_offset != UINT64_MAX);
 
             _upf_type *element_type = _upf_parse_type(cu, cu->base + subtype_offset);
-
             _upf_type type = {
                 .name = name,
                 .kind = _UPF_TK_ARRAY,

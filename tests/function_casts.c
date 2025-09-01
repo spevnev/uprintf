@@ -17,16 +17,16 @@ int *(*(**k_fun(void))(char c))(int i) {
 }
 
 int main(void) {
-    uprintf("%s\n", ((int *(*) (int) ) i_fun)(1));
-    uprintf("%s\n", ((int *((*) )(int) ) i_fun)(2));
-    uprintf("%s\n", ((int *((*) (int) )) i_fun)(3));
+    uprintf("%S\n", ((int *(*) (int) ) i_fun)(1));
+    uprintf("%S\n", ((int *((*) )(int) ) i_fun)(2));
+    uprintf("%S\n", ((int *((*) (int) )) i_fun)(3));
 
-    uprintf("%s\n", (((int *((*(*) (char) )(int) )) j_fun)('a')(4)));
-    uprintf("%s\n", (((int *((*((*) (char) ))(int) )) j_fun)('b')(5)));
-    uprintf("%s\n", (((int *((*(((*) (char) )))(int) )) j_fun)('c')(6)));
+    uprintf("%S\n", (((int *((*(*) (char) )(int) )) j_fun)('a')(4)));
+    uprintf("%S\n", (((int *((*((*) (char) ))(int) )) j_fun)('b')(5)));
+    uprintf("%S\n", (((int *((*(((*) (char) )))(int) )) j_fun)('c')(6)));
 
-    uprintf("%s\n", (*((int *(*(**(*) (void) )(char) )(int) ) k_fun)())('d')(7));
-    uprintf("%s\n", (*((int *(*((**(*) (void) )(char) ))(int) ) k_fun)())('e')(8));
+    uprintf("%S\n", (*((int *(*(**(*) (void) )(char) )(int) ) k_fun)())('d')(7));
+    uprintf("%S\n", (*((int *(*((**(*) (void) )(char) ))(int) ) k_fun)())('e')(8));
 
     return _upf_test_status;
 }
