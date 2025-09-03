@@ -13,7 +13,7 @@ jobs:
       matrix:
         compiler: [ clang-18, clang-17, clang-16, clang-15, clang-14, gcc-14, gcc-13, gcc-12, gcc-11 ]
     env:
-      COMPILERS: ${{matrix.compiler}}
+      COMPILERS: ${{ matrix.compiler }}
     steps:
     - uses: actions/checkout@v4
     - name: Install packages

@@ -63,7 +63,10 @@ function uses_shared_implementation {
 function get_similarity {
     result=100
 
-    if [ $is_gcc = false ]; then
+    if [ $is_gcc = true ]; then
+        # Some GCC versions use "size_t" while others use "unsigned long int".
+        if [ "$test" = "function" ]; then result=95; fi
+    else
         # These tests contain stdint.h types which have different typenames in gcc and clang.
         # Baselines are generated from gcc, so decrease its similarity for clang:
         if   [ "$test" = "struct" ];        then result=90;
@@ -73,15 +76,14 @@ function get_similarity {
         # retrieval of function definition doesn't work.
         # Also, some GCC versions use "size_t" while others use "unsigned long int".
         elif [ "$test" = "function" ]; then result=85; fi
-    else
-        # Some GCC versions use "size_t" while others use "unsigned long int".
-        if [ "$test" = "function" ]; then result=95; fi
     fi
 
     # FILE has different implementation depending on stdio.h and it often has pointers
     # that point out-of-bounds which prints garbage data.
     # The primary goal is to check that there are no errors, i.e. segfaults, leaks.
-    if [ "$test" = "stdio_file" ]; then result=10; fi
+    if   [ "$test" = "stdio_file" ]; then result=10;
+    # When union is initialized with pointers, its number members are different every time.
+    elif [ "$test" = "union" ];      then result=90; fi
 
     echo $result
 }

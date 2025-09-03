@@ -25,7 +25,6 @@
 
 // ====================== CHECKS ==========================
 
-// clang-format off
 #ifndef __linux__
 #error [ERROR] uprintf only supports Linux
 #endif
@@ -33,19 +32,18 @@
 #ifdef __cplusplus
 #error [ERROR] uprintf does NOT support C++
 #endif
-// clang-format on
 
 // ====================== HEADER ==========================
 
 #ifndef UPRINTF_H
 #define UPRINTF_H
 
+void _upf_uprintf(const char *file, int line, const char *fmt, const char *args, ...);
+
 // If variadic arguments are stringified directly, the macros will stringify to
 // the macro name instead of being expanded. Passing them to another macro causes
 // them to get expanded before stringification.
 #define _upf_stringify_va_args(...) #__VA_ARGS__
-
-void _upf_uprintf(const char *file, int line, const char *fmt, const char *args, ...);
 
 // The noop instruction is required to keep the return PC within the scope of the
 // caller function. Otherwise, it might be optimized to return outside of it.
@@ -89,8 +87,13 @@ extern int _upf_test_status;
 
 // ===================== INCLUDES =========================
 
+#ifndef __USE_XOPEN_EXTENDED
 #define __USE_XOPEN_EXTENDED
+#endif
+
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 
 #include <dlfcn.h>
 #include <errno.h>
@@ -254,6 +257,7 @@ int dl_iterate_phdr(int (*callback)(struct dl_phdr_info *info, size_t size, void
 #define DW_LANG_C99 0x000c
 #define DW_LANG_C11 0x001d
 #define DW_LANG_C17 0x002c
+#define DW_LANG_C23 0x003e
 
 // ===================== TESTING ==========================
 
@@ -695,7 +699,7 @@ static size_t _upf_uLEB_to_uint64(const uint8_t *leb, uint64_t *result) {
     *result = 0;
     do {
         b = leb[i++];
-        _UPF_ASSERT(shift < 57);
+        _UPF_ASSERT(shift <= 56 || (shift == 63 && b == 1));
         *result |= (((uint64_t) (b & BITS_MASK)) << shift);
         shift += 7;
     } while (b & CONTINUE_MASK);
@@ -1459,16 +1463,12 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
 
             return type_ptr;
         }
-        case DW_TAG_structure_type:
-        case DW_TAG_union_type: {
-            bool is_struct = abbrev->tag == DW_TAG_structure_type;
+        case DW_TAG_structure_type: {
             _upf_type type = {
-                .name = name ? name : (is_struct ? "struct" : "union"),
-                .kind = is_struct ? _UPF_TK_STRUCT : _UPF_TK_UNION,
+                .name = name ? name : "struct",
+                .kind = _UPF_TK_STRUCT,
                 .size = size,
-                .as.cstruct = {
-                    .is_declaration = is_declaration,
-                },
+                .as.cstruct.is_declaration = is_declaration,
             };
 
             if (!abbrev->has_children) return _upf_new_type2(die_base, type);
@@ -1481,7 +1481,7 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                 }
 
                 _upf_member member = {
-                    .offset = is_struct ? UINT64_MAX : 0,
+                    .offset = UINT64_MAX,
                 };
                 bool skip_member = false;
                 for (uint32_t i = 0; i < abbrev->attrs.length; i++) {
@@ -1518,6 +1518,52 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                 if (skip_member) continue;
 
                 _UPF_ASSERT(member.name != NULL && member.type != NULL && member.offset != UINT64_MAX);
+                _UPF_VECTOR_PUSH(&type.as.cstruct.members, member);
+            }
+
+            return _upf_new_type2(die_base, type);
+        }
+        case DW_TAG_union_type: {
+            _upf_type type = {
+                .name = name ? name : "union",
+                .kind = _UPF_TK_UNION,
+                .size = size,
+                .as.cstruct.is_declaration = is_declaration,
+            };
+
+            if (!abbrev->has_children) return _upf_new_type2(die_base, type);
+            while (true) {
+                die += _upf_get_abbrev(&abbrev, cu, die);
+                if (abbrev == NULL) break;
+                if (abbrev->tag != DW_TAG_member) {
+                    die = _upf_skip_die(die, abbrev);
+                    continue;
+                }
+
+                _upf_member member = {0};
+                bool skip_member = false;
+                for (uint32_t i = 0; i < abbrev->attrs.length; i++) {
+                    _upf_attr attr = abbrev->attrs.data[i];
+
+                    if (attr.name == DW_AT_name) {
+                        member.name = _upf_get_str(cu, die, attr.form);
+                    } else if (attr.name == DW_AT_type) {
+                        const uint8_t *type_die = cu->base + _upf_get_ref(die, attr.form);
+                        member.type = _upf_parse_type(cu, type_die);
+                    } else if (attr.name == DW_AT_bit_size) {
+                        if (_upf_is_data(attr.form)) {
+                            member.bit_size = _upf_get_data(die, attr);
+                        } else {
+                            _UPF_WARN("Non-constant bit field sizes aren't supported. Skipping this field.");
+                            skip_member = true;
+                        }
+                    }
+
+                    die += _upf_get_attr_size(die, attr.form);
+                }
+                if (skip_member) continue;
+
+                _UPF_ASSERT(member.name != NULL && member.type != NULL);
                 _UPF_VECTOR_PUSH(&type.as.cstruct.members, member);
             }
 
@@ -1739,6 +1785,7 @@ static bool _upf_is_language_c(int64_t language) {
         case DW_LANG_C99:
         case DW_LANG_C11:
         case DW_LANG_C17:
+        case DW_LANG_C23:
             return true;
         default:
             return false;
@@ -3575,6 +3622,8 @@ __attribute__((noinline)) void _upf_uprintf(const char *file_path, int line, con
 
 // ====================== UNDEF ===========================
 
+#undef __USE_XOPEN_EXTENDED
+#undef _GNU_SOURCE
 #undef _UPF_SET_TEST_STATUS
 #undef _UPF_LOG
 #undef _UPF_WARN
