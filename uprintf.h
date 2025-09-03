@@ -254,6 +254,13 @@ int dl_iterate_phdr(int (*callback)(struct dl_phdr_info *info, size_t size, void
 #define DW_LANG_C11 0x001d
 #define DW_LANG_C17 0x002c
 #define DW_LANG_C23 0x003e
+#define DW_LANG_C_plus_plus 0x0004
+#define DW_LANG_C_plus_plus_03 0x0019
+#define DW_LANG_C_plus_plus_11 0x001a
+#define DW_LANG_C_plus_plus_14 0x0021
+#define DW_LANG_C_plus_plus_17 0x002a
+#define DW_LANG_C_plus_plus_20 0x002b
+#define DW_LANG_C_plus_plus_23 0x003a
 
 // ===================== TESTING ==========================
 
@@ -1763,6 +1770,13 @@ static bool _upf_is_language_c(int64_t language) {
         case DW_LANG_C11:
         case DW_LANG_C17:
         case DW_LANG_C23:
+        case DW_LANG_C_plus_plus:
+        case DW_LANG_C_plus_plus_03:
+        case DW_LANG_C_plus_plus_11:
+        case DW_LANG_C_plus_plus_14:
+        case DW_LANG_C_plus_plus_17:
+        case DW_LANG_C_plus_plus_20:
+        case DW_LANG_C_plus_plus_23:
             return true;
         default:
             return false;
