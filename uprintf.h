@@ -2064,7 +2064,7 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *die, const uint
     if (low_pc_die != NULL) cu.base_address = _upf_get_addr(&cu, low_pc_die, low_pc_attr.form);
 
     cu.scope.ranges = _upf_get_die_ranges(&cu, low_pc_die, low_pc_attr, high_pc_die, high_pc_attr, ranges_die, ranges_attr);
-    _UPF_ASSERT(cu.scope.ranges.length > 0);
+    if (cu.scope.ranges.length == 0) return;
 
     _upf_scope_stack_entry stack_entry = _UPF_ZERO_INIT;
     stack_entry.scope = &cu.scope;

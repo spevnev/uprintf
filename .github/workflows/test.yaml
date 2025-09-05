@@ -11,12 +11,40 @@ jobs:
     runs-on: ubuntu-24.04
     strategy:
       matrix:
-        compiler: [ clang-18, clang-17, clang-16, clang-15, clang-14, gcc-14, gcc-13, gcc-12, gcc-11 ]
-    env:
-      COMPILERS: ${{ matrix.compiler }}
+        include:
+          - packages: clang-18
+            cc: clang-18
+            cxx: clang++-18
+          - packages: clang-17
+            cc: clang-17
+            cxx: clang++-17
+          - packages: clang-16
+            cc: clang-16
+            cxx: clang++-16
+          - packages: clang-15
+            cc: clang-15
+            cxx: clang++-15
+          - packages: clang-14
+            cc: clang-14
+            cxx: clang++-14
+          - packages: gcc-14 g++-14
+            cc: gcc-14
+            cxx: g++-14
+          - packages: gcc-13 g++-13
+            cc: gcc-13
+            cxx: g++-13
+          - packages: gcc-12 g++-12
+            cc: gcc-12
+            cxx: g++-12
+          - packages: gcc-11 g++-11
+            cc: gcc-11
+            cxx: g++-11
     steps:
     - uses: actions/checkout@v4
-    - name: Install packages
-      run: sudo apt-get install -y wdiff $COMPILERS
+    - name: Install dependencies
+      run: sudo apt update && sudo apt install -y wdiff ${{ matrix.packages }}
     - name: Run tests
+      env:
+        C_COMPILERS: ${{ matrix.cc }}
+        CXX_COMPILERS: ${{ matrix.cxx }}
       run: make tests
