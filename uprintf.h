@@ -3174,8 +3174,9 @@ __attribute__((no_sanitize_address)) static void _upf_print_char_ptr(const char 
     _upf_bprintf(")");
 }
 
-static void _upf_collect_circular_structs(_upf_indexed_struct_vec *seen, _upf_indexed_struct_vec *circular, const uint8_t *data,
-                                          const _upf_type *type, int depth) {
+__attribute__((no_sanitize_address)) static void _upf_collect_circular_structs(_upf_indexed_struct_vec *seen,
+                                                                               _upf_indexed_struct_vec *circular, const uint8_t *data,
+                                                                               const _upf_type *type, int depth) {
     _UPF_ASSERT(seen != NULL && circular != NULL && type != NULL);
 
     if (UPRINTF_MAX_DEPTH >= 0 && depth >= UPRINTF_MAX_DEPTH) return;
@@ -3222,7 +3223,8 @@ static void _upf_collect_circular_structs(_upf_indexed_struct_vec *seen, _upf_in
 // [] -> arrays
 // {} -> structs/unions
 // <> -> meta information, e.g. unnamed, unknown, invalid, out of bounds, truncated, etc.
-static void _upf_print_type(_upf_indexed_struct_vec *circular, const uint8_t *data, const _upf_type *type, int depth) {
+__attribute__((no_sanitize_address)) static void _upf_print_type(_upf_indexed_struct_vec *circular, const uint8_t *data,
+                                                                 const _upf_type *type, int depth) {
     _UPF_ASSERT(circular != NULL && type != NULL);
 
     if (UPRINTF_MAX_DEPTH >= 0 && depth >= UPRINTF_MAX_DEPTH) {
@@ -3367,7 +3369,25 @@ static void _upf_print_type(_upf_indexed_struct_vec *circular, const uint8_t *da
 #if UPRINTF_ARRAY_COMPRESSION_THRESHOLD > 0
                 size_t j = i;
                 // Advance while element at `j` is same as at `i`.
-                while (j < type->as.array.lengths.data[0] && memcmp(current, data + element_size * j, element_size) == 0) j++;
+                while (j < type->as.array.lengths.data[0]) {
+                    const uint8_t *next = data + element_size * j;
+
+                    // Use a loop instead of memcmp to avoid triggering libasan
+                    // in case the pointer is valid but unallocated.
+                    // Disabling address sanitization for the function does not
+                    // turn off the check because it is in the interceptor memcmp,
+                    // and interceptors cannot be disabled for a single function.
+                    bool equal = true;
+                    for (size_t k = 0; k < element_size; k++) {
+                        if (current[k] != next[k]) {
+                            equal = false;
+                            break;
+                        }
+                    }
+                    if (!equal) break;
+
+                    j++;
+                }
 
                 int count = j - i;
                 if (j - i >= UPRINTF_ARRAY_COMPRESSION_THRESHOLD) {
