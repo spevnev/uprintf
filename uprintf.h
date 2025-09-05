@@ -527,6 +527,7 @@ typedef struct {
     const uint8_t *base;
     _upf_scope scope;
 
+    uint64_t base_address;
     uint64_t addr_base;
     uint64_t str_offsets_base;
     uint64_t rnglists_base;
@@ -1733,9 +1734,9 @@ unknown_type:
     return _upf_new_type2(die_base, type);
 }
 
-static bool _upf_is_in_range(uint64_t pc, _upf_range_vec ranges) {
+static bool _upf_is_in_range(uint64_t addr, _upf_range_vec ranges) {
     for (uint32_t i = 0; i < ranges.length; i++) {
-        if (ranges.data[i].start <= pc && pc < ranges.data[i].end) return true;
+        if (ranges.data[i].start <= addr && addr < ranges.data[i].end) return true;
     }
     return false;
 }
@@ -1747,7 +1748,7 @@ static _upf_range_vec _upf_get_ranges(const _upf_cu *cu, const uint8_t *die, uin
     if (form == DW_FORM_sec_offset) {
         rnglist = _upf_state.rnglists + _upf_offset_cast(die);
     } else {
-        _UPF_ASSERT(cu->rnglists_base != UINT64_MAX);
+        _UPF_ASSERT(form == DW_FORM_rnglistx && cu->rnglists_base != UINT64_MAX);
         uint64_t index;
         _upf_uLEB_to_uint64(die, &index);
         uint64_t rnglist_offset = _upf_offset_cast(_upf_state.rnglists + cu->rnglists_base + index * _upf_state.offset_size);
@@ -1755,9 +1756,7 @@ static _upf_range_vec _upf_get_ranges(const _upf_cu *cu, const uint8_t *die, uin
     }
     _UPF_ASSERT(rnglist != NULL);
 
-    uint64_t base = 0;
-    if (cu->scope.ranges.length == 1) base = cu->scope.ranges.data[0].start;
-
+    uint64_t base = cu->base_address;
     _upf_range_vec ranges = _UPF_ZERO_INIT;
     while (*rnglist != DW_RLE_end_of_list) {
         switch (*rnglist++) {
@@ -1766,21 +1765,20 @@ static _upf_range_vec _upf_get_ranges(const _upf_cu *cu, const uint8_t *die, uin
                 rnglist += _upf_get_attr_size(rnglist, DW_FORM_addrx);
                 break;
             case DW_RLE_startx_endx: {
-                uint64_t start = _upf_get_addr(cu, rnglist, DW_FORM_addrx);
+                _upf_range range = _UPF_ZERO_INIT;
+
+                range.start = _upf_get_addr(cu, rnglist, DW_FORM_addrx);
                 rnglist += _upf_get_attr_size(rnglist, DW_FORM_addrx);
-                uint64_t end = _upf_get_addr(cu, rnglist, DW_FORM_addrx);
+                range.end = _upf_get_addr(cu, rnglist, DW_FORM_addrx);
                 rnglist += _upf_get_attr_size(rnglist, DW_FORM_addrx);
 
-                _upf_range range = _UPF_ZERO_INIT;
-                range.start = start;
-                range.end = end;
                 _UPF_VECTOR_PUSH(&ranges, range);
             } break;
             case DW_RLE_startx_length: {
                 uint64_t address = _upf_get_addr(cu, rnglist, DW_FORM_addrx);
                 rnglist += _upf_get_attr_size(rnglist, DW_FORM_addrx);
-                uint64_t length = _upf_get_addr(cu, rnglist, DW_FORM_addrx);
-                rnglist += _upf_get_attr_size(rnglist, DW_FORM_addrx);
+                uint64_t length;
+                rnglist += _upf_uLEB_to_uint64(rnglist, &length);
 
                 _upf_range range = _UPF_ZERO_INIT;
                 range.start = address;
@@ -1802,14 +1800,13 @@ static _upf_range_vec _upf_get_ranges(const _upf_cu *cu, const uint8_t *die, uin
                 rnglist += _upf_state.address_size;
                 break;
             case DW_RLE_start_end: {
-                uint64_t start = _upf_address_cast(rnglist);
+                _upf_range range = _UPF_ZERO_INIT;
+
+                range.start = _upf_address_cast(rnglist);
                 rnglist += _upf_state.address_size;
-                uint64_t end = _upf_address_cast(rnglist);
+                range.end = _upf_address_cast(rnglist);
                 rnglist += _upf_state.address_size;
 
-                _upf_range range = _UPF_ZERO_INIT;
-                range.start = start;
-                range.end = end;
                 _UPF_VECTOR_PUSH(&ranges, range);
             } break;
             case DW_RLE_start_length: {
@@ -1827,6 +1824,27 @@ static _upf_range_vec _upf_get_ranges(const _upf_cu *cu, const uint8_t *die, uin
                 _UPF_WARN("Found unsupported range list entry kind (0x%x). Skipping it.", *(rnglist - 1));
                 return ranges;
         }
+    }
+    return ranges;
+}
+
+static _upf_range_vec _upf_get_die_ranges(const _upf_cu *cu, const uint8_t *low_pc_die, _upf_attr low_pc_attr, const uint8_t *high_pc_die,
+                                          _upf_attr high_pc_attr, const uint8_t *ranges_die, _upf_attr ranges_attr) {
+    _UPF_ASSERT(cu != NULL);
+
+    if (ranges_die != NULL) return _upf_get_ranges(cu, ranges_die, ranges_attr.form);
+
+    _upf_range_vec ranges = _UPF_ZERO_INIT;
+    if (low_pc_die != NULL && high_pc_die != NULL) {
+        _upf_range range = _UPF_ZERO_INIT;
+        range.start = _upf_get_addr(cu, low_pc_die, low_pc_attr.form);
+        if (_upf_is_addr(high_pc_attr.form)) {
+            range.end = _upf_get_addr(cu, high_pc_die, high_pc_attr.form);
+        } else {
+            range.end = range.start + _upf_get_data(high_pc_die, high_pc_attr);
+        }
+
+        _UPF_VECTOR_PUSH(&ranges, range);
     }
     return ranges;
 }
@@ -1850,35 +1868,6 @@ static bool _upf_is_language_c(int64_t language) {
         default:
             return false;
     }
-}
-
-static _upf_range_vec _upf_get_cu_ranges(const _upf_cu *cu, const uint8_t *low_pc_die, _upf_attr low_pc_attr, const uint8_t *high_pc_die,
-                                         _upf_attr high_pc_attr, const uint8_t *ranges_die, _upf_attr ranges_attr) {
-    _UPF_ASSERT(cu != NULL);
-
-    if (ranges_die != NULL) return _upf_get_ranges(cu, ranges_die, ranges_attr.form);
-
-    _upf_range_vec ranges = _UPF_ZERO_INIT;
-    _upf_range range = _UPF_ZERO_INIT;
-    range.start = UINT64_MAX;
-    range.end = UINT64_MAX;
-
-    if (low_pc_die == NULL) {
-        _UPF_VECTOR_PUSH(&ranges, range);
-        return ranges;
-    }
-
-    range.start = _upf_get_addr(cu, low_pc_die, low_pc_attr.form);
-    if (high_pc_die != NULL) {
-        if (_upf_is_addr(high_pc_attr.form)) {
-            range.end = _upf_get_addr(cu, high_pc_die, high_pc_attr.form);
-        } else {
-            range.end = range.start + _upf_get_data(high_pc_die, high_pc_attr);
-        }
-    }
-
-    _UPF_VECTOR_PUSH(&ranges, range);
-    return ranges;
 }
 
 static void _upf_parse_subprogram_parameters(_upf_function *function, const _upf_cu *cu, const uint8_t *die) {
@@ -1942,67 +1931,45 @@ static _upf_function _upf_parse_cu_subprogram(const _upf_cu *cu, const uint8_t *
     return function;
 }
 
-static bool _upf_parse_cu_scope(const _upf_cu *cu, _upf_scope_stack *scope_stack, int depth, const uint8_t *die,
+static void _upf_parse_cu_scope(const _upf_cu *cu, _upf_scope_stack *scope_stack, int depth, const uint8_t *die,
                                 const _upf_abbrev *abbrev) {
     _UPF_ASSERT(cu != NULL && scope_stack != NULL && die != NULL && abbrev != NULL);
 
-    if (!abbrev->has_children) return false;
-    _UPF_ASSERT(scope_stack->length > 0);
-
-    _upf_scope new_scope = _UPF_ZERO_INIT;
-
-    uint64_t low_pc = UINT64_MAX;
+    const uint8_t *low_pc_die = NULL;
+    _upf_attr low_pc_attr = _UPF_ZERO_INIT;
     const uint8_t *high_pc_die = NULL;
     _upf_attr high_pc_attr = _UPF_ZERO_INIT;
+    const uint8_t *ranges_die = NULL;
+    _upf_attr ranges_attr = _UPF_ZERO_INIT;
     for (uint32_t i = 0; i < abbrev->attrs.length; i++) {
         _upf_attr attr = abbrev->attrs.data[i];
 
         if (attr.name == DW_AT_low_pc) {
-            low_pc = _upf_get_addr(cu, die, attr.form);
+            low_pc_attr = attr;
+            low_pc_die = die;
         } else if (attr.name == DW_AT_high_pc) {
-            high_pc_die = die;
             high_pc_attr = attr;
+            high_pc_die = die;
         } else if (attr.name == DW_AT_ranges) {
-            new_scope.ranges = _upf_get_ranges(cu, die, attr.form);
+            ranges_attr = attr;
+            ranges_die = die;
         }
 
         die += _upf_get_attr_size(die, attr.form);
     }
 
-    if (low_pc != UINT64_MAX) {
-        if (high_pc_die == NULL) _UPF_ERROR("Expected CU to have both low and high PC.");
+    _upf_scope new_scope = _UPF_ZERO_INIT;
+    new_scope.ranges = _upf_get_die_ranges(cu, low_pc_die, low_pc_attr, high_pc_die, high_pc_attr, ranges_die, ranges_attr);
+    if (new_scope.ranges.length == 0) return;
 
-        _upf_range range = _UPF_ZERO_INIT;
-        range.start = low_pc;
-
-        if (_upf_is_addr(high_pc_attr.form)) {
-            range.end = _upf_get_addr(cu, high_pc_die, high_pc_attr.form);
-        } else {
-            range.end = low_pc + _upf_get_data(high_pc_die, high_pc_attr);
-        }
-
-        _UPF_VECTOR_PUSH(&new_scope.ranges, range);
-    }
+    _UPF_ASSERT(scope_stack->length > 0);
+    _upf_scope *scope = _UPF_VECTOR_TOP(scope_stack).scope;
+    _UPF_VECTOR_PUSH(&scope->scopes, new_scope);
 
     _upf_scope_stack_entry stack_entry = _UPF_ZERO_INIT;
     stack_entry.depth = depth;
-
-    if (new_scope.ranges.length > 0) {
-        _upf_scope *scope = NULL;
-        for (uint32_t i = 0; i < scope_stack->length; i++) {
-            scope = scope_stack->data[scope_stack->length - 1 - i].scope;
-            if (scope != NULL) break;
-        }
-        _UPF_ASSERT(scope != NULL);
-
-        _UPF_VECTOR_PUSH(&scope->scopes, new_scope);
-        stack_entry.scope = &_UPF_VECTOR_TOP(&scope->scopes);
-    } else {
-        stack_entry.scope = NULL;
-    }
-
+    stack_entry.scope = &_UPF_VECTOR_TOP(&scope->scopes);
     _UPF_VECTOR_PUSH(scope_stack, stack_entry);
-    return new_scope.ranges.length > 0;
 }
 
 static const char *_upf_get_typename(const _upf_cu *cu, const uint8_t *die, const _upf_abbrev *abbrev) {
@@ -2094,16 +2061,18 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *die, const uint
         die += _upf_get_attr_size(die, attr.form);
     }
 
-    cu.scope.ranges = _upf_get_cu_ranges(&cu, low_pc_die, low_pc_attr, high_pc_die, high_pc_attr, ranges_die, ranges_attr);
+    if (low_pc_die != NULL) cu.base_address = _upf_get_addr(&cu, low_pc_die, low_pc_attr.form);
 
-    int depth = 0;
-    _upf_scope_stack scope_stack = _UPF_ZERO_INIT;
+    cu.scope.ranges = _upf_get_die_ranges(&cu, low_pc_die, low_pc_attr, high_pc_die, high_pc_attr, ranges_die, ranges_attr);
+    _UPF_ASSERT(cu.scope.ranges.length > 0);
 
     _upf_scope_stack_entry stack_entry = _UPF_ZERO_INIT;
-    stack_entry.depth = depth;
     stack_entry.scope = &cu.scope;
+
+    _upf_scope_stack scope_stack = _UPF_ZERO_INIT;
     _UPF_VECTOR_PUSH(&scope_stack, stack_entry);
 
+    int depth = 0;
     while (die < die_end) {
         const uint8_t *die_base = die;
 
@@ -2125,7 +2094,7 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *die, const uint
             }
             case DW_TAG_lexical_block:
             case DW_TAG_inlined_subroutine:
-                _upf_parse_cu_scope(&cu, &scope_stack, depth, die, abbrev);
+                if (abbrev->has_children) _upf_parse_cu_scope(&cu, &scope_stack, depth, die, abbrev);
                 break;
             case DW_TAG_array_type:
             case DW_TAG_class_type:
@@ -2146,15 +2115,11 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *die, const uint
             } break;
             case DW_TAG_variable:
             case DW_TAG_formal_parameter: {
-                _upf_scope *scope = _UPF_VECTOR_TOP(&scope_stack).scope;
-                if (scope == NULL) break;
-
                 _upf_named_type var = _upf_parse_cu_variable(&cu, die, abbrev);
                 if (var.name == NULL) break;
-                if (var.die == NULL) {
-                    _UPF_ERROR("Failed to find variable DIE. %s", _UPF_NO_DEBUG_INFO_ERROR);
-                }
+                if (var.die == NULL) _UPF_ERROR("Failed to find variable DIE. %s", _UPF_NO_DEBUG_INFO_ERROR);
 
+                _upf_scope *scope = _UPF_VECTOR_TOP(&scope_stack).scope;
                 _UPF_VECTOR_PUSH(&scope->vars, var);
             } break;
         }

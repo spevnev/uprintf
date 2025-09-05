@@ -1,5 +1,6 @@
 #include "avl.h"  // https://github.com/etherealvisage/avl
 #include <stdint.h>
+#include <stdlib.h>
 
 #define UPRINTF_INDENTATION_WIDTH 2
 #define UPRINTF_MAX_DEPTH 5
@@ -30,5 +31,5 @@ int main(void) {
         avl_remove(&tree, (void *) (long) i);
     }
 
-    return 0;
+    return EXIT_SUCCESS;
 }
