@@ -34,6 +34,10 @@
 #ifndef UPRINTF_H
 #define UPRINTF_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void _upf_uprintf(const char *file, int line, const char *fmt, const char *args, ...);
 
 // If variadic arguments are stringified directly, the macros will stringify to
@@ -51,6 +55,10 @@ void _upf_uprintf(const char *file, int line, const char *fmt, const char *args,
 
 #ifdef UPRINTF_TEST
 extern int _upf_test_status;
+#endif
+
+#ifdef __cplusplus
+}
 #endif
 
 #endif  // UPRINTF_H
@@ -3615,6 +3623,9 @@ __attribute__((destructor)) void _upf_fini(void) {
     _upf_free_allocator();
 }
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 __attribute__((noinline)) void _upf_uprintf(const char *file_path, int line, const char *fmt, const char *args_string, ...) {
     _UPF_ASSERT(file_path != NULL && line > 0 && fmt != NULL && args_string != NULL);
 
@@ -3676,6 +3687,9 @@ __attribute__((noinline)) void _upf_uprintf(const char *file_path, int line, con
     printf("%s", _upf_state.buffer);
     fflush(stdout);
 }
+#ifdef __cplusplus
+}
+#endif
 
 // ====================== UNDEF ===========================
 
