@@ -1,24 +1,31 @@
 prefix     := /usr/local
 includedir := $(prefix)/include
 
-CC     := gcc
-CFLAGS := -O2 -g2 -std=c11 -Wall -Wextra -pedantic -I . -DUPRINTF_TEST -fsanitize=undefined,address,leak
-
 BUILD_DIR    := build
 LIB_DIR      := libs
 EXAMPLE_DIR  := examples
 TEST_DIR     := tests
 BASELINE_DIR := tests/baselines
 
-COMPILERS ?= clang gcc
-O_LEVELS  ?= O0 O2 O3 Os
-G_LEVELS  ?= g2 g3
+
+COMMON_FLAGS := -Wall -Wextra -Werror -pedantic -I . -DUPRINTF_TEST -fsanitize=undefined,address,leak
+CFLAGS       := $(COMMON_FLAGS) -std=c11
+CXXFLAGS     := $(COMMON_FLAGS) -std=c++11
+
+C_COMPILERS   ?= clang gcc
+CXX_COMPILERS ?= clang++ g++
+O_LEVELS      ?= O0 O2 O3 Os
+G_LEVELS      ?= g2 g3
+
+C_TESTS   := $(patsubst $(TEST_DIR)/%.c, %, $(wildcard $(TEST_DIR)/*.c))
+CXX_TESTS := $(patsubst $(TEST_DIR)/%.cc, %, $(wildcard $(TEST_DIR)/*.cc))
+
+
+EXAMPLE_CFLAGS := -Wall -Wextra -pedantic -I . -fsanitize=undefined,address,leak -std=c11 -O2 -g2
 
 EXAMPLE_SRCS := $(wildcard $(EXAMPLE_DIR)/*.c)
 EXAMPLE_OUTS := $(EXAMPLE_SRCS:.c=.out)
 EXAMPLES     := $(patsubst %.c, $(BUILD_DIR)/%, $(EXAMPLE_SRCS))
-
-TESTS        := $(patsubst $(TEST_DIR)/%.c, %, $(wildcard $(TEST_DIR)/*.c))
 
 .PHONY: clean install uninstall examples readme test tests
 all: examples
@@ -37,7 +44,7 @@ examples: $(EXAMPLES)
 
 $(BUILD_DIR)/$(EXAMPLE_DIR)/vorbis: $(EXAMPLE_DIR)/vorbis.c $(LIB_DIR)/stb_vorbis.c uprintf.h
 	@mkdir -p $(@D)
-	$(CC) $(CFLAGS) -I $(LIB_DIR) -o $@ $< -lm
+	$(CC) $(EXAMPLE_CFLAGS) -I $(LIB_DIR) -o $@ $< -lm
 
 $(LIB_DIR)/stb_vorbis.c:
 	@mkdir -p $(@D)
@@ -45,7 +52,7 @@ $(LIB_DIR)/stb_vorbis.c:
 
 $(BUILD_DIR)/$(EXAMPLE_DIR)/avl: $(EXAMPLE_DIR)/avl.c $(LIB_DIR)/avl uprintf.h
 	@mkdir -p $(@D)
-	$(CC) $(CFLAGS) -I $(LIB_DIR)/avl -o $@ $< $(LIB_DIR)/avl/avl.c
+	$(CC) $(EXAMPLE_CFLAGS) -I $(LIB_DIR)/avl -o $@ $< $(LIB_DIR)/avl/avl.c
 
 $(LIB_DIR)/avl:
 	@mkdir -p $(@D)
@@ -55,7 +62,7 @@ $(LIB_DIR)/avl:
 
 $(BUILD_DIR)/$(EXAMPLE_DIR)/sqlite: $(EXAMPLE_DIR)/sqlite.c $(LIB_DIR)/sqlite/sqlite3.c uprintf.h
 	@mkdir -p $(@D)
-	$(CC) $(CFLAGS) -I $(LIB_DIR)/sqlite -o $@ $<
+	$(CC) $(EXAMPLE_CFLAGS) -I $(LIB_DIR)/sqlite -o $@ $<
 
 $(LIB_DIR)/sqlite/sqlite3.c:
 	mkdir -p $(LIB_DIR)
@@ -65,12 +72,12 @@ $(LIB_DIR)/sqlite/sqlite3.c:
 
 $(BUILD_DIR)/$(EXAMPLE_DIR)/uprintf: $(EXAMPLE_DIR)/uprintf.c uprintf.h
 	@mkdir -p $(@D)
-	$(CC) $(CFLAGS) -o $@ $<
+	$(CC) $(EXAMPLE_CFLAGS) -o $@ $<
 
 
 readme: README.md.in $(EXAMPLE_OUTS)
 	cp README.md.in README.md
-	@for file in $(EXAMPLE_OUTS); do                     \
+	@for file in $(EXAMPLE_OUTS); do                                       \
 		sed -i -e "\:^!$$file$$: {" -e "r $$file" -e "d" -e "}" README.md; \
 	done
 
@@ -78,30 +85,53 @@ $(EXAMPLE_DIR)/%.out: $(BUILD_DIR)/$(EXAMPLE_DIR)/%
 	./$< > $@
 
 test: tests
-tests: $(foreach C,$(COMPILERS),$(foreach O,$(O_LEVELS),$(foreach G,$(G_LEVELS),$(foreach T,$(TESTS),$(BUILD_DIR)/test/$T/$C-$O-$G))))
+tests: $(foreach O,$(O_LEVELS),$(foreach G,$(G_LEVELS),\
+			$(foreach C,$(C_COMPILERS),$(foreach T,$(C_TESTS),$(BUILD_DIR)/test/$T/$C-$O-$G)) \
+			$(foreach C,$(CXX_COMPILERS),$(foreach T,$(CXX_TESTS),$(BUILD_DIR)/test/$T/$C-$O-$G))))
 
 # Export all variables to subprocesses, i.e. test.sh
 export
 
-define TEST_TEMPLATE
-$(BUILD_DIR)/test/$1/$2-$3-$4: $(BUILD_DIR)/impl/$2.o $(TEST_DIR)/$1.c uprintf.h test.sh
-	@./test.sh $1 $2 $3 $4
+define C_TEST_TEMPLATE
+$(BUILD_DIR)/test/$1/$2-$3-$4: $(TEST_DIR)/$1.c $(BUILD_DIR)/impl/$2.o test.sh
+	@./test.sh "$(CFLAGS)" $$< $1 $2 $3 $4
 endef
 
-$(foreach C,$(COMPILERS),                                 \
-	$(foreach O,$(O_LEVELS),                              \
-		$(foreach G,$(G_LEVELS),                          \
-			$(foreach T,$(TESTS),                         \
-				$(eval $(call TEST_TEMPLATE,$T,$C,$O,$G)) \
-			)                                             \
-		)                                                 \
-	)                                                     \
+define CXX_TEST_TEMPLATE
+$(BUILD_DIR)/test/$1/$2-$3-$4: $(TEST_DIR)/$1.cc $(BUILD_DIR)/impl/$2.o test.sh
+	@./test.sh "$(CXXFLAGS)" $$< $1 $2 $3 $4
+endef
+
+$(foreach O,$(O_LEVELS),                                      \
+	$(foreach G,$(G_LEVELS),                                  \
+		$(foreach C,$(C_COMPILERS),                           \
+			$(foreach T,$(C_TESTS),                           \
+				$(eval $(call C_TEST_TEMPLATE,$T,$C,$O,$G))   \
+			)                                                 \
+		)                                                     \
+		$(foreach C,$(CXX_COMPILERS),                         \
+			$(foreach T,$(CXX_TESTS),                         \
+				$(eval $(call CXX_TEST_TEMPLATE,$T,$C,$O,$G)) \
+			)                                                 \
+		)                                                     \
+	)                                                         \
 )
 
-define IMPL_TEMPLATE
+define C_IMPL_TEMPLATE
 $(BUILD_DIR)/impl/$1.o: uprintf.h
 	@mkdir -p $$(@D)
 	$1 $(CFLAGS) -DUPRINTF_IMPLEMENTATION -x c -c $$< -o $$@
 endef
 
-$(foreach C,$(COMPILERS),$(eval $(call IMPL_TEMPLATE,$C)))
+define CXX_IMPL_TEMPLATE
+$(BUILD_DIR)/impl/$1.o: $(BUILD_DIR)/uprintf.hh
+	@mkdir -p $$(@D)
+	$1 $(CXXFLAGS) -DUPRINTF_IMPLEMENTATION -x c++ -c $$< -o $$@
+endef
+
+$(BUILD_DIR)/uprintf.hh:
+	@mkdir -p $(@D)
+	ln -s $(shell pwd)/uprintf.h $@
+
+$(foreach C,$(C_COMPILERS),$(eval $(call C_IMPL_TEMPLATE,$C)))
+$(foreach C,$(CXX_COMPILERS),$(eval $(call CXX_IMPL_TEMPLATE,$C)))

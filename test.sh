@@ -5,15 +5,17 @@ RED="\e[1;31m"
 GREEN="\e[1;32m"
 YELLOW="\e[1;33m"
 
-if [ "$#" -ne 4 ]; then
-    echo "usage: $(basename $0) <test> <compiler> <o_level> <g_level>"
+if [ "$#" -ne 6 ]; then
+    echo "usage: $(basename $0) <compiler_flags> <src> <test> <compiler> <o_level> <g_level>"
     exit 1
 fi
 
-test=$1
-compiler=$2
-o_level=$3
-g_level=$4
+flags=$1
+src=$2
+test=$3
+compiler=$4
+o_level=$5
+g_level=$6
 
 executables=(wdiff $compiler)
 for executable in "${executables[@]}"; do
@@ -25,7 +27,6 @@ done
 
 test_id="$test-$compiler-$o_level-$g_level"
 dir="$BUILD_DIR/test/$test"
-src="$TEST_DIR/$test.c"
 bin="$dir/$compiler-$o_level-$g_level"
 log="$bin.log"
 output="$bin.out"
@@ -51,7 +52,7 @@ function should_skip {
 }
 
 # Regular tests share single uprintf implementation, but option tests need their own.
-function uses_shared_implementation {
+function use_shared_implementation {
     if   [ "$test" = "depth_option" ];       then echo false;
     elif [ "$test" = "indentation_option" ]; then echo false;
     elif [ "$test" = "stdio_file" ];         then echo false;
@@ -96,7 +97,7 @@ fi
 
 # Compiling
 mkdir -p $dir
-if [ $(uses_shared_implementation) = true ]; then
+if [ $(use_shared_implementation) = true ]; then
     object="$bin.o"
     implementation="$BUILD_DIR/impl/$compiler.o"
 
@@ -105,11 +106,11 @@ if [ $(uses_shared_implementation) = true ]; then
         exit 1
     fi
 
-    $compiler $CFLAGS -Werror -$o_level -$g_level -c $src -o $object > $log 2>&1
+    $compiler $flags -$o_level -$g_level -c $src -o $object > $log 2>&1
     ret=$?
-    $compiler $CFLAGS -Werror -$o_level -$g_level -o $bin $object $implementation >> $log 2>&1
+    $compiler $flags -$o_level -$g_level -o $bin $object $implementation >> $log 2>&1
 else
-    $compiler $CFLAGS -Werror -$o_level -$g_level -o $bin $src > $log 2>&1
+    $compiler $flags -$o_level -$g_level -o $bin $src > $log 2>&1
     ret=$?
 fi
 
