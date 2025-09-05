@@ -1,0 +1,33 @@
+CompileFlags:
+    Add:
+        - "-DUPRINTF_IMPLEMENTATION"
+        - "-DUPRINTF_TEST"
+---
+If:
+    PathMatch: [.*\.c, .*\.h]
+CompileFlags:
+    Add:
+        - "-xc-header"
+        - "-std=c11"
+---
+If:
+    PathMatch: [.*\.cc, .*\.hh]
+CompileFlags:
+    Add: ["-std=c++11"]
+---
+If:
+    PathMatch: [examples/.*]
+CompileFlags:
+    Add:
+        - "-Ilibs"
+        - "-Ilibs/avl"
+        - "-Ilibs/sqlite"
+---
+If:
+    PathMatch: [examples/.*, tests/.*]
+CompileFlags:
+    Add:
+        - "-I.."
+        - "-Ilibs"
+        - "-Ilibs/avl"
+        - "-Ilibs/sqlite"

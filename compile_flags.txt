@@ -1,7 +1,0 @@
--std=c11
--DUPRINTF_IMPLEMENTATION
--DUPRINTF_TEST
--I.
--Ilibs
--Ilibs/avl
--Ilibs/sqlite
