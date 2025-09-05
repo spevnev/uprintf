@@ -131,6 +131,7 @@ int dl_iterate_phdr(int (*callback)(struct dl_phdr_info *info, size_t size, void
 #define DW_UT_compile 0x01
 
 #define DW_TAG_array_type 0x01
+#define DW_TAG_class_type 0x02
 #define DW_TAG_enumeration_type 0x04
 #define DW_TAG_formal_parameter 0x05
 #define DW_TAG_lexical_block 0x0b
@@ -142,6 +143,7 @@ int dl_iterate_phdr(int (*callback)(struct dl_phdr_info *info, size_t size, void
 #define DW_TAG_typedef 0x16
 #define DW_TAG_union_type 0x17
 #define DW_TAG_unspecified_parameters 0x18
+#define DW_TAG_inheritance 0x1c
 #define DW_TAG_inlined_subroutine 0x1d
 #define DW_TAG_subrange_type 0x21
 #define DW_TAG_base_type 0x24
@@ -1485,7 +1487,8 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
 
             return type_ptr;
         }
-        case DW_TAG_structure_type: {
+        case DW_TAG_structure_type:
+        case DW_TAG_class_type: {
             _upf_type type = _UPF_ZERO_INIT;
             type.name = name ? name : "struct";
             type.kind = _UPF_TK_STRUCT;
@@ -1540,8 +1543,36 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                             _UPF_VECTOR_PUSH(&type.as.cstruct.members, member);
                         }
                     } break;
+                    case DW_TAG_inheritance: {
+                        _upf_type *parent_type = NULL;
+                        int64_t offset = -1;
+                        bool add_members = true;
+                        for (uint32_t i = 0; i < abbrev->attrs.length; i++) {
+                            _upf_attr attr = abbrev->attrs.data[i];
 
+                            if (attr.name == DW_AT_type) {
+                                const uint8_t *type_die = cu->base + _upf_get_ref(die, attr.form);
+                                parent_type = _upf_parse_type(cu, type_die);
+                            } else if (attr.name == DW_AT_data_member_location) {
+                                if (_upf_is_data(attr.form)) {
+                                    offset = _upf_get_data(die, attr);
+                                } else {
+                                    _UPF_WARN("Non-constant member offsets aren't supported. Skipping this field.");
+                                    add_members = false;
+                                }
+                            }
 
+                            die += _upf_get_attr_size(die, attr.form);
+                        }
+                        if (add_members) {
+                            _UPF_ASSERT(parent_type != NULL && parent_type->kind == _UPF_TK_STRUCT && offset != -1);
+                            for (uint32_t i = 0; i < parent_type->as.cstruct.members.length; i++) {
+                                _upf_member member = parent_type->as.cstruct.members.data[i];
+                                member.offset += offset;
+                                _UPF_VECTOR_PUSH(&type.as.cstruct.members, member);
+                            }
+                        }
+                    } break;
                     default:
                         die = _upf_skip_die(cu, die, abbrev);
                         break;
@@ -2087,6 +2118,7 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *die, const uint
             case DW_TAG_array_type:
             case DW_TAG_enumeration_type:
             case DW_TAG_pointer_type:
+            case DW_TAG_class_type:
             case DW_TAG_structure_type:
             case DW_TAG_typedef:
             case DW_TAG_union_type:
