@@ -1,0 +1,5 @@
+refs: {
+    int i = 5
+    const char *cstr = POINTER ("str")
+    float f = 1.230000
+}

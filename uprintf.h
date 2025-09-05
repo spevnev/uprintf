@@ -145,6 +145,7 @@ int dl_iterate_phdr(int (*callback)(struct dl_phdr_info *info, size_t size, void
 #define DW_TAG_lexical_block 0x0b
 #define DW_TAG_member 0x0d
 #define DW_TAG_pointer_type 0x0f
+#define DW_TAG_reference_type 0x10
 #define DW_TAG_compile_unit 0x11
 #define DW_TAG_structure_type 0x13
 #define DW_TAG_subroutine_type 0x15
@@ -448,6 +449,7 @@ struct _upf_type {
         } array;
         struct {
             _upf_type *type;
+            bool is_reference;
         } pointer;
         struct {
             _upf_type *return_type;
@@ -1474,13 +1476,15 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
 
             return _upf_new_type2(die_base, type);
         }
-        case DW_TAG_pointer_type: {
+        case DW_TAG_pointer_type:
+        case DW_TAG_reference_type: {
             _UPF_ASSERT(size == UINT64_MAX || size == sizeof(void *));
 
             _upf_type type = _UPF_ZERO_INIT;
             type.name = name;
             type.kind = _UPF_TK_POINTER;
             type.size = sizeof(void *);
+            type.as.pointer.is_reference = abbrev->tag == DW_TAG_reference_type;
 
             // Pointers must be added before parsing their data to prevent
             // self-referential structs from infinite recursion.
@@ -2124,9 +2128,10 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *die, const uint
                 _upf_parse_cu_scope(&cu, &scope_stack, depth, die, abbrev);
                 break;
             case DW_TAG_array_type:
+            case DW_TAG_class_type:
             case DW_TAG_enumeration_type:
             case DW_TAG_pointer_type:
-            case DW_TAG_class_type:
+            case DW_TAG_reference_type:
             case DW_TAG_structure_type:
             case DW_TAG_typedef:
             case DW_TAG_union_type:
@@ -3098,7 +3103,7 @@ static void _upf_print_typename(const _upf_type *type, bool print_trailing_white
     switch (type->kind) {
         case _UPF_TK_POINTER: {
             if (type->as.pointer.type == NULL) {
-                _upf_bprintf("void *");
+                _upf_bprintf("void %c", type->as.pointer.is_reference ? '&' : '*');
                 _upf_print_modifiers(type->modifiers);
                 break;
             }
@@ -3110,7 +3115,7 @@ static void _upf_print_typename(const _upf_type *type, bool print_trailing_white
             }
 
             _upf_print_typename(pointer_type, true, is_return_type);
-            _upf_bprintf("*");
+            _upf_bprintf("%c", type->as.pointer.is_reference ? '&' : '*');
             _upf_print_modifiers(type->modifiers);
         } break;
         case _UPF_TK_FUNCTION:
