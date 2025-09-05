@@ -297,11 +297,11 @@ int _upf_test_status = EXIT_SUCCESS;
         _UPF_SET_TEST_STATUS(EXIT_FAILURE); \
     } while (0)
 
-#define _UPF_ERROR(...)                            \
-    do {                                           \
-        _UPF_LOG("ERROR", __VA_ARGS__);            \
-        _UPF_SET_TEST_STATUS(EXIT_FAILURE);        \
-        longjmp(_upf_state.jmp_buf, EXIT_FAILURE); \
+#define _UPF_ERROR(...)                                  \
+    do {                                                 \
+        _UPF_LOG("ERROR", __VA_ARGS__);                  \
+        _UPF_SET_TEST_STATUS(EXIT_FAILURE);              \
+        longjmp(_upf_state.error_jmp_buf, EXIT_FAILURE); \
     } while (0)
 
 #define _UPF_ASSERT(condition)                                                                        \
@@ -638,7 +638,7 @@ struct _upf_state {
     uint32_t size;
     uint32_t free;
     // error handling
-    jmp_buf jmp_buf;
+    jmp_buf error_jmp_buf;
     const char *file_path;
     int line;
     // tokenizer
@@ -3598,7 +3598,7 @@ static void *_upf_get_this_executable_address(void) {
 // =================== ENTRY POINTS =======================
 
 __attribute__((constructor)) void _upf_init(void) {
-    if (setjmp(_upf_state.jmp_buf) != 0) return;
+    if (setjmp(_upf_state.error_jmp_buf) != 0) return;
 
     if (access("/proc/self/exe", R_OK) != 0) _UPF_ERROR("Expected \"/proc/self/exe\" to be a valid path.");
     if (access("/proc/self/maps", R_OK) != 0) _UPF_ERROR("Expected \"/proc/self/maps\" to be a valid path.");
@@ -3629,7 +3629,7 @@ extern "C" {
 __attribute__((noinline)) void _upf_uprintf(const char *file_path, int line, const char *fmt, const char *args_string, ...) {
     _UPF_ASSERT(file_path != NULL && line > 0 && fmt != NULL && args_string != NULL);
 
-    if (setjmp(_upf_state.jmp_buf) != 0) return;
+    if (setjmp(_upf_state.error_jmp_buf) != 0) return;
     if (!_upf_state.is_init) return;
 
     _upf_state.ptr = _upf_state.buffer;
