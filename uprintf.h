@@ -363,7 +363,6 @@ typedef struct {
 _UPF_VECTOR_TYPEDEF(_upf_attr_vec, _upf_attr);
 
 typedef struct {
-    uint64_t code;
     uint64_t tag;
     bool has_children;
     _upf_attr_vec attrs;
@@ -1056,14 +1055,14 @@ static size_t _upf_get_abbrev(const _upf_abbrev **abbrev, const _upf_cu *cu, con
 static _upf_abbrev_vec _upf_parse_abbrevs(const uint8_t *abbrev_table) {
     _UPF_ASSERT(abbrev_table != NULL);
 
+    uint64_t code;
     _upf_abbrev_vec abbrevs = _UPF_ZERO_INIT;
     while (true) {
         _upf_abbrev abbrev = _UPF_ZERO_INIT;
-        abbrev.code = UINT64_MAX;
         abbrev.tag = UINT64_MAX;
 
-        abbrev_table += _upf_uLEB_to_uint64(abbrev_table, &abbrev.code);
-        if (abbrev.code == 0) break;
+        abbrev_table += _upf_uLEB_to_uint64(abbrev_table, &code);
+        if (code == 0) break;
         abbrev_table += _upf_uLEB_to_uint64(abbrev_table, &abbrev.tag);
 
         abbrev.has_children = *abbrev_table;
@@ -1079,6 +1078,7 @@ static _upf_abbrev_vec _upf_parse_abbrevs(const uint8_t *abbrev_table) {
         }
 
         _UPF_VECTOR_PUSH(&abbrevs, abbrev);
+        _UPF_ASSERT(code == abbrevs.length);
     }
 
     return abbrevs;
