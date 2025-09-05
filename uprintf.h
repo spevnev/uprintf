@@ -1496,50 +1496,56 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
             while (true) {
                 die += _upf_get_abbrev(&abbrev, cu, die);
                 if (abbrev == NULL) break;
-                if (abbrev->tag != DW_TAG_member) {
-                    die = _upf_skip_die(die, abbrev);
-                    continue;
-                }
 
-                _upf_member member = _UPF_ZERO_INIT;
-                member.offset = UINT64_MAX;
+                switch (abbrev->tag) {
+                    case DW_TAG_member: {
+                        _upf_member member = _UPF_ZERO_INIT;
+                        member.offset = UINT64_MAX;
 
-                bool skip_member = false;
-                for (uint32_t i = 0; i < abbrev->attrs.length; i++) {
-                    _upf_attr attr = abbrev->attrs.data[i];
+                        bool add_member = true;
+                        for (uint32_t i = 0; i < abbrev->attrs.length; i++) {
+                            _upf_attr attr = abbrev->attrs.data[i];
 
-                    if (attr.name == DW_AT_name) {
-                        member.name = _upf_get_str(cu, die, attr.form);
-                    } else if (attr.name == DW_AT_type) {
-                        const uint8_t *type_die = cu->base + _upf_get_ref(die, attr.form);
-                        member.type = _upf_parse_type(cu, type_die);
-                    } else if (attr.name == DW_AT_data_member_location) {
-                        if (_upf_is_data(attr.form)) {
-                            member.offset = _upf_get_data(die, attr);
-                        } else {
-                            _UPF_WARN("Non-constant member offsets aren't supported. Skipping this field.");
-                            skip_member = true;
+                            if (attr.name == DW_AT_name) {
+                                member.name = _upf_get_str(cu, die, attr.form);
+                            } else if (attr.name == DW_AT_type) {
+                                const uint8_t *type_die = cu->base + _upf_get_ref(die, attr.form);
+                                member.type = _upf_parse_type(cu, type_die);
+                            } else if (attr.name == DW_AT_data_member_location) {
+                                if (_upf_is_data(attr.form)) {
+                                    member.offset = _upf_get_data(die, attr);
+                                } else {
+                                    _UPF_WARN("Non-constant member offsets aren't supported. Skipping this field.");
+                                    add_member = false;
+                                }
+                            } else if (attr.name == DW_AT_bit_offset) {
+                                _UPF_WARN("DW_AT_bit_offset is deprecated in DWARF v5. Skipping this field.");
+                                add_member = false;
+                            } else if (attr.name == DW_AT_data_bit_offset) {
+                                member.offset = _upf_get_data(die, attr);
+                            } else if (attr.name == DW_AT_bit_size) {
+                                if (_upf_is_data(attr.form)) {
+                                    member.bit_size = _upf_get_data(die, attr);
+                                } else {
+                                    _UPF_WARN("Non-constant bit field sizes aren't supported. Skipping this field.");
+                                    add_member = false;
+                                }
+                            }
+
+                            die += _upf_get_attr_size(die, attr.form);
                         }
-                    } else if (attr.name == DW_AT_bit_offset) {
-                        _UPF_WARN("DW_AT_bit_offset is deprecated in DWARF v5. Skipping this field.");
-                        skip_member = true;
-                    } else if (attr.name == DW_AT_data_bit_offset) {
-                        member.offset = _upf_get_data(die, attr);
-                    } else if (attr.name == DW_AT_bit_size) {
-                        if (_upf_is_data(attr.form)) {
-                            member.bit_size = _upf_get_data(die, attr);
-                        } else {
-                            _UPF_WARN("Non-constant bit field sizes aren't supported. Skipping this field.");
-                            skip_member = true;
+                        if (add_member) {
+                            _UPF_ASSERT(member.type != NULL && member.offset != UINT64_MAX);
+                            if (member.name == NULL) member.name = "<anonymous>";
+                            _UPF_VECTOR_PUSH(&type.as.cstruct.members, member);
                         }
-                    }
+                    } break;
 
-                    die += _upf_get_attr_size(die, attr.form);
+
+                    default:
+                        die = _upf_skip_die(cu, die, abbrev);
+                        break;
                 }
-                if (skip_member) continue;
-
-                _UPF_ASSERT(member.name != NULL && member.type != NULL && member.offset != UINT64_MAX);
-                _UPF_VECTOR_PUSH(&type.as.cstruct.members, member);
             }
 
             return _upf_new_type2(die_base, type);
@@ -1583,7 +1589,8 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                 }
                 if (skip_member) continue;
 
-                _UPF_ASSERT(member.name != NULL && member.type != NULL);
+                _UPF_ASSERT(member.type != NULL);
+                if (member.name == NULL) member.name = "<anonymous>";
                 _UPF_VECTOR_PUSH(&type.as.cstruct.members, member);
             }
 
