@@ -11,3 +11,6 @@ AllowShortIfStatementsOnASingleLine: AllIfsAndElse
 AlignTrailingComments: true
 DerivePointerAlignment: false
 PointerAlignment: Right
+AllowShortCaseLabelsOnASingleLine: true
+AlignConsecutiveShortCaseStatements:
+  Enabled: true
