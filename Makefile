@@ -84,6 +84,7 @@ readme: README.md.in $(EXAMPLE_OUTS)
 $(EXAMPLE_DIR)/%.out: $(BUILD_DIR)/$(EXAMPLE_DIR)/%
 	./$< > $@
 
+
 test: tests
 tests: $(foreach O,$(O_LEVELS),$(foreach G,$(G_LEVELS),\
 			$(foreach C,$(C_COMPILERS),$(foreach T,$(C_TESTS),$(BUILD_DIR)/test/$T/$C-$O-$G)) \
