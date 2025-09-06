@@ -19,15 +19,12 @@ If:
     PathMatch: [examples/.*]
 CompileFlags:
     Add:
-        - "-Ilibs"
-        - "-Ilibs/avl"
-        - "-Ilibs/sqlite"
+        - "-I../libs"
+        - "-I../libs/avl"
+        - "-I../libs/sqlite"
 ---
 If:
     PathMatch: [examples/.*, tests/.*]
 CompileFlags:
     Add:
         - "-I.."
-        - "-Ilibs"
-        - "-Ilibs/avl"
-        - "-Ilibs/sqlite"
