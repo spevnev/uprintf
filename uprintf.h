@@ -162,6 +162,7 @@ int dl_iterate_phdr(int (*callback)(struct dl_phdr_info *info, size_t size, void
 #define DW_TAG_variable 0x34
 #define DW_TAG_volatile_type 0x35
 #define DW_TAG_restrict_type 0x37
+#define DW_TAG_rvalue_reference_type 0x42
 #define DW_TAG_atomic_type 0x47
 #define DW_TAG_call_site 0x48
 #define DW_TAG_call_site_parameter 0x49
@@ -390,6 +391,7 @@ typedef enum {
     _UPF_TK_ENUM,
     _UPF_TK_ARRAY,
     _UPF_TK_POINTER,
+    _UPF_TK_RVALUE_REFERENCE,
     _UPF_TK_FUNCTION,
     _UPF_TK_U1,
     _UPF_TK_U2,
@@ -451,6 +453,9 @@ struct _upf_type {
             _upf_type *type;
             bool is_reference;
         } pointer;
+        struct {
+            _upf_type *type;
+        } rvalue_reference;
         struct {
             _upf_type *return_type;
             _upf_type_ptr_vec arg_types;
@@ -765,10 +770,11 @@ static bool _upf_is_primitive(const _upf_type *type) {
     switch (type->kind) {
         case _UPF_TK_STRUCT:
         case _UPF_TK_UNION:
-        case _UPF_TK_ARRAY:    return false;
+        case _UPF_TK_ARRAY:            return false;
         case _UPF_TK_FUNCTION:
         case _UPF_TK_ENUM:
         case _UPF_TK_POINTER:
+        case _UPF_TK_RVALUE_REFERENCE:
         case _UPF_TK_U1:
         case _UPF_TK_U2:
         case _UPF_TK_U4:
@@ -783,7 +789,7 @@ static bool _upf_is_primitive(const _upf_type *type) {
         case _UPF_TK_SCHAR:
         case _UPF_TK_UCHAR:
         case _UPF_TK_VOID:
-        case _UPF_TK_UNKNOWN:  return true;
+        case _UPF_TK_UNKNOWN:          return true;
     }
     _UPF_ERROR("Invalid type: %d.", type->kind);
 }
@@ -1431,6 +1437,17 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
             type_ptr->name = type_ptr->as.pointer.type->name;
 
             return type_ptr;
+        }
+        case DW_TAG_rvalue_reference_type: {
+            _UPF_ASSERT(subtype_offset != UINT64_MAX);
+
+            _upf_type type = _UPF_ZERO_INIT;
+            type.name = name;
+            type.kind = _UPF_TK_RVALUE_REFERENCE;
+            type.size = 0;
+            type.as.rvalue_reference.type = _upf_parse_type(cu, cu->base + subtype_offset);
+
+            return _upf_new_type2(die_base, type);
         }
         case DW_TAG_structure_type:
         case DW_TAG_class_type:     {
@@ -2968,6 +2985,10 @@ static void _upf_print_typename(const _upf_type *type, bool print_trailing_white
             _upf_bprintf("%c", type->as.pointer.is_reference ? '&' : '*');
             _upf_print_modifiers(type->modifiers);
         } break;
+        case _UPF_TK_RVALUE_REFERENCE: {
+            _upf_print_typename(type->as.rvalue_reference.type, true, is_return_type);
+            _upf_bprintf("&&");
+        } break;
         case _UPF_TK_FUNCTION:
             if (is_return_type) _upf_bprintf("(");
 
@@ -3294,7 +3315,8 @@ __attribute__((no_sanitize_address)) static void _upf_print_type(_upf_indexed_st
             _upf_print_type(circular, (const uint8_t *) ptr, pointed_type, depth);
             _upf_bprintf(")");
         } break;
-        case _UPF_TK_FUNCTION: {
+        case _UPF_TK_RVALUE_REFERENCE: _upf_print_type(circular, data, type->as.rvalue_reference.type, depth); break;
+        case _UPF_TK_FUNCTION:         {
             uint64_t absolute_function_pc = (uint64_t) data;
             uint64_t relative_function_pc = data - _upf_state.base;
 

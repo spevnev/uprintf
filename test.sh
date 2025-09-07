@@ -31,15 +31,15 @@ bin="$dir/$compiler-$o_level-$g_level"
 log="$bin.log"
 output="$bin.out"
 baseline="$BASELINE_DIR/$test.out"
-is_gcc=false
 
-if [ $(echo "$compiler" | head -c 3) = "gcc" ]; then is_gcc=true; fi
+is_clang=false
+if [ $(echo "$compiler" | head -c 5) = "clang" ]; then is_clang=true; fi
 
 # Some tests fail on older versions of compilers
 function should_skip {
     result=false
 
-    if [ $is_gcc = false ]; then
+    if [ $is_clang = true ]; then
         major_version=$("$compiler" -dumpversion | cut -d. -f1)
 
         if [ $major_version -le 15 ]; then
@@ -64,10 +64,7 @@ function use_shared_implementation {
 function get_similarity {
     result=100
 
-    if [ $is_gcc = true ]; then
-        # Some GCC versions use "size_t" while others use "unsigned long int".
-        if [ "$test" = "function" ]; then result=95; fi
-    else
+    if [ $is_clang = true ]; then
         # These tests contain stdint.h types which have different typenames in gcc and clang.
         # Baselines are generated from gcc, so decrease its similarity for clang:
         if   [ "$test" = "struct" ];        then result=90;
@@ -77,14 +74,19 @@ function get_similarity {
         # retrieval of function definition doesn't work.
         # Also, some GCC versions use "size_t" while others use "unsigned long int".
         elif [ "$test" = "function" ]; then result=85; fi
+    else
+        # Some GCC versions use "size_t" while others use "unsigned long int".
+        if [ "$test" = "function" ]; then result=95;
+        # GCC doesn't output the information about the second function.
+        elif [ "$test" = "rvalue" ]; then result=50; fi
     fi
 
     # FILE has different implementation depending on stdio.h and it often has pointers
     # that point out-of-bounds which prints garbage data.
     # The primary goal is to check that there are no errors, i.e. segfaults, leaks.
-    if   [ "$test" = "stdio_file" ]; then result=10;
+    if [ "$test" = "stdio_file" ]; then result=10;
     # When union is initialized with pointers, its number members are different every time.
-    elif [ "$test" = "union" ];      then result=90; fi
+    elif [ "$test" = "union" ]; then result=90; fi
 
     echo $result
 }
