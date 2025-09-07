@@ -1,0 +1,6 @@
+int: 5
+float: 0.000000
+const int: 5
+struct: {
+    int p = 1
+}

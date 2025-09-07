@@ -552,6 +552,7 @@ typedef enum {
     _UPF_TT_GENERIC,
     _UPF_TT_SIZEOF,
     _UPF_TT_ALIGNOF,
+    _UPF_TT_CXX_CAST,
     _UPF_TT_OPEN_PAREN,
     _UPF_TT_CLOSE_PAREN,
     _UPF_TT_OPEN_BRACKET,
@@ -566,6 +567,8 @@ typedef enum {
     _UPF_TT_PLUS,
     _UPF_TT_MINUS,
     _UPF_TT_STAR,
+    _UPF_TT_LESS_THAN,
+    _UPF_TT_GREATER_THAN,
     _UPF_TT_LOGICAL,
     _UPF_TT_FACTOR,
     _UPF_TT_AMPERSAND,
@@ -2244,7 +2247,7 @@ static void _upf_tokenize(const char *string) {
            {_UPF_TT_COMMA, ","},        {_UPF_TT_AMPERSAND, "&"},    {_UPF_TT_STAR, "*"},         {_UPF_TT_OPEN_PAREN, "("},
            {_UPF_TT_CLOSE_PAREN, ")"},  {_UPF_TT_DOT, "."},          {_UPF_TT_OPEN_BRACKET, "["}, {_UPF_TT_CLOSE_BRACKET, "]"},
            {_UPF_TT_OPEN_BRACE, "{"},   {_UPF_TT_CLOSE_BRACE, "}"},  {_UPF_TT_QUESTION, "?"},     {_UPF_TT_COLON, ":"},
-           {_UPF_TT_LOGICAL, "<"},      {_UPF_TT_LOGICAL, ">"},      {_UPF_TT_UNARY, "!"},        {_UPF_TT_PLUS, "+"},
+           {_UPF_TT_LESS_THAN, "<"},    {_UPF_TT_GREATER_THAN, ">"}, {_UPF_TT_UNARY, "!"},        {_UPF_TT_PLUS, "+"},
            {_UPF_TT_MINUS, "-"},        {_UPF_TT_UNARY, "~"},        {_UPF_TT_FACTOR, "/"},       {_UPF_TT_FACTOR, "%"},
            {_UPF_TT_LOGICAL, "^"},      {_UPF_TT_LOGICAL, "|"},      {_UPF_TT_ASSIGNMENT, "="}};
 
@@ -2271,6 +2274,10 @@ static void _upf_tokenize(const char *string) {
         {_UPF_TT_SIZEOF, "sizeof"},
         {_UPF_TT_ALIGNOF, "_Alignof"},
         {_UPF_TT_ALIGNOF, "alignof"},
+        {_UPF_TT_CXX_CAST, "static_cast"},
+        {_UPF_TT_CXX_CAST, "reinterpret_cast"},
+        {_UPF_TT_CXX_CAST, "dynamic_cast"},
+        {_UPF_TT_CXX_CAST, "const_cast"},
     };
 
     const char *ch = string;
@@ -2631,8 +2638,19 @@ static _upf_type *_upf_sizeof(void) {
 
 static _upf_type *_upf_alignof(void) {
     _upf_consume_token();
+    _upf_expect_token(_UPF_TT_OPEN_PAREN);
     _upf_consume_parens(_UPF_TT_OPEN_PAREN, _UPF_TT_CLOSE_PAREN);
     return _upf_get_number_type();
+}
+
+static _upf_type *_upf_cxx_cast(void) {
+    _upf_consume_token();
+    _upf_expect_token(_UPF_TT_LESS_THAN);
+    _upf_type *type = _upf_parse_typename();
+    _upf_expect_token(_UPF_TT_GREATER_THAN);
+    _upf_expect_token(_UPF_TT_OPEN_PAREN);
+    _upf_consume_parens(_UPF_TT_OPEN_PAREN, _UPF_TT_CLOSE_PAREN);
+    return type;
 }
 
 static _upf_type *_upf_unary(void) {
@@ -2818,6 +2836,7 @@ static void _upf_init_parsing_rules(void) {
     _UPF_DEFINE_RULE(_UPF_TT_GENERIC,      _upf_generic,    NULL,            _UPF_PREC_NONE      );
     _UPF_DEFINE_RULE(_UPF_TT_SIZEOF,       _upf_sizeof,     NULL,            _UPF_PREC_NONE      );
     _UPF_DEFINE_RULE(_UPF_TT_ALIGNOF,      _upf_alignof,    NULL,            _UPF_PREC_NONE      );
+    _UPF_DEFINE_RULE(_UPF_TT_CXX_CAST,     _upf_cxx_cast,   NULL,            _UPF_PREC_NONE      );
     _UPF_DEFINE_RULE(_UPF_TT_UNARY,        _upf_unary,      NULL,            _UPF_PREC_NONE      );
     _UPF_DEFINE_RULE(_UPF_TT_OPEN_PAREN,   _upf_paren,      _upf_call,       _UPF_PREC_POSTFIX   );
     _UPF_DEFINE_RULE(_UPF_TT_OPEN_BRACKET, NULL,            _upf_index,      _UPF_PREC_POSTFIX   );
@@ -2828,6 +2847,8 @@ static void _upf_init_parsing_rules(void) {
     _UPF_DEFINE_RULE(_UPF_TT_MINUS,        _upf_unary,      _upf_binary,     _UPF_PREC_TERM      );
     _UPF_DEFINE_RULE(_UPF_TT_STAR,         _upf_unary,      _upf_binary,     _UPF_PREC_FACTOR    );
     _UPF_DEFINE_RULE(_UPF_TT_AMPERSAND,    _upf_unary,      _upf_binary,     _UPF_PREC_LOGICAL   );
+    _UPF_DEFINE_RULE(_UPF_TT_LESS_THAN,    _upf_unary,      _upf_binary,     _UPF_PREC_LOGICAL   );
+    _UPF_DEFINE_RULE(_UPF_TT_GREATER_THAN,    _upf_unary,      _upf_binary,     _UPF_PREC_LOGICAL   );
     _UPF_DEFINE_RULE(_UPF_TT_LOGICAL,      NULL,            _upf_binary,     _UPF_PREC_LOGICAL   );
     _UPF_DEFINE_RULE(_UPF_TT_FACTOR,       NULL,            _upf_binary,     _UPF_PREC_FACTOR    );
     _UPF_DEFINE_RULE(_UPF_TT_QUESTION,     NULL,            _upf_ternary,    _UPF_PREC_TERNARY   );
