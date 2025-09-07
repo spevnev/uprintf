@@ -154,6 +154,7 @@ int dl_iterate_phdr(int (*callback)(struct dl_phdr_info *info, size_t size, void
 #define DW_TAG_unspecified_parameters 0x18
 #define DW_TAG_inheritance 0x1c
 #define DW_TAG_inlined_subroutine 0x1d
+#define DW_TAG_ptr_to_member_type 0x1f
 #define DW_TAG_subrange_type 0x21
 #define DW_TAG_base_type 0x24
 #define DW_TAG_const_type 0x26
@@ -392,6 +393,7 @@ typedef enum {
     _UPF_TK_ARRAY,
     _UPF_TK_POINTER,
     _UPF_TK_REFERENCE,
+    _UPF_TK_MEMBER_POINTER,
     _UPF_TK_FUNCTION,
     _UPF_TK_U1,
     _UPF_TK_U2,
@@ -566,7 +568,9 @@ typedef enum {
     _UPF_TT_CLOSE_BRACE,
     _UPF_TT_COMMA,
     _UPF_TT_DOT,
+    _UPF_TT_DOT_STAR,
     _UPF_TT_ARROW,
+    _UPF_TT_ARROW_STAR,
     _UPF_TT_UNARY,
     _UPF_TT_INCREMENT,
     _UPF_TT_PLUS,
@@ -777,11 +781,12 @@ static bool _upf_is_primitive(const _upf_type *type) {
     switch (type->kind) {
         case _UPF_TK_STRUCT:
         case _UPF_TK_UNION:
-        case _UPF_TK_ARRAY:     return false;
+        case _UPF_TK_ARRAY:          return false;
         case _UPF_TK_FUNCTION:
         case _UPF_TK_ENUM:
         case _UPF_TK_POINTER:
         case _UPF_TK_REFERENCE:
+        case _UPF_TK_MEMBER_POINTER:
         case _UPF_TK_U1:
         case _UPF_TK_U2:
         case _UPF_TK_U4:
@@ -796,7 +801,7 @@ static bool _upf_is_primitive(const _upf_type *type) {
         case _UPF_TK_SCHAR:
         case _UPF_TK_UCHAR:
         case _UPF_TK_VOID:
-        case _UPF_TK_UNKNOWN:   return true;
+        case _UPF_TK_UNKNOWN:        return true;
     }
     _UPF_ERROR("Invalid type: %d.", type->kind);
 }
@@ -1620,6 +1625,13 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
             }
             return _upf_new_type2(die_base, type);
         }
+        case DW_TAG_ptr_to_member_type: {
+            _UPF_ASSERT(subtype_offset != UINT64_MAX);
+            _upf_type type = _UPF_ZERO_INIT;
+            type.kind = _UPF_TK_MEMBER_POINTER;
+            type.as.pointer.type = _upf_parse_type(cu, cu->base + subtype_offset);
+            return _upf_new_type2(die_base, type);
+        }
         case DW_TAG_typedef: {
             _UPF_ASSERT(name != NULL);
 
@@ -2040,6 +2052,7 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *die, const uint
             case DW_TAG_structure_type:
             case DW_TAG_typedef:
             case DW_TAG_union_type:
+            case DW_TAG_ptr_to_member_type:
             case DW_TAG_base_type:
             case DW_TAG_rvalue_reference_type: {
                 const char *type_name = _upf_get_typename(&cu, die, abbrev);
@@ -2268,13 +2281,13 @@ static void _upf_tokenize(const char *string) {
     // Signs must be ordered from longest to shortest to prevent multicharacter
     // sign from being tokenized as multiple single character ones.
     static const _upf_token signs[]
-        = {{_UPF_TT_ASSIGNMENT, "<<="}, {_UPF_TT_ASSIGNMENT, ">>="},
+        = {{_UPF_TT_ASSIGNMENT, "<<="}, {_UPF_TT_ASSIGNMENT, ">>="}, {_UPF_TT_ARROW_STAR, "->*"},
 
            {_UPF_TT_ARROW, "->"},       {_UPF_TT_INCREMENT, "++"},   {_UPF_TT_INCREMENT, "--"},   {_UPF_TT_LOGICAL, "<="},
            {_UPF_TT_LOGICAL, ">="},     {_UPF_TT_LOGICAL, "=="},     {_UPF_TT_LOGICAL, "!="},     {_UPF_TT_DOUBLE_AMPERSAND, "&&"},
            {_UPF_TT_LOGICAL, "||"},     {_UPF_TT_LOGICAL, "<<"},     {_UPF_TT_LOGICAL, ">>"},     {_UPF_TT_ASSIGNMENT, "*="},
            {_UPF_TT_ASSIGNMENT, "/="},  {_UPF_TT_ASSIGNMENT, "%="},  {_UPF_TT_ASSIGNMENT, "+="},  {_UPF_TT_ASSIGNMENT, "-="},
-           {_UPF_TT_ASSIGNMENT, "&="},  {_UPF_TT_ASSIGNMENT, "^="},  {_UPF_TT_ASSIGNMENT, "|="},
+           {_UPF_TT_ASSIGNMENT, "&="},  {_UPF_TT_ASSIGNMENT, "^="},  {_UPF_TT_ASSIGNMENT, "|="},  {_UPF_TT_DOT_STAR, ".*"},
 
            {_UPF_TT_COMMA, ","},        {_UPF_TT_AMPERSAND, "&"},    {_UPF_TT_STAR, "*"},         {_UPF_TT_OPEN_PAREN, "("},
            {_UPF_TT_CLOSE_PAREN, ")"},  {_UPF_TT_DOT, "."},          {_UPF_TT_OPEN_BRACKET, "["}, {_UPF_TT_CLOSE_BRACKET, "]"},
@@ -2766,6 +2779,13 @@ static _upf_type *_upf_dot(_upf_type *type) {
     return NULL;
 }
 
+static _upf_type *_upf_dot_star(__attribute__((unused)) _upf_type *_type) {
+    _upf_consume_token();
+    _upf_type *type = _upf_parse(_UPF_PREC_POSTFIX);
+    _UPF_ASSERT(type->kind == _UPF_TK_MEMBER_POINTER);
+    return type->as.pointer.type;
+}
+
 static _upf_type *_upf_postfix(_upf_type *type) {
     _upf_consume_token();
     // Post increment cannot change the type.
@@ -2883,6 +2903,8 @@ static void _upf_init_parsing_rules(void) {
     _UPF_DEFINE_RULE(_UPF_TT_OPEN_BRACKET,     NULL,            _upf_index,      _UPF_PREC_POSTFIX   );
     _UPF_DEFINE_RULE(_UPF_TT_DOT,              NULL,            _upf_dot,        _UPF_PREC_POSTFIX   );
     _UPF_DEFINE_RULE(_UPF_TT_ARROW,            NULL,            _upf_dot,        _UPF_PREC_POSTFIX   );
+    _UPF_DEFINE_RULE(_UPF_TT_DOT_STAR,         NULL,            _upf_dot_star,   _UPF_PREC_POSTFIX   );
+    _UPF_DEFINE_RULE(_UPF_TT_ARROW_STAR,       NULL,            _upf_dot_star,   _UPF_PREC_POSTFIX   );
     _UPF_DEFINE_RULE(_UPF_TT_FACTOR,           NULL,            _upf_binary,     _UPF_PREC_FACTOR    );
     _UPF_DEFINE_RULE(_UPF_TT_STAR,             _upf_unary,      _upf_binary,     _UPF_PREC_FACTOR    );
     _UPF_DEFINE_RULE(_UPF_TT_PLUS,             _upf_unary,      _upf_binary,     _UPF_PREC_TERM      );
@@ -3351,7 +3373,8 @@ __attribute__((no_sanitize_address)) static void _upf_print_type(_upf_indexed_st
                 _upf_print_type(circular, (const uint8_t *) ptr, type->as.reference.type, depth);
             }
         } break;
-        case _UPF_TK_FUNCTION: {
+        case _UPF_TK_MEMBER_POINTER: _upf_bprintf("<member pointer>"); break;
+        case _UPF_TK_FUNCTION:       {
             uint64_t absolute_function_pc = (uint64_t) data;
             uint64_t relative_function_pc = data - _upf_state.base;
 
