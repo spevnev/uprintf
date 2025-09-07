@@ -78,7 +78,7 @@ function get_similarity {
         # Some GCC versions use "size_t" while others use "unsigned long int".
         if [ "$test" = "function" ]; then result=95;
         # GCC doesn't output the information about the second function.
-        elif [ "$test" = "rvalue" ]; then result=50; fi
+        elif [ "$test" = "reference" ]; then result=85; fi
     fi
 
     # FILE has different implementation depending on stdio.h and it often has pointers

@@ -391,7 +391,7 @@ typedef enum {
     _UPF_TK_ENUM,
     _UPF_TK_ARRAY,
     _UPF_TK_POINTER,
-    _UPF_TK_RVALUE_REFERENCE,
+    _UPF_TK_REFERENCE,
     _UPF_TK_FUNCTION,
     _UPF_TK_U1,
     _UPF_TK_U2,
@@ -451,11 +451,11 @@ struct _upf_type {
         } array;
         struct {
             _upf_type *type;
-            bool is_reference;
         } pointer;
         struct {
             _upf_type *type;
-        } rvalue_reference;
+            bool is_rvalue;
+        } reference;
         struct {
             _upf_type *return_type;
             _upf_type_ptr_vec arg_types;
@@ -577,6 +577,7 @@ typedef enum {
     _UPF_TT_LOGICAL,
     _UPF_TT_FACTOR,
     _UPF_TT_AMPERSAND,
+    _UPF_TT_DOUBLE_AMPERSAND,
     _UPF_TT_QUESTION,
     _UPF_TT_COLON,
     _UPF_TT_ASSIGNMENT,
@@ -594,7 +595,6 @@ _UPF_VECTOR_TYPEDEF(_upf_token_vec, _upf_token);
 // https://en.cppreference.com/w/c/language/operator_precedence.html
 typedef enum {
     _UPF_PREC_NONE = 0,
-    _UPF_PREC_COMMA,
     _UPF_PREC_ASSIGNMENT,
     _UPF_PREC_TERNARY,
     _UPF_PREC_LOGICAL,
@@ -609,6 +609,13 @@ typedef struct {
     _upf_type *(*infix)(_upf_type *);
     _upf_parse_precedence precedence;
 } _upf_parse_rule;
+
+typedef struct {
+    int pointers;
+    bool reference;
+    _upf_type *function_type;
+    _upf_type **function_return_type;
+} _upf_abstract_declarator;
 
 // =================== GLOBAL STATE =======================
 
@@ -770,11 +777,11 @@ static bool _upf_is_primitive(const _upf_type *type) {
     switch (type->kind) {
         case _UPF_TK_STRUCT:
         case _UPF_TK_UNION:
-        case _UPF_TK_ARRAY:            return false;
+        case _UPF_TK_ARRAY:     return false;
         case _UPF_TK_FUNCTION:
         case _UPF_TK_ENUM:
         case _UPF_TK_POINTER:
-        case _UPF_TK_RVALUE_REFERENCE:
+        case _UPF_TK_REFERENCE:
         case _UPF_TK_U1:
         case _UPF_TK_U2:
         case _UPF_TK_U4:
@@ -789,7 +796,7 @@ static bool _upf_is_primitive(const _upf_type *type) {
         case _UPF_TK_SCHAR:
         case _UPF_TK_UCHAR:
         case _UPF_TK_VOID:
-        case _UPF_TK_UNKNOWN:          return true;
+        case _UPF_TK_UNKNOWN:   return true;
     }
     _UPF_ERROR("Invalid type: %d.", type->kind);
 }
@@ -1201,6 +1208,13 @@ static _upf_type *_upf_get_pointer_to_type(_upf_type *type_ptr) {
     return _upf_new_type(type);
 }
 
+static _upf_type *_upf_get_reference_to_type(_upf_type *type_ptr) {
+    _upf_type type = _UPF_ZERO_INIT;
+    type.kind = _UPF_TK_REFERENCE;
+    type.as.reference.type = type_ptr;
+    return _upf_new_type(type);
+}
+
 static bool _upf_is_pointer(const _upf_type *type) {
     _UPF_ASSERT(type != NULL);
     if (type->kind == _UPF_TK_POINTER || type->kind == _UPF_TK_ARRAY) return true;
@@ -1415,15 +1429,13 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
 
             return _upf_new_type2(die_base, type);
         }
-        case DW_TAG_pointer_type:
-        case DW_TAG_reference_type: {
+        case DW_TAG_pointer_type: {
             _UPF_ASSERT(size == UINT64_MAX || size == sizeof(void *));
 
             _upf_type type = _UPF_ZERO_INIT;
             type.name = name;
             type.kind = _UPF_TK_POINTER;
             type.size = sizeof(void *);
-            type.as.pointer.is_reference = abbrev->tag == DW_TAG_reference_type;
 
             // Pointers must be added before parsing their data to prevent
             // self-referential structs from infinite recursion.
@@ -1438,14 +1450,16 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
 
             return type_ptr;
         }
+        case DW_TAG_reference_type:
         case DW_TAG_rvalue_reference_type: {
             _UPF_ASSERT(subtype_offset != UINT64_MAX);
 
             _upf_type type = _UPF_ZERO_INIT;
             type.name = name;
-            type.kind = _UPF_TK_RVALUE_REFERENCE;
+            type.kind = _UPF_TK_REFERENCE;
             type.size = 0;
-            type.as.rvalue_reference.type = _upf_parse_type(cu, cu->base + subtype_offset);
+            type.as.reference.type = _upf_parse_type(cu, cu->base + subtype_offset);
+            type.as.reference.is_rvalue = abbrev->tag == DW_TAG_rvalue_reference_type;
 
             return _upf_new_type2(die_base, type);
         }
@@ -2026,7 +2040,8 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *die, const uint
             case DW_TAG_structure_type:
             case DW_TAG_typedef:
             case DW_TAG_union_type:
-            case DW_TAG_base_type:        {
+            case DW_TAG_base_type:
+            case DW_TAG_rvalue_reference_type: {
                 const char *type_name = _upf_get_typename(&cu, die, abbrev);
                 if (type_name == NULL) break;
 
@@ -2256,7 +2271,7 @@ static void _upf_tokenize(const char *string) {
         = {{_UPF_TT_ASSIGNMENT, "<<="}, {_UPF_TT_ASSIGNMENT, ">>="},
 
            {_UPF_TT_ARROW, "->"},       {_UPF_TT_INCREMENT, "++"},   {_UPF_TT_INCREMENT, "--"},   {_UPF_TT_LOGICAL, "<="},
-           {_UPF_TT_LOGICAL, ">="},     {_UPF_TT_LOGICAL, "=="},     {_UPF_TT_LOGICAL, "!="},     {_UPF_TT_LOGICAL, "&&"},
+           {_UPF_TT_LOGICAL, ">="},     {_UPF_TT_LOGICAL, "=="},     {_UPF_TT_LOGICAL, "!="},     {_UPF_TT_DOUBLE_AMPERSAND, "&&"},
            {_UPF_TT_LOGICAL, "||"},     {_UPF_TT_LOGICAL, "<<"},     {_UPF_TT_LOGICAL, ">>"},     {_UPF_TT_ASSIGNMENT, "*="},
            {_UPF_TT_ASSIGNMENT, "/="},  {_UPF_TT_ASSIGNMENT, "%="},  {_UPF_TT_ASSIGNMENT, "+="},  {_UPF_TT_ASSIGNMENT, "-="},
            {_UPF_TT_ASSIGNMENT, "&="},  {_UPF_TT_ASSIGNMENT, "^="},  {_UPF_TT_ASSIGNMENT, "|="},
@@ -2453,24 +2468,30 @@ static _upf_type *_upf_get_function(const _upf_cu *cu, const char *function_name
 
 static _upf_type *_upf_parse_expression(void) { return _upf_parse(_UPF_PREC_ASSIGNMENT); }
 
-static int _upf_parse_abstract_declarator(_upf_type **function_type, _upf_type ***function_return_type) {
-    _UPF_ASSERT(function_type != NULL && function_return_type != NULL);
-
-    int pointers = 0;
+static _upf_abstract_declarator _upf_parse_abstract_declarator(void) {
+    _upf_abstract_declarator result = _UPF_ZERO_INIT;
     while (_upf_match_token(_UPF_TT_STAR)) {
-        pointers++;
+        result.pointers++;
         while (_upf_match_token(_UPF_TT_TYPE_QUALIFIER)) continue;
     }
 
-    if (!_upf_match_token(_UPF_TT_OPEN_PAREN)) return pointers;
-    int sub_pointers = _upf_parse_abstract_declarator(function_type, function_return_type);
+    result.reference = _upf_match_token(_UPF_TT_AMPERSAND) || _upf_match_token(_UPF_TT_DOUBLE_AMPERSAND);
+
+    if (!_upf_match_token(_UPF_TT_OPEN_PAREN)) return result;
+
+    _upf_abstract_declarator sub_result = _upf_parse_abstract_declarator();
     _upf_expect_token(_UPF_TT_CLOSE_PAREN);
 
-    if (!_upf_match_token(_UPF_TT_OPEN_PAREN)) return pointers + sub_pointers;
+    if (!_upf_match_token(_UPF_TT_OPEN_PAREN)) {
+        sub_result.pointers += result.pointers;
+        return sub_result;
+    }
     _upf_consume_parens(_UPF_TT_OPEN_PAREN, _UPF_TT_CLOSE_PAREN);
 
-    _UPF_ASSERT(sub_pointers > 0);
-    sub_pointers--;
+    if (!sub_result.reference) {
+        _UPF_ASSERT(sub_result.pointers > 0);
+        sub_result.pointers--;
+    }
 
     _upf_type type = _UPF_ZERO_INIT;
     type.kind = _UPF_TK_FUNCTION;
@@ -2478,17 +2499,19 @@ static int _upf_parse_abstract_declarator(_upf_type **function_type, _upf_type *
     _upf_type *current_function_type = _upf_new_type(type);
     _upf_type **current_function_return_type = &current_function_type->as.function.return_type;
 
-    while (sub_pointers-- > 0) current_function_type = _upf_get_pointer_to_type(current_function_type);
+    while (sub_result.pointers-- > 0) current_function_type = _upf_get_pointer_to_type(current_function_type);
 
-    if (*function_type == NULL) {
-        *function_type = current_function_type;
+    if (sub_result.function_type == NULL) {
+        result.function_type = current_function_type;
     } else {
-        _UPF_ASSERT(*function_return_type != NULL);
-        **function_return_type = current_function_type;
-    }
+        _UPF_ASSERT(sub_result.function_return_type != NULL);
+        *sub_result.function_return_type = current_function_type;
 
-    *function_return_type = current_function_return_type;
-    return pointers;
+        result.function_type = sub_result.function_type;
+    }
+    result.function_return_type = current_function_return_type;
+
+    return result;
 }
 
 static _upf_type *_upf_parse_typename(void) {
@@ -2529,9 +2552,7 @@ static _upf_type *_upf_parse_typename(void) {
         }
     }
 
-    _upf_type *function_type = NULL;
-    _upf_type **function_return_type = NULL;
-    int pointers = _upf_parse_abstract_declarator(&function_type, &function_return_type);
+    _upf_abstract_declarator abstract_declarator = _upf_parse_abstract_declarator();
 
     _upf_type *type_ptr;
     if (identifier != NULL) {
@@ -2609,14 +2630,16 @@ static _upf_type *_upf_parse_typename(void) {
     }
 
     _UPF_ASSERT(type_ptr != NULL);
-    while (pointers > 0) {
+    while (abstract_declarator.pointers > 0) {
         type_ptr = _upf_get_pointer_to_type(type_ptr);
-        pointers--;
+        abstract_declarator.pointers--;
     }
 
-    if (function_type != NULL) {
-        *function_return_type = type_ptr;
-        type_ptr = function_type;
+    if (abstract_declarator.reference) type_ptr = _upf_get_reference_to_type(type_ptr);
+
+    if (abstract_declarator.function_type != NULL) {
+        *abstract_declarator.function_return_type = type_ptr;
+        type_ptr = abstract_declarator.function_type;
     }
 
     return type_ptr;
@@ -2847,29 +2870,30 @@ static void _upf_init_parsing_rules(void) {
 #define _UPF_DEFINE_RULE(token, prefix, infix, precedence) _upf_parse_rules[token] = (_upf_parse_rule) {prefix, infix, precedence}
 #endif
     // clang-format off
-    _UPF_DEFINE_RULE(_UPF_TT_NUMBER,       _upf_number,     NULL,            _UPF_PREC_NONE      );
-    _UPF_DEFINE_RULE(_UPF_TT_STRING,       _upf_string,     NULL,            _UPF_PREC_NONE      );
-    _UPF_DEFINE_RULE(_UPF_TT_IDENTIFIER,   _upf_identifier, NULL,            _UPF_PREC_NONE      );
-    _UPF_DEFINE_RULE(_UPF_TT_GENERIC,      _upf_generic,    NULL,            _UPF_PREC_NONE      );
-    _UPF_DEFINE_RULE(_UPF_TT_SIZEOF,       _upf_sizeof,     NULL,            _UPF_PREC_NONE      );
-    _UPF_DEFINE_RULE(_UPF_TT_ALIGNOF,      _upf_alignof,    NULL,            _UPF_PREC_NONE      );
-    _UPF_DEFINE_RULE(_UPF_TT_CXX_CAST,     _upf_cxx_cast,   NULL,            _UPF_PREC_NONE      );
-    _UPF_DEFINE_RULE(_UPF_TT_UNARY,        _upf_unary,      NULL,            _UPF_PREC_NONE      );
-    _UPF_DEFINE_RULE(_UPF_TT_OPEN_PAREN,   _upf_paren,      _upf_call,       _UPF_PREC_POSTFIX   );
-    _UPF_DEFINE_RULE(_UPF_TT_OPEN_BRACKET, NULL,            _upf_index,      _UPF_PREC_POSTFIX   );
-    _UPF_DEFINE_RULE(_UPF_TT_DOT,          NULL,            _upf_dot,        _UPF_PREC_POSTFIX   );
-    _UPF_DEFINE_RULE(_UPF_TT_ARROW,        NULL,            _upf_dot,        _UPF_PREC_POSTFIX   );
-    _UPF_DEFINE_RULE(_UPF_TT_INCREMENT,    _upf_unary,      _upf_postfix,    _UPF_PREC_POSTFIX   );
-    _UPF_DEFINE_RULE(_UPF_TT_PLUS,         _upf_unary,      _upf_binary,     _UPF_PREC_TERM      );
-    _UPF_DEFINE_RULE(_UPF_TT_MINUS,        _upf_unary,      _upf_binary,     _UPF_PREC_TERM      );
-    _UPF_DEFINE_RULE(_UPF_TT_STAR,         _upf_unary,      _upf_binary,     _UPF_PREC_FACTOR    );
-    _UPF_DEFINE_RULE(_UPF_TT_AMPERSAND,    _upf_unary,      _upf_binary,     _UPF_PREC_LOGICAL   );
-    _UPF_DEFINE_RULE(_UPF_TT_LESS_THAN,    _upf_unary,      _upf_binary,     _UPF_PREC_LOGICAL   );
-    _UPF_DEFINE_RULE(_UPF_TT_GREATER_THAN,    _upf_unary,      _upf_binary,     _UPF_PREC_LOGICAL   );
-    _UPF_DEFINE_RULE(_UPF_TT_LOGICAL,      NULL,            _upf_binary,     _UPF_PREC_LOGICAL   );
-    _UPF_DEFINE_RULE(_UPF_TT_FACTOR,       NULL,            _upf_binary,     _UPF_PREC_FACTOR    );
-    _UPF_DEFINE_RULE(_UPF_TT_QUESTION,     NULL,            _upf_ternary,    _UPF_PREC_TERNARY   );
-    _UPF_DEFINE_RULE(_UPF_TT_ASSIGNMENT,   NULL,            _upf_assignment, _UPF_PREC_ASSIGNMENT);
+    _UPF_DEFINE_RULE(_UPF_TT_NUMBER,           _upf_number,     NULL,            _UPF_PREC_NONE      );
+    _UPF_DEFINE_RULE(_UPF_TT_STRING,           _upf_string,     NULL,            _UPF_PREC_NONE      );
+    _UPF_DEFINE_RULE(_UPF_TT_IDENTIFIER,       _upf_identifier, NULL,            _UPF_PREC_NONE      );
+    _UPF_DEFINE_RULE(_UPF_TT_GENERIC,          _upf_generic,    NULL,            _UPF_PREC_NONE      );
+    _UPF_DEFINE_RULE(_UPF_TT_SIZEOF,           _upf_sizeof,     NULL,            _UPF_PREC_NONE      );
+    _UPF_DEFINE_RULE(_UPF_TT_ALIGNOF,          _upf_alignof,    NULL,            _UPF_PREC_NONE      );
+    _UPF_DEFINE_RULE(_UPF_TT_CXX_CAST,         _upf_cxx_cast,   NULL,            _UPF_PREC_NONE      );
+    _UPF_DEFINE_RULE(_UPF_TT_UNARY,            _upf_unary,      NULL,            _UPF_PREC_NONE      );
+    _UPF_DEFINE_RULE(_UPF_TT_OPEN_PAREN,       _upf_paren,      _upf_call,       _UPF_PREC_POSTFIX   );
+    _UPF_DEFINE_RULE(_UPF_TT_INCREMENT,        _upf_unary,      _upf_postfix,    _UPF_PREC_POSTFIX   );
+    _UPF_DEFINE_RULE(_UPF_TT_OPEN_BRACKET,     NULL,            _upf_index,      _UPF_PREC_POSTFIX   );
+    _UPF_DEFINE_RULE(_UPF_TT_DOT,              NULL,            _upf_dot,        _UPF_PREC_POSTFIX   );
+    _UPF_DEFINE_RULE(_UPF_TT_ARROW,            NULL,            _upf_dot,        _UPF_PREC_POSTFIX   );
+    _UPF_DEFINE_RULE(_UPF_TT_FACTOR,           NULL,            _upf_binary,     _UPF_PREC_FACTOR    );
+    _UPF_DEFINE_RULE(_UPF_TT_STAR,             _upf_unary,      _upf_binary,     _UPF_PREC_FACTOR    );
+    _UPF_DEFINE_RULE(_UPF_TT_PLUS,             _upf_unary,      _upf_binary,     _UPF_PREC_TERM      );
+    _UPF_DEFINE_RULE(_UPF_TT_MINUS,            _upf_unary,      _upf_binary,     _UPF_PREC_TERM      );
+    _UPF_DEFINE_RULE(_UPF_TT_AMPERSAND,        _upf_unary,      _upf_binary,     _UPF_PREC_LOGICAL   );
+    _UPF_DEFINE_RULE(_UPF_TT_LESS_THAN,        _upf_unary,      _upf_binary,     _UPF_PREC_LOGICAL   );
+    _UPF_DEFINE_RULE(_UPF_TT_GREATER_THAN,     _upf_unary,      _upf_binary,     _UPF_PREC_LOGICAL   );
+    _UPF_DEFINE_RULE(_UPF_TT_DOUBLE_AMPERSAND, NULL,            _upf_binary,     _UPF_PREC_LOGICAL   );
+    _UPF_DEFINE_RULE(_UPF_TT_LOGICAL,          NULL,            _upf_binary,     _UPF_PREC_LOGICAL   );
+    _UPF_DEFINE_RULE(_UPF_TT_QUESTION,         NULL,            _upf_ternary,    _UPF_PREC_TERNARY   );
+    _UPF_DEFINE_RULE(_UPF_TT_ASSIGNMENT,       NULL,            _upf_assignment, _UPF_PREC_ASSIGNMENT);
     // clang-format on
 #undef _UPF_DEFINE_RULE
 }
@@ -2970,7 +2994,7 @@ static void _upf_print_typename(const _upf_type *type, bool print_trailing_white
     switch (type->kind) {
         case _UPF_TK_POINTER: {
             if (type->as.pointer.type == NULL) {
-                _upf_bprintf("void %c", type->as.pointer.is_reference ? '&' : '*');
+                _upf_bprintf("void *");
                 _upf_print_modifiers(type->modifiers);
                 break;
             }
@@ -2982,12 +3006,12 @@ static void _upf_print_typename(const _upf_type *type, bool print_trailing_white
             }
 
             _upf_print_typename(pointer_type, true, is_return_type);
-            _upf_bprintf("%c", type->as.pointer.is_reference ? '&' : '*');
+            _upf_bprintf("*");
             _upf_print_modifiers(type->modifiers);
         } break;
-        case _UPF_TK_RVALUE_REFERENCE: {
-            _upf_print_typename(type->as.rvalue_reference.type, true, is_return_type);
-            _upf_bprintf("&&");
+        case _UPF_TK_REFERENCE: {
+            _upf_print_typename(type->as.reference.type, true, is_return_type);
+            _upf_bprintf("%s", type->as.reference.is_rvalue ? "&&" : "&");
         } break;
         case _UPF_TK_FUNCTION:
             if (is_return_type) _upf_bprintf("(");
@@ -3315,8 +3339,19 @@ __attribute__((no_sanitize_address)) static void _upf_print_type(_upf_indexed_st
             _upf_print_type(circular, (const uint8_t *) ptr, pointed_type, depth);
             _upf_bprintf(")");
         } break;
-        case _UPF_TK_RVALUE_REFERENCE: _upf_print_type(circular, data, type->as.rvalue_reference.type, depth); break;
-        case _UPF_TK_FUNCTION:         {
+        case _UPF_TK_REFERENCE: {
+            void *ptr;
+            memcpy(&ptr, data, sizeof(ptr));
+
+            // If it is a valid pointer, treat reference as a pointer,
+            // otherwise assume that it is the data.
+            if (_upf_get_memory_region_end(ptr) == NULL) {
+                _upf_print_type(circular, data, type->as.reference.type, depth);
+            } else {
+                _upf_print_type(circular, (const uint8_t *) ptr, type->as.reference.type, depth);
+            }
+        } break;
+        case _UPF_TK_FUNCTION: {
             uint64_t absolute_function_pc = (uint64_t) data;
             uint64_t relative_function_pc = data - _upf_state.base;
 

@@ -1,5 +1,9 @@
 {
-    int i = 1
-    int &ir = POINTER (2)
-    int *&ptr_ref = POINTER
+    int64_t i = 1
+    int &ir = 2
+    int *&ptr_ref = POINTER (2)
 }
+POINTER (void fun1(int &&i))
+POINTER (void fun2(int *&i))
+4
+5

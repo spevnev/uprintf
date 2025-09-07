@@ -1,2 +1,0 @@
-POINTER (void fun1(int &&i))
-POINTER (void fun2(int *&&i))
