@@ -51,6 +51,12 @@ function should_skip {
     echo $result
 }
 
+# Disable asan for tests that are known to leak memory.
+function disable_asan {
+    if   [ "$test" = "new" ]; then echo true;
+    else echo false; fi
+}
+
 # Regular tests share single uprintf implementation, but option tests need their own.
 function use_shared_implementation {
     if   [ "$test" = "depth_option" ];       then echo false;
@@ -124,6 +130,10 @@ if [ $ret -ne 0 ]; then
         echo -e "$RED[COMPILATION FAILED]$RESET $test_id. Log: $log"
     fi
     exit 1
+fi
+
+if [ $(disable_asan) = true ]; then
+    export ASAN_OPTIONS=detect_leaks=0
 fi
 
 ./$bin > $output 2>&1

@@ -559,7 +559,6 @@ typedef enum {
     _UPF_TT_GENERIC,
     _UPF_TT_SIZEOF,
     _UPF_TT_ALIGNOF,
-    _UPF_TT_CXX_CAST,
     _UPF_TT_OPEN_PAREN,
     _UPF_TT_CLOSE_PAREN,
     _UPF_TT_OPEN_BRACKET,
@@ -585,6 +584,9 @@ typedef enum {
     _UPF_TT_QUESTION,
     _UPF_TT_COLON,
     _UPF_TT_ASSIGNMENT,
+    _UPF_TT_CXX_CAST,
+    _UPF_TT_CXX_NEW,
+    _UPF_TT_CXX_SCOPE,
 
     _UPF_TT_COUNT
 } _upf_token_type;
@@ -617,6 +619,7 @@ typedef struct {
 typedef struct {
     int pointers;
     bool reference;
+    bool failed;
     _upf_type *function_type;
     _upf_type **function_return_type;
 } _upf_abstract_declarator;
@@ -665,7 +668,7 @@ struct _upf_state {
     int line;
     // tokenizer
     _upf_token_vec tokens;
-    size_t tokens_idx;
+    uint32_t tokens_idx;
     // parser
     uint64_t current_pc;
     _upf_cu *current_cu;
@@ -2288,6 +2291,7 @@ static void _upf_tokenize(const char *string) {
            {_UPF_TT_LOGICAL, "||"},     {_UPF_TT_LOGICAL, "<<"},     {_UPF_TT_LOGICAL, ">>"},     {_UPF_TT_ASSIGNMENT, "*="},
            {_UPF_TT_ASSIGNMENT, "/="},  {_UPF_TT_ASSIGNMENT, "%="},  {_UPF_TT_ASSIGNMENT, "+="},  {_UPF_TT_ASSIGNMENT, "-="},
            {_UPF_TT_ASSIGNMENT, "&="},  {_UPF_TT_ASSIGNMENT, "^="},  {_UPF_TT_ASSIGNMENT, "|="},  {_UPF_TT_DOT_STAR, ".*"},
+           {_UPF_TT_CXX_SCOPE, "::"},
 
            {_UPF_TT_COMMA, ","},        {_UPF_TT_AMPERSAND, "&"},    {_UPF_TT_STAR, "*"},         {_UPF_TT_OPEN_PAREN, "("},
            {_UPF_TT_CLOSE_PAREN, ")"},  {_UPF_TT_DOT, "."},          {_UPF_TT_OPEN_BRACKET, "["}, {_UPF_TT_CLOSE_BRACKET, "]"},
@@ -2323,6 +2327,7 @@ static void _upf_tokenize(const char *string) {
         {_UPF_TT_CXX_CAST, "reinterpret_cast"},
         {_UPF_TT_CXX_CAST, "dynamic_cast"},
         {_UPF_TT_CXX_CAST, "const_cast"},
+        {_UPF_TT_CXX_NEW, "new"},
     };
 
     const char *ch = string;
@@ -2490,10 +2495,15 @@ static _upf_abstract_declarator _upf_parse_abstract_declarator(void) {
 
     result.reference = _upf_match_token(_UPF_TT_AMPERSAND) || _upf_match_token(_UPF_TT_DOUBLE_AMPERSAND);
 
+    uint32_t current_idx = _upf_state.tokens_idx;
     if (!_upf_match_token(_UPF_TT_OPEN_PAREN)) return result;
 
     _upf_abstract_declarator sub_result = _upf_parse_abstract_declarator();
-    _upf_expect_token(_UPF_TT_CLOSE_PAREN);
+    if (sub_result.failed || !_upf_match_token(_UPF_TT_CLOSE_PAREN)) {
+        _upf_state.tokens_idx = current_idx;
+        result.failed = true;
+        return result;
+    }
 
     if (!_upf_match_token(_UPF_TT_OPEN_PAREN)) {
         sub_result.pointers += result.pointers;
@@ -2564,6 +2574,7 @@ static _upf_type *_upf_parse_typename(void) {
             default:                 parsed_type = true; break;
         }
     }
+    if (identifier == NULL && type_specifiers_idx == 0) return NULL;
 
     _upf_abstract_declarator abstract_declarator = _upf_parse_abstract_declarator();
 
@@ -2706,6 +2717,45 @@ static _upf_type *_upf_cxx_cast(void) {
     return type;
 }
 
+static _upf_type *_upf_cxx_new(void) {
+    _upf_consume_token();
+
+    _upf_type *type = NULL;
+    if (_upf_match_token(_UPF_TT_OPEN_PAREN)) {
+        // Try to parse as "new (type)".
+        uint32_t current_idx = _upf_state.tokens_idx;
+        type = _upf_parse_typename();
+
+        // Parse as "new (placement-args) type".
+        if (!_upf_match_token(_UPF_TT_CLOSE_PAREN) || type == NULL) {
+            _upf_state.tokens_idx = current_idx;
+            _upf_consume_parens(_UPF_TT_OPEN_PAREN, _UPF_TT_CLOSE_PAREN);
+
+            bool is_parenthesised = _upf_match_token(_UPF_TT_OPEN_PAREN);
+            type = _upf_parse_typename();
+            if (is_parenthesised) _upf_expect_token(_UPF_TT_CLOSE_PAREN);
+        }
+    } else {
+        // Parse as "new type".
+        type = _upf_parse_typename();
+    }
+
+    // Optional parentheses- or brace-enclosed initializer.
+    if (_upf_match_token(_UPF_TT_OPEN_PAREN)) {
+        _upf_consume_parens(_UPF_TT_OPEN_PAREN, _UPF_TT_CLOSE_PAREN);
+    } else if (_upf_match_token(_UPF_TT_OPEN_BRACE)) {
+        _upf_consume_parens(_UPF_TT_OPEN_BRACE, _UPF_TT_CLOSE_BRACE);
+    }
+
+    return _upf_get_pointer_to_type(type);
+}
+
+static _upf_type *_upf_cxx_scope(void) {
+    _upf_consume_token();
+    if (_upf_peek_token().type == _UPF_TT_CXX_NEW) return _upf_cxx_new();
+    _UPF_ERROR("TODO");
+}
+
 static _upf_type *_upf_unary(void) {
     _upf_token unop = _upf_consume_token();
     _upf_type *type = _upf_parse(_UPF_PREC_UNARY);
@@ -2721,7 +2771,7 @@ static _upf_type *_upf_paren(void) {
     _upf_consume_token();
 
     // Try to parse as grouping: "(expression)".
-    size_t current_idx = _upf_state.tokens_idx;
+    uint32_t current_idx = _upf_state.tokens_idx;
     _upf_type *type = NULL;
     do {
         type = _upf_parse_expression();
@@ -2897,6 +2947,8 @@ static void _upf_init_parsing_rules(void) {
     _UPF_DEFINE_RULE(_UPF_TT_SIZEOF,           _upf_sizeof,     NULL,            _UPF_PREC_NONE      );
     _UPF_DEFINE_RULE(_UPF_TT_ALIGNOF,          _upf_alignof,    NULL,            _UPF_PREC_NONE      );
     _UPF_DEFINE_RULE(_UPF_TT_CXX_CAST,         _upf_cxx_cast,   NULL,            _UPF_PREC_NONE      );
+    _UPF_DEFINE_RULE(_UPF_TT_CXX_NEW,          _upf_cxx_new,    NULL,            _UPF_PREC_NONE      );
+    _UPF_DEFINE_RULE(_UPF_TT_CXX_SCOPE,        _upf_cxx_scope,  NULL,            _UPF_PREC_NONE      );
     _UPF_DEFINE_RULE(_UPF_TT_UNARY,            _upf_unary,      NULL,            _UPF_PREC_NONE      );
     _UPF_DEFINE_RULE(_UPF_TT_OPEN_PAREN,       _upf_paren,      _upf_call,       _UPF_PREC_POSTFIX   );
     _UPF_DEFINE_RULE(_UPF_TT_INCREMENT,        _upf_unary,      _upf_postfix,    _UPF_PREC_POSTFIX   );
