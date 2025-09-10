@@ -9,7 +9,7 @@ Examples and their outputs can be found in [examples](examples), and can be buil
 ### Example outputs
 
 <details>
-  <summary>avl</summary>
+  <summary>avl (<a href="https://github.com/etherealvisage/avl">src</a>)</summary>
 
 ```c
 !examples/avl.out
@@ -17,7 +17,7 @@ Examples and their outputs can be found in [examples](examples), and can be buil
 </details>
 
 <details>
-  <summary>sqlite</summary>
+  <summary>sqlite (<a href="https://www.sqlite.org">src</a>)</summary>
 
 ```c
 !examples/sqlite.out
@@ -25,10 +25,18 @@ Examples and their outputs can be found in [examples](examples), and can be buil
 </details>
 
 <details>
-  <summary>vorbis</summary>
+  <summary>vorbis (<a href="https://github.com/nothings/stb/blob/master/stb_vorbis.c">src</a>)</summary>
 
 ```c
 !examples/vorbis.out
+```
+</details>
+
+<details>
+  <summary>miniaudio (<a href="https://github.com/mackron/miniaudio">src</a>)</summary>
+
+```c
+!examples/miniaudio.out
 ```
 </details>
 

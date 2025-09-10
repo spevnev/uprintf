@@ -773,7 +773,7 @@ static size_t _upf_LEB_to_int64(const uint8_t *leb, int64_t *result) {
         *result |= (((uint64_t) (b & BITS_MASK)) << shift);
         shift += 7;
     } while (b & CONTINUE_MASK);
-    if ((shift < sizeof(*result) * 8) && (b & SIGN_MASK)) *result |= -(1 << shift);
+    if ((shift < sizeof(*result) * 8) && (b & SIGN_MASK)) *result |= -(1LL << shift);
 
     return i;
 }

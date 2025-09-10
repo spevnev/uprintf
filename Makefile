@@ -74,6 +74,14 @@ $(BUILD_DIR)/$(EXAMPLE_DIR)/uprintf: $(EXAMPLE_DIR)/uprintf.c uprintf.h
 	@mkdir -p $(@D)
 	$(CC) $(EXAMPLE_CFLAGS) -o $@ $<
 
+$(BUILD_DIR)/$(EXAMPLE_DIR)/miniaudio: $(EXAMPLE_DIR)/miniaudio.c $(LIB_DIR)/miniaudio.h uprintf.h
+	@mkdir -p $(@D)
+	$(CC) $(EXAMPLE_CFLAGS) -I $(LIB_DIR) -o $@ $< -lm -lpthread
+
+$(LIB_DIR)/miniaudio.h:
+	@mkdir -p $(@D)
+	wget https://raw.githubusercontent.com/mackron/miniaudio/refs/heads/master/miniaudio.h -O $@
+
 
 readme: README.md.in $(EXAMPLE_OUTS)
 	cp README.md.in README.md
