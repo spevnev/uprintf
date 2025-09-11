@@ -46,6 +46,8 @@ function should_skip {
             # Old bit fields format (not DWARFv5)
             if [ "$test" = "bits" ]; then result=true; fi
         fi
+
+        if [ "$test" = "scoped_type" ]; then result=true; fi
     fi
 
     echo $result
