@@ -1,0 +1,5 @@
+C: {
+    int i = 1
+    float f = 1.200000
+    const char *cstr = POINTER ("str")
+}

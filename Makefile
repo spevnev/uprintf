@@ -17,8 +17,8 @@ CXX_COMPILERS ?= clang++ g++
 O_LEVELS      ?= O0 O2 O3 Os
 G_LEVELS      ?= g2 g3
 
-C_TESTS   := $(patsubst $(TEST_DIR)/%.c, %, $(wildcard $(TEST_DIR)/*.c))
-CXX_TESTS := $(patsubst $(TEST_DIR)/%.cc, %, $(wildcard $(TEST_DIR)/*.cc))
+C_TESTS   ?= $(patsubst $(TEST_DIR)/%.c, %, $(wildcard $(TEST_DIR)/*.c))
+CXX_TESTS ?= $(patsubst $(TEST_DIR)/%.cc, %, $(wildcard $(TEST_DIR)/*.cc))
 
 
 EXAMPLE_CFLAGS := -Wall -Wextra -pedantic -I . -fsanitize=undefined,address,leak -std=c11 -O2 -g2

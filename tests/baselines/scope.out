@@ -1,0 +1,112 @@
+{
+    int v = 1
+}
+I 1
+I {
+    int v = 1
+}
+I 1
+I 1
+I {
+    int v = 1
+}
+I 1
+I 1
+I {
+    int v = 1
+}
+I 1
+
+{
+    float v = 1.230000
+}
+I anonymous 1.230000
+I anonymous {
+    float v = 1.230000
+}
+I anonymous 1.230000
+
+{
+    const char *v = POINTER ("str")
+}
+I::J POINTER ("str")
+I::J {
+    const char *v = POINTER ("str")
+}
+I::J POINTER ("str")
+I::J POINTER ("str")
+I::J {
+    const char *v = POINTER ("str")
+}
+I::J POINTER ("str")
+I::J POINTER ("str")
+I::J {
+    const char *v = POINTER ("str")
+}
+I::J POINTER ("str")
+I::J POINTER ("str")
+I::J {
+    const char *v = POINTER ("str")
+}
+I::J POINTER ("str")
+
+{
+    bool v = true
+}
+I::J anonymous true
+I::J anonymous {
+    bool v = true
+}
+I::J anonymous true
+
+{
+    void *v = NULL
+}
+I::J::K NULL
+I::J::K {
+    void *v = NULL
+}
+I::J::K NULL
+I::J::K NULL
+I::J::K {
+    void *v = NULL
+}
+I::J::K NULL
+I::J::K NULL
+I::J::K {
+    void *v = NULL
+}
+I::J::K NULL
+I::J::K NULL
+I::J::K {
+    void *v = NULL
+}
+I::J::K NULL
+I::J::K NULL
+I::J::K {
+    void *v = NULL
+}
+I::J::K NULL
+
+{
+    char v = 99 ('c')
+}
+I::J::K anonymous 99 ('c')
+I::J::K anonymous {
+    char v = 99 ('c')
+}
+I::J::K anonymous 99 ('c')
+
+{
+    char v = 99 ('c')
+}
+C 99 ('c')
+C {
+    char v = 99 ('c')
+}
+C 99 ('c')
+C 99 ('c')
+C {
+    char v = 99 ('c')
+}
+C 99 ('c')
