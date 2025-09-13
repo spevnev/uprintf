@@ -534,6 +534,7 @@ typedef struct {
 _UPF_VECTOR_TYPEDEF(_upf_named_ns_vec, _upf_named_ns);
 
 typedef struct _upf_ns {
+    bool is_visited;
     _upf_named_type_vec vars;
     _upf_named_type_vec types;
     _upf_function_vec functions;
@@ -2055,8 +2056,6 @@ static void _upf_parse_sub_namespace(_upf_cu *cu, const uint8_t *die, _upf_ns *n
 static _upf_scope *_upf_parse_scope(_upf_cu *cu, const uint8_t *die, const _upf_abbrev *abbrev) {
     _UPF_ASSERT(cu != NULL && die != NULL && abbrev != NULL);
 
-    if (!abbrev->has_children) return NULL;
-
     const uint8_t *low_pc_die = NULL;
     _upf_attr low_pc_attr = _UPF_ZERO_INIT;
     const uint8_t *high_pc_die = NULL;
@@ -2088,6 +2087,8 @@ static _upf_scope *_upf_parse_scope(_upf_cu *cu, const uint8_t *die, const _upf_
     _upf_scope *scope = (_upf_scope *) _upf_alloc(sizeof(*scope));
     memset(scope, 0, sizeof(*scope));  // TODO: is needed?
     scope->ranges = ranges;
+
+    if (!abbrev->has_children) return scope;
 
     while (true) {
         const uint8_t *die_base = die;
@@ -2689,13 +2690,16 @@ static _upf_type *_upf_parse(_upf_parse_precedence precedence);
 
 static _upf_ns *_upf_ns_find_sub_ns(_upf_ns *ns, const char *name) {
     _UPF_ASSERT(ns != NULL && name != NULL);
+    if (ns->is_visited) return NULL;
 
     for (uint32_t i = 0; i < ns->sub_nss.length; i++) {
         if (strcmp(ns->sub_nss.data[i].name, name) == 0) return ns->sub_nss.data[i].ns;
     }
 
     for (uint32_t i = 0; i < ns->imported_nss.length; i++) {
+        ns->is_visited = true;
         _upf_ns *result = _upf_ns_find_sub_ns(ns->imported_nss.data[i], name);
+        ns->is_visited = false;
         if (result != NULL) return result;
     }
 
@@ -2715,8 +2719,9 @@ static _upf_ns *_upf_scope_resolve_ns(const _upf_cstr_vec *ns_names, const _upf_
     return NULL;
 }
 
-static _upf_type *_upf_ns_get_type_by_name(const _upf_ns *ns, const char *type_name) {
+static _upf_type *_upf_ns_get_type_by_name(_upf_ns *ns, const char *type_name) {
     _UPF_ASSERT(ns != NULL && type_name != NULL);
+    if (ns->is_visited) return NULL;
 
     for (uint32_t i = 0; i < ns->types.length; i++) {
         if (strcmp(ns->types.data[i].name, type_name) == 0) {
@@ -2725,7 +2730,9 @@ static _upf_type *_upf_ns_get_type_by_name(const _upf_ns *ns, const char *type_n
     }
 
     for (uint32_t i = 0; i < ns->imported_nss.length; i++) {
+        ns->is_visited = true;
         _upf_type *result = _upf_ns_get_type_by_name(ns->imported_nss.data[i], type_name);
+        ns->is_visited = false;
         if (result != NULL) return result;
     }
 
@@ -2750,8 +2757,9 @@ static _upf_type *_upf_get_type_by_name(const char *type_name) {
     return NULL;
 }
 
-static _upf_type *_upf_ns_get_function_by_name(const _upf_ns *ns, const char *function_name) {
+static _upf_type *_upf_ns_get_function_by_name(_upf_ns *ns, const char *function_name) {
     _UPF_ASSERT(ns != NULL && function_name != NULL);
+    if (ns->is_visited) return NULL;
 
     for (uint32_t i = 0; i < ns->functions.length; i++) {
         _upf_function *function = &ns->functions.data[i];
@@ -2759,7 +2767,9 @@ static _upf_type *_upf_ns_get_function_by_name(const _upf_ns *ns, const char *fu
     }
 
     for (uint32_t i = 0; i < ns->imported_nss.length; i++) {
+        ns->is_visited = true;
         _upf_type *result = _upf_ns_get_function_by_name(ns->imported_nss.data[i], function_name);
+        ns->is_visited = false;
         if (result != NULL) return result;
     }
 
@@ -2778,15 +2788,18 @@ static _upf_type *_upf_get_function_by_name(const char *function_name) {
     return NULL;
 }
 
-static _upf_function *_upf_ns_get_function_by_pc(const _upf_ns *ns, uint64_t pc) {
+static _upf_function *_upf_ns_get_function_by_pc(_upf_ns *ns, uint64_t pc) {
     _UPF_ASSERT(ns != NULL);
+    if (ns->is_visited) return NULL;
 
     for (uint32_t i = 0; i < ns->functions.length; i++) {
         if (ns->functions.data[i].pc == pc) return &ns->functions.data[i];
     }
 
     for (uint32_t i = 0; i < ns->imported_nss.length; i++) {
+        ns->is_visited = true;
         _upf_function *result = _upf_ns_get_function_by_pc(ns->imported_nss.data[i], pc);
+        ns->is_visited = false;
         if (result != NULL) return result;
     }
 
@@ -2804,8 +2817,9 @@ static _upf_function *_upf_get_function_by_pc(uint64_t pc) {
     return NULL;
 }
 
-static _upf_type *_upf_ns_get_variable_type(const _upf_ns *ns, const char *var_name) {
+static _upf_type *_upf_ns_get_variable_type(_upf_ns *ns, const char *var_name) {
     _UPF_ASSERT(ns != NULL && var_name != NULL);
+    if (ns->is_visited) return NULL;
 
     for (uint32_t i = 0; i < ns->vars.length; i++) {
         if (strcmp(ns->vars.data[i].name, var_name) == 0) {
@@ -2814,7 +2828,9 @@ static _upf_type *_upf_ns_get_variable_type(const _upf_ns *ns, const char *var_n
     }
 
     for (uint32_t i = 0; i < ns->imported_nss.length; i++) {
+        ns->is_visited = true;
         _upf_type *result = _upf_ns_get_variable_type(ns->imported_nss.data[i], var_name);
+        ns->is_visited = false;
         if (result != NULL) return result;
     }
 
