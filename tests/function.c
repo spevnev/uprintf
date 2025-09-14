@@ -15,13 +15,14 @@ typedef fun_t (*fun1_t)(void);
 typedef struct {
     fun1_t f;
     fun1_t *fp;
-} Functions;
+} F1;
 
 typedef struct {
     void *(*alloc)(size_t);
     void *(*realloc)(void *, size_t);
     void (*free)(void *);
-} AllocatorMethods;
+    int (*print)(const char *, ...);
+} F2;
 
 static int num = 200;
 
@@ -53,6 +54,11 @@ void *custom_realloc(void *data, size_t new_size) {
 
 void custom_free(void *data) { (void) data; }
 
+int print(const char *fmt, ...) {
+    printf("%s\n", fmt);
+    return 0;
+}
+
 int main(void) {
     uprintf("Variadic function: %S\n", &variadic);
 
@@ -82,7 +88,7 @@ int main(void) {
     uprintf("&(*ptr_fun)().f0: %S\n", &(*ptr_fun)()->f0);
     uprintf("(*ptr_fun)().f0(): %S\n", (*ptr_fun)()->f0());
 
-    Functions functions = {
+    F1 functions = {
         .f = fun1,
         .fp = &var_fun1,
     };
@@ -103,12 +109,12 @@ int main(void) {
     uprintf("&(*functions.fp)()().f0: %S\n", &(*functions.fp)()()->f0);
     uprintf("(*functions.fp)()().f0()(): %S\n", (*functions.fp)()()->f0());
 
-    AllocatorMethods libc = {malloc, realloc, free};
-    AllocatorMethods custom = {custom_alloc, custom_realloc, custom_free};
-    uprintf("Allocator methods: %S\n%S\n", &libc, &custom);
+    F2 stdlib = {malloc, realloc, free, printf};
+    F2 local = {custom_alloc, custom_realloc, custom_free, print};
+    uprintf("Functions: %S\n%S\n", &stdlib, &local);
 
 #ifndef __clang__
-    uprintf("libc functions: %S, %S, %S\n", &malloc, &printf, &fread);
+    uprintf("stdlib functions: %S, %S, %S, %S\n", &malloc, &printf, &fread, &printf);
 #endif
 
     return _upf_test_status;
