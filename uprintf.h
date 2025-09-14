@@ -1499,21 +1499,12 @@ static _upf_named_type _upf_parse_variable(const _upf_cu *cu, const uint8_t *die
 
 static const char *_upf_get_type_name(const _upf_cu *cu, const uint8_t *die, const _upf_abbrev *abbrev) {
     _UPF_ASSERT(cu != NULL && die != NULL && abbrev != NULL);
-
-    const char *name = NULL;
-    uint64_t type_offset = UINT64_MAX;
     for (uint32_t i = 0; i < abbrev->attrs.length; i++) {
         _upf_attr attr = abbrev->attrs.data[i];
-        switch (attr.name) {
-            case DW_AT_name: name = _upf_get_str(cu, die, attr.form); break;
-            case DW_AT_type: type_offset = _upf_get_ref(die, attr.form); break;
-        }
+        if (attr.name == DW_AT_name) return _upf_get_str(cu, die, attr.form);
         die += _upf_get_attr_size(die, attr.form);
     }
-    if (abbrev->tag == DW_TAG_pointer_type && type_offset == UINT64_MAX) return "void";
-    // TODO: is ^ really necessary? its seems wrong, void pointer should have '*' in the name?
-
-    return name;
+    return NULL;
 }
 
 static _upf_function _upf_parse_subprogram(const _upf_cu *cu, const uint8_t *die, const _upf_abbrev *abbrev) {
@@ -2036,7 +2027,7 @@ static void _upf_parse_sub_namespace(_upf_cu *cu, const uint8_t *die, _upf_ns *n
         die += _upf_get_attr_size(die, attr.form);
     }
 
-    _upf_ns *sub_ns = _upf_parse_ns_body(cu, die, ns_stack);
+    _upf_ns *sub_ns = abbrev->has_children ? _upf_parse_ns_body(cu, die, ns_stack) : NULL;
 
     if (name == NULL || export_symbols) _UPF_VECTOR_PUSH(&ns->imported_nss, sub_ns);
 
@@ -2085,7 +2076,7 @@ static _upf_scope *_upf_parse_scope(_upf_cu *cu, const uint8_t *die, const _upf_
     if (ranges.length == 0) return NULL;
 
     _upf_scope *scope = (_upf_scope *) _upf_alloc(sizeof(*scope));
-    memset(scope, 0, sizeof(*scope));  // TODO: is needed?
+    memset(scope, 0, sizeof(*scope));
     scope->ranges = ranges;
 
     if (!abbrev->has_children) return scope;
@@ -2141,7 +2132,7 @@ static _upf_scope *_upf_parse_scope(_upf_cu *cu, const uint8_t *die, const _upf_
 
 static _upf_ns *_upf_parse_ns_body(_upf_cu *cu, const uint8_t *die, _upf_ns_vec *ns_stack) {
     _upf_ns *ns = (_upf_ns *) _upf_alloc(sizeof(*ns));
-    memset(ns, 0, sizeof(*ns));  // TODO: is needed?
+    memset(ns, 0, sizeof(*ns));
     _UPF_VECTOR_PUSH(ns_stack, ns);
 
     const _upf_abbrev *abbrev;
@@ -2163,11 +2154,13 @@ static _upf_ns *_upf_parse_ns_body(_upf_cu *cu, const uint8_t *die, _upf_ns_vec 
             case DW_TAG_union_type:     {
                 const char *type_name = _upf_get_type_name(cu, die, abbrev);
                 if (type_name != NULL) {
-                    _upf_ns *class_ns = _upf_parse_ns_body(cu, _upf_skip_attrs(die, abbrev), ns_stack);
-                    _upf_named_ns entry = _UPF_ZERO_INIT;
-                    entry.name = type_name;
-                    entry.ns = class_ns;
-                    _UPF_VECTOR_PUSH(&ns->sub_nss, entry);
+                    if (abbrev->has_children) {
+                        _upf_ns *class_ns = _upf_parse_ns_body(cu, _upf_skip_attrs(die, abbrev), ns_stack);
+                        _upf_named_ns entry = _UPF_ZERO_INIT;
+                        entry.name = type_name;
+                        entry.ns = class_ns;
+                        _UPF_VECTOR_PUSH(&ns->sub_nss, entry);
+                    }
 
                     _upf_named_type type = _UPF_ZERO_INIT;
                     type.die = die_base;
@@ -3332,11 +3325,12 @@ static _upf_cu *_upf_find_cu(uint64_t pc) {
     return NULL;
 }
 
-static void _upf_find_scopes(uint64_t pc, _upf_scope *scope, _upf_scope_vec *scopes) {
+static void _upf_find_scopes(uint64_t pc, _upf_scope *scope, _upf_scope_vec *result) {
     for (uint32_t i = 0; i < scope->scopes.length; i++) {
         if (!_upf_is_in_range(pc, scope->scopes.data[i]->ranges)) continue;
-        _upf_find_scopes(pc, scope->scopes.data[i], scopes);
-        _UPF_VECTOR_PUSH(scopes, scope->scopes.data[i]);
+        _upf_find_scopes(pc, scope->scopes.data[i], result);
+        _UPF_VECTOR_PUSH(result, scope->scopes.data[i]);
+        break;
     }
 }
 
@@ -3464,7 +3458,6 @@ static const void *_upf_get_memory_region_end(const void *ptr) {
     }
 
 static const char *_upf_escape_char(char ch) {
-    // clang-format off
     switch (ch) {
         case '\a': return "\\a";
         case '\b': return "\\b";
@@ -3475,7 +3468,6 @@ static const char *_upf_escape_char(char ch) {
         case '\v': return "\\v";
         case '\\': return "\\\\";
     }
-    // clang-format on
 
     static char str[2];
     str[0] = ch;
@@ -3860,46 +3852,37 @@ __attribute__((no_sanitize_address)) static void _upf_print_type(_upf_indexed_st
             uint64_t absolute_function_pc = (uint64_t) data;
             uint64_t relative_function_pc = data - _upf_state.base;
 
-            _upf_cu *cu = _upf_state.current_cu;
             _upf_function *function = _upf_get_function_by_pc(relative_function_pc);
             if (function == NULL) {
-                const char *function_name = NULL;
                 for (uint32_t i = 0; i < _upf_state.extern_functions.length; i++) {
-                    if (_upf_state.extern_functions.data[i].pc == absolute_function_pc) {
-                        function_name = _upf_state.extern_functions.data[i].name;
-                        _UPF_ASSERT(function_name != NULL);
-                        break;
-                    }
-                }
-                if (function_name != NULL) {
-                    for (uint32_t i = 0; i < _upf_state.cus.length; i++) {
-                        cu = &_upf_state.cus.data[i];
-                        for (uint32_t j = 0; j < cu->extern_functions.length; j++) {
-                            if (strcmp(cu->extern_functions.data[j].name, function_name) == 0) {
-                                function = &cu->extern_functions.data[j];
-                                break;
-                            }
+                    if (_upf_state.extern_functions.data[i].pc != absolute_function_pc) continue;
+
+                    const char *function_name = _upf_state.extern_functions.data[i].name;
+                    _UPF_ASSERT(function_name != NULL);
+
+                    for (uint32_t j = 0; j < _upf_state.current_cu->extern_functions.length; j++) {
+                        if (strcmp(_upf_state.current_cu->extern_functions.data[j].name, function_name) == 0) {
+                            function = &_upf_state.current_cu->extern_functions.data[j];
+                            break;
                         }
-                        if (function != NULL) break;
                     }
+                    break;
                 }
             }
 
             _upf_bprintf("%p", (void *) data);
             if (function != NULL) {
-                _UPF_ASSERT(cu != NULL);
-
                 _upf_bprintf(" (");
                 if (function->return_type_die == NULL) {
                     _upf_bprintf("void ");
                 } else {
-                    _upf_type *return_type = _upf_parse_type(cu, function->return_type_die);
+                    _upf_type *return_type = _upf_parse_type(_upf_state.current_cu, function->return_type_die);
                     _upf_print_typename(return_type, true, true);
                 }
                 _upf_bprintf("%s(", function->name);
                 for (uint32_t i = 0; i < function->args.length; i++) {
                     _upf_named_type arg = function->args.data[i];
-                    _upf_type *arg_type = _upf_parse_type(cu, arg.die);
+                    _upf_type *arg_type = _upf_parse_type(_upf_state.current_cu, arg.die);
                     bool has_name = arg.name != NULL;
 
                     if (i > 0) _upf_bprintf(", ");
