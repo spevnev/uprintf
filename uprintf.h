@@ -40,6 +40,14 @@ extern "C" {
 
 void _upf_uprintf(const char *file, int line, const char *fmt, const char *args, ...);
 
+#ifdef UPRINTF_TEST
+extern int _upf_test_status;
+#endif
+
+#ifdef __cplusplus
+}  // extern "C"
+#endif
+
 // If variadic arguments are stringified directly, the macros will stringify to
 // the macro name instead of being expanded. Passing them to another macro causes
 // them to get expanded before stringification.
@@ -52,14 +60,6 @@ void _upf_uprintf(const char *file, int line, const char *fmt, const char *args,
         _upf_uprintf(__FILE__, __LINE__, fmt, _upf_stringify_va_args(__VA_ARGS__), __VA_ARGS__); \
         __asm__ volatile("nop");                                                                 \
     } while (0)
-
-#ifdef UPRINTF_TEST
-extern int _upf_test_status;
-#endif
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif  // UPRINTF_H
 
@@ -130,6 +130,9 @@ typedef struct {
 
 struct dl_phdr_info;
 int dl_iterate_phdr(int (*callback)(struct dl_phdr_info *info, size_t size, void *data), void *data);
+
+// Linker-generated entry to the dynamic section of ELF.
+extern Elf64_Dyn _DYNAMIC[];
 
 // ===================== dwarf.h ==========================
 
@@ -284,12 +287,22 @@ int dl_iterate_phdr(int (*callback)(struct dl_phdr_info *info, size_t size, void
 // ===================== TESTING ==========================
 
 #ifdef UPRINTF_TEST
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 int _upf_test_status = EXIT_SUCCESS;
 
-#define _UPF_SET_TEST_STATUS(status) _upf_test_status = status
-#else
-#define _UPF_SET_TEST_STATUS(status) (void) status
+#ifdef __cplusplus
+}  // extern "C"
 #endif
+
+#define _UPF_SET_TEST_STATUS(status) _upf_test_status = status
+
+#else  // UPRINTF_TEST
+#define _UPF_SET_TEST_STATUS(status) (void) status
+#endif  // UPRINTF_TEST
 
 // ====================== ERRORS ==========================
 
@@ -366,6 +379,10 @@ int _upf_test_status = EXIT_SUCCESS;
 // clang-format on
 #else
 #define _UPF_ZERO_INIT {0}
+#endif
+
+#ifdef __cplusplus
+namespace uprintf {
 #endif
 
 // ====================== TYPES ===========================
@@ -2382,9 +2399,6 @@ static void _upf_parse_dwarf(void) {
 
 // ======================= ELF ============================
 
-// Linker-generated entry to the dynamic section of ELF.
-extern Elf64_Dyn _DYNAMIC[];
-
 // Extern function mapping: function pointer -> GOT -> RELA -> symbol -> name -> DIE.
 static void _upf_parse_extern_functions(void) {
     _UPF_ASSERT(_DYNAMIC != NULL);
@@ -4026,9 +4040,16 @@ __attribute__((destructor)) void _upf_fini(void) {
 }
 
 #ifdef __cplusplus
+}  // namespace uprintf
+
 extern "C" {
 #endif
+
 __attribute__((noinline)) void _upf_uprintf(const char *file_path, int line, const char *fmt, const char *args_string, ...) {
+#ifdef __cplusplus
+    using namespace uprintf;
+#endif
+
     _UPF_ASSERT(file_path != NULL && line > 0 && fmt != NULL && args_string != NULL);
 
     if (setjmp(_upf_state.error_jmp_buf) != 0) return;
@@ -4095,8 +4116,9 @@ __attribute__((noinline)) void _upf_uprintf(const char *file_path, int line, con
     printf("%s", _upf_state.buffer);
     fflush(stdout);
 }
+
 #ifdef __cplusplus
-}
+}  // extern "C"
 #endif
 
 // ====================== UNDEF ===========================
