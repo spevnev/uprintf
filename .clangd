@@ -13,7 +13,7 @@ CompileFlags:
 If:
     PathMatch: [.*\.cc, .*\.hh]
 CompileFlags:
-    Add: ["-std=c++11"]
+    Add: ["-std=c++17"]
 ---
 If:
     PathMatch: [examples/.*]
@@ -22,6 +22,7 @@ CompileFlags:
         - "-I../libs"
         - "-I../libs/avl"
         - "-I../libs/sqlite"
+        - "-I../libs/taskflow"
 ---
 If:
     PathMatch: [examples/.*, tests/.*]

@@ -3486,6 +3486,992 @@ uprintf's state: {
     size_t tokens_idx = 2
     uint64_t current_pc = 340540
     _upf_cu *current_cu = 0x7f6da74d25e0 (<points to #1>)
+```
+</details>
+
+<details>
+  <summary>cxxopts (<a href="https://github.com/jarro2783/cxxopts">src</a>)</summary>
+
+```c
+Options: {
+    string m_program = {
+        _Alloc_hider _M_dataplus = {
+            char *_M_p = 0x7b4357300810 ("test")
+        }
+        size_type _M_string_length = 4
+        union <anonymous> = <union> {
+            char[] _M_local_buf = [116 ('t'), 101 ('e'), 115 ('s'), 116 ('t'), 0 <repeats 12 times>]
+            size_type _M_allocated_capacity = 1953719668
+        }
+    }
+    String m_help_string = {
+        _Alloc_hider _M_dataplus = {
+            char *_M_p = 0x7b73581e0040 ("A brief description")
+        }
+        size_type _M_string_length = 19
+        union <anonymous> = <union> {
+            char[] _M_local_buf = [19, 0 <repeats 15 times>]
+            size_type _M_allocated_capacity = 19
+        }
+    }
+    string m_custom_help = {
+        _Alloc_hider _M_dataplus = {
+            char *_M_p = 0x7b4357300850 ("[OPTION...]")
+        }
+        size_type _M_string_length = 11
+        union <anonymous> = <union> {
+            char[] _M_local_buf = [91 ('['), 79 ('O'), 80 ('P'), 84 ('T'), 73 ('I'), 79 ('O'), 78 ('N'), 46 ('.'), 46 ('.'), 46 ('.'), 93 (']'), 0 <repeats 5 times>]
+            size_type _M_allocated_capacity = 3336691550293872475
+        }
+    }
+    string m_positional_help = {
+        _Alloc_hider _M_dataplus = {
+            char *_M_p = 0x7b73581e0070 ("positional parameters")
+        }
+        size_type _M_string_length = 21
+        union <anonymous> = <union> {
+            char[] _M_local_buf = [21, 0 <repeats 15 times>]
+            size_type _M_allocated_capacity = 21
+        }
+    }
+    bool m_show_positional = false
+    bool m_allow_unrecognised = false
+    size_t m_width = 76
+    bool m_tab_expansion = false
+    shared_ptr<std::unordered_map<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::shared_ptr<cxxopts::OptionDetails>, std::hash<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::equal_to<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::allocator<std::pair<const std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::shared_ptr<cxxopts::OptionDetails> > > > > m_options = {
+        element_type *_M_ptr = 0x7bb3581e0030 ({
+            _Hashtable _M_h = {
+                _Hashtable_ebo_helper<std::hash<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, true> _M_hash = {
+                    hash<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > _M_obj = {}
+                }
+                _Hashtable_ebo_helper<std::equal_to<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, true> _M_equal = {
+                    equal_to<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > _M_obj = {}
+                }
+                _Hashtable_ebo_helper<std::allocator<std::__detail::_Hash_node<std::pair<const std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::shared_ptr<cxxopts::OptionDetails> >, true> >, true> _M_alloc = {
+                    allocator<std::__detail::_Hash_node<std::pair<const std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::shared_ptr<cxxopts::OptionDetails> >, true> > _M_obj = {}
+                }
+                __node_base **_M_buckets = 0x7bf3581e0040
+                size_type _M_bucket_count = 13
+                __node_base _M_before_begin = {
+                    _Hash_node_base *_M_nxt = 0x7ba3581e04a0 ({
+                        _Hash_node_base *_M_nxt = 0x7ba3581e0320 ({
+                            _Hash_node_base *_M_nxt = 0x7ba3581e0260 ({
+                                _Hash_node_base *_M_nxt = 0x7ba3581e0380 ({
+                                    _Hash_node_base *_M_nxt = 0x7ba3581e0200 ({
+                                        _Hash_node_base *_M_nxt = 0x7ba3581e0140 ({...})
+                                    })
+                                })
+                            })
+                        })
+                    })
+                }
+                size_type _M_element_count = 8
+                _Prime_rehash_policy _M_rehash_policy = {
+                    float _M_max_load_factor = 1.000000
+                    size_t _M_next_resize = 13
+                }
+                __node_base *_M_single_bucket = NULL
+            }
+        })
+        __shared_count<(__gnu_cxx::_Lock_policy)2> _M_refcount = {
+            _Sp_counted_base<(__gnu_cxx::_Lock_policy)2> *_M_pi = 0x7bb3581e0020 ({
+                int(...) *_vptr._Sp_counted_base = 0x55f73452e440
+                _Atomic_word _M_use_count = 1
+                _Atomic_word _M_weak_count = 1
+            })
+        }
+    }
+    vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > m_positional = {
+        _Vector_impl _M_impl = {
+            basic_string<char, std::char_traits<char>, std::allocator<char> > *_M_start = NULL
+            basic_string<char, std::char_traits<char>, std::allocator<char> > *_M_finish = NULL
+            basic_string<char, std::char_traits<char>, std::allocator<char> > *_M_end_of_storage = NULL
+        }
+    }
+    unordered_set<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::hash<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::equal_to<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > m_positional_set = {
+        _Hashtable _M_h = {
+            _Hashtable_ebo_helper<std::hash<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, true> _M_hash = {
+                hash<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > _M_obj = {}
+            }
+            _Hashtable_ebo_helper<std::equal_to<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, true> _M_equal = {
+                equal_to<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > _M_obj = {}
+            }
+            _Hashtable_ebo_helper<std::allocator<std::__detail::_Hash_node<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, true> >, true> _M_alloc = {
+                allocator<std::__detail::_Hash_node<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, true> > _M_obj = {}
+            }
+            __node_base **_M_buckets = 0x7b43573008f0
+            size_type _M_bucket_count = 1
+            __node_base _M_before_begin = {
+                _Hash_node_base *_M_nxt = NULL
+            }
+            size_type _M_element_count = 0
+            _Prime_rehash_policy _M_rehash_policy = {
+                float _M_max_load_factor = 1.000000
+                size_t _M_next_resize = 0
+            }
+            __node_base *_M_single_bucket = NULL
+        }
+    }
+    vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > m_group = {
+        _Vector_impl _M_impl = {
+            basic_string<char, std::char_traits<char>, std::allocator<char> > *_M_start = 0x7b73581e0100 ({
+                _Alloc_hider _M_dataplus = {
+                    char *_M_p = 0x7b73581e0110 ("")
+                }
+                size_type _M_string_length = 0
+                union <anonymous> = <union> {
+                    char[] _M_local_buf = [0, -66 <repeats 15 times>]
+                    size_type _M_allocated_capacity = 13744632839234567680
+                }
+            })
+            basic_string<char, std::char_traits<char>, std::allocator<char> > *_M_finish = 0x7b73581e0120 (<#0> {
+                _Alloc_hider _M_dataplus = {
+                    char *_M_p = 0x2000000202 (<out-of-bounds>)
+                }
+                size_type _M_string_length = 26
+                union <anonymous> = <union> {
+                    char[] _M_local_buf = [64 ('@'), 1, 30, 88 ('X'), 115 ('s'), 123 ('{'), 0, 0, 3, 0 <repeats 7 times>]
+                    size_type _M_allocated_capacity = 135735329816896
+                }
+            })
+            basic_string<char, std::char_traits<char>, std::allocator<char> > *_M_end_of_storage = 0x7b73581e0120 (<points to #0>)
+        }
+    }
+    map<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, cxxopts::HelpGroupDetails, std::less<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::allocator<std::pair<const std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, cxxopts::HelpGroupDetails> > > m_help = {
+        _Rep_type _M_t = {
+            _Rb_tree_impl<std::less<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, true> _M_impl = {
+                less<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > _M_key_compare = {}
+                _Rb_tree_node_base _M_header = {
+                    _Rb_tree_color _M_color = _S_red (0)
+                    void *_M_parent = 0x7c23581e0040
+                    void *_M_left = 0x7c23581e0040
+                    void *_M_right = 0x7c23581e0040
+                }
+                size_t _M_node_count = 1
+            }
+        }
+    }
+}
+Result: {
+    NameHashMap m_keys = {
+        _Hashtable _M_h = {
+            _Hashtable_ebo_helper<std::hash<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, true> _M_hash = {
+                hash<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > _M_obj = {}
+            }
+            _Hashtable_ebo_helper<std::equal_to<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, true> _M_equal = {
+                equal_to<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > _M_obj = {}
+            }
+            _Hashtable_ebo_helper<std::allocator<std::__detail::_Hash_node<std::pair<const std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, long unsigned int>, true> >, true> _M_alloc = {
+                allocator<std::__detail::_Hash_node<std::pair<const std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, long unsigned int>, true> > _M_obj = {}
+            }
+            __node_base **_M_buckets = 0x7bf3581e01a0
+            size_type _M_bucket_count = 13
+            __node_base _M_before_begin = {
+                _Hash_node_base *_M_nxt = 0x7ba3581e0980 ({
+                    _Hash_node_base *_M_nxt = 0x7ba3581e08c0 ({
+                        _Hash_node_base *_M_nxt = 0x7ba3581e0860 ({
+                            _Hash_node_base *_M_nxt = 0x7ba3581e0800 ({
+                                _Hash_node_base *_M_nxt = 0x7ba3581e07a0 ({
+                                    _Hash_node_base *_M_nxt = 0x7ba3581e0740 ({
+                                        _Hash_node_base *_M_nxt = 0x7ba3581e0920 ({...})
+                                    })
+                                })
+                            })
+                        })
+                    })
+                })
+            }
+            size_type _M_element_count = 8
+            _Prime_rehash_policy _M_rehash_policy = {
+                float _M_max_load_factor = 1.000000
+                size_t _M_next_resize = 13
+            }
+            __node_base *_M_single_bucket = NULL
+        }
+    }
+    ParsedHashMap m_values = {
+        _Hashtable _M_h = {
+            _Hashtable_ebo_helper<std::hash<long unsigned int>, true> _M_hash = {
+                hash<long unsigned int> _M_obj = {}
+            }
+            _Hashtable_ebo_helper<std::equal_to<long unsigned int>, true> _M_equal = {
+                equal_to<long unsigned int> _M_obj = {}
+            }
+            _Hashtable_ebo_helper<std::allocator<std::__detail::_Hash_node<std::pair<long unsigned int const, cxxopts::OptionValue>, false> >, true> _M_alloc = {
+                allocator<std::__detail::_Hash_node<std::pair<long unsigned int const, cxxopts::OptionValue>, false> > _M_obj = {}
+            }
+            __node_base **_M_buckets = 0x7bf3581e00f0
+            size_type _M_bucket_count = 13
+            __node_base _M_before_begin = {
+                _Hash_node_base *_M_nxt = 0x7ba3581e0680 ({
+                    _Hash_node_base *_M_nxt = 0x7ba3581e0620 ({
+                        _Hash_node_base *_M_nxt = 0x7ba3581e05c0 (<#0> {
+                            _Hash_node_base *_M_nxt = 0x7ba3581e0500 ({
+                                _Hash_node_base *_M_nxt = NULL
+                            })
+                        })
+                    })
+                })
+            }
+            size_type _M_element_count = 4
+            _Prime_rehash_policy _M_rehash_policy = {
+                float _M_max_load_factor = 1.000000
+                size_t _M_next_resize = 13
+            }
+            __node_base *_M_single_bucket = NULL
+        }
+    }
+    vector<cxxopts::KeyValue, std::allocator<cxxopts::KeyValue> > m_sequential = {
+        _Vector_impl _M_impl = {
+            KeyValue *_M_start = NULL
+            KeyValue *_M_finish = NULL
+            KeyValue *_M_end_of_storage = NULL
+        }
+    }
+    vector<cxxopts::KeyValue, std::allocator<cxxopts::KeyValue> > m_defaults = {
+        _Vector_impl _M_impl = {
+            KeyValue *_M_start = 0x7c53581e02c0 ({
+                string m_key = {
+                    _Alloc_hider _M_dataplus = {
+                        char *_M_p = 0x7c53581e02d0 ("help")
+                    }
+                    size_type _M_string_length = 4
+                    union <anonymous> = <union> {
+                        char[] _M_local_buf = [104 ('h'), 101 ('e'), 108 ('l'), 112 ('p'), 0, -66 <repeats 11 times>]
+                        size_type _M_allocated_capacity = 13744632021876761960
+                    }
+                }
+                string m_value = {
+                    _Alloc_hider _M_dataplus = {
+                        char *_M_p = 0x7c53581e02f0 ("false")
+                    }
+                    size_type _M_string_length = 5
+                    union <anonymous> = <union> {
+                        char[] _M_local_buf = [102 ('f'), 97 ('a'), 108 ('l'), 115 ('s'), 101 ('e'), 0, -66 <repeats 10 times>]
+                        size_type _M_allocated_capacity = 13744423548509512038
+                    }
+                }
+            })
+            KeyValue *_M_finish = 0x7c53581e0380 ({
+                string m_key = {
+                    _Alloc_hider _M_dataplus = {
+                        char *_M_p = 0xbebebebebebebebe (<out-of-bounds>)
+                    }
+                    size_type _M_string_length = 13744632839234567870
+                    union <anonymous> = <union> {
+                        char[] _M_local_buf = [-66 <repeats 16 times>]
+                        size_type _M_allocated_capacity = 13744632839234567870
+                    }
+                }
+                string m_value = {
+                    _Alloc_hider _M_dataplus = {
+                        char *_M_p = 0xbebebebebebebebe (<out-of-bounds>)
+                    }
+                    size_type _M_string_length = 13744632839234567870
+                    union <anonymous> = <union> {
+                        char[] _M_local_buf = [-66 <repeats 16 times>]
+                        size_type _M_allocated_capacity = 13744632839234567870
+                    }
+                }
+            })
+            KeyValue *_M_end_of_storage = 0x7c53581e03c0 ({
+                string m_key = {
+                    _Alloc_hider _M_dataplus = {
+                        char *_M_p = 0xcc6e96b9cc6e96b9 (<out-of-bounds>)
+                    }
+                    size_type _M_string_length = 136697402491888
+                    union <anonymous> = <union> {
+                        char[] _M_local_buf = [0 <repeats 16 times>]
+                        size_type _M_allocated_capacity = 0
+                    }
+                }
+                string m_value = {
+                    _Alloc_hider _M_dataplus = {
+                        char *_M_p = NULL
+                    }
+                    size_type _M_string_length = 0
+                    union <anonymous> = <union> {
+                        char[] _M_local_buf = [3, 17, 0, 0, -16, 0, 0, 0, 96 ('`'), 0 <repeats 7 times>]
+                        size_type _M_allocated_capacity = 1030792155395
+                    }
+                }
+            })
+        }
+    }
+    vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > m_unmatched = {
+        _Vector_impl _M_impl = {
+            basic_string<char, std::char_traits<char>, std::allocator<char> > *_M_start = NULL
+            basic_string<char, std::char_traits<char>, std::allocator<char> > *_M_finish = NULL
+            basic_string<char, std::char_traits<char>, std::allocator<char> > *_M_end_of_storage = NULL
+        }
+    }
+}
+```
+</details>
+
+<details>
+  <summary>taskflow (<a href="https://github.com/taskflow/taskflow">src</a>)</summary>
+
+```c
+TaskA
+TaskC
+TaskB
+TaskD
+executor: {
+    mutex _taskflows_mutex = {
+        __native_type _M_mutex = <union> {
+            __pthread_mutex_s __data = {
+                int __lock = 0
+                unsigned int __count = 0
+                int __owner = 0
+                unsigned int __nusers = 0
+                int __kind = 0
+                short int __spins = 0
+                short int __elision = 0
+                __pthread_list_t __list = {
+                    __pthread_internal_list *__prev = NULL
+                    __pthread_internal_list *__next = NULL
+                }
+            }
+            char[] __size = [0 <repeats 40 times>]
+            long int __align = 0
+        }
+    }
+    vector<tf::Worker, std::allocator<tf::Worker> > _workers = {
+        _Vector_impl _M_impl = {
+            void *_M_start = 0x7e3ba6be0400
+            void *_M_finish = 0x7e3ba6be9c00
+            void *_M_end_of_storage = 0x7e3ba6be9c00
+        }
+    }
+    DefaultNotifier _notifier = {
+        atomic<long unsigned int> _state = {
+            __int_type _M_i = 4398046511119
+        }
+        vector<tf::NonblockingNotifierV2::Waiter, std::allocator<tf::NonblockingNotifierV2::Waiter> > _waiters = {
+            _Vector_impl _M_impl = {
+                Waiter *_M_start = 0x7d3ba6be0080 ({
+                    atomic<long unsigned int> next = {
+                        __int_type _M_i = 16383
+                    }
+                    uint64_t epoch = 4398046511104
+                    mutex mu = {
+                        __native_type _M_mutex = <union> {
+                            __pthread_mutex_s __data = {
+                                int __lock = 0
+                                unsigned int __count = 0
+                                int __owner = 0
+                                unsigned int __nusers = 1
+                                int __kind = 0
+                                short int __spins = 0
+                                short int __elision = 0
+                                __pthread_list_t __list = {
+                                    __pthread_internal_list *__prev = NULL
+                                    __pthread_internal_list *__next = NULL
+                                }
+                            }
+                            char[] __size = [0 <repeats 12 times>, 1, 0 <repeats 27 times>]
+                            long int __align = 0
+                        }
+                    }
+                    condition_variable cv = {
+                        __condvar _M_cond = {
+                            __gthread_cond_t _M_cond = <union> {
+                                __pthread_cond_s __data = {
+                                    __atomic_wide_counter __wseq = <union> {
+                                        long long unsigned int __value64 = 2
+                                        struct __value32 = {...}
+                                    }
+                                    __atomic_wide_counter __g1_start = <union> {
+                                        long long unsigned int __value64 = 0
+                                        struct __value32 = {...}
+                                    }
+                                    unsigned int[] __g_size = [0, 0]
+                                    unsigned int __g1_orig_size = 0
+                                    unsigned int __wrefs = 8
+                                    unsigned int[] __g_signals = [0, 0]
+                                    unsigned int __unused_initialized_1 = 0
+                                    unsigned int __unused_initialized_2 = 0
+                                }
+                                char[] __size = [2, 0 <repeats 27 times>, 8, 0 <repeats 19 times>]
+                                long long int __align = 2
+                            }
+                        }
+                    }
+                    unsigned int state = 1
+                })
+                Waiter *_M_finish = 0x7d3ba6be0880 (<#0> {
+                    atomic<long unsigned int> next = {
+                        __int_type _M_i = 0
+                    }
+                    uint64_t epoch = 0
+                    mutex mu = {
+                        __native_type _M_mutex = <union> {
+                            __pthread_mutex_s __data = {
+                                int __lock = 0
+                                unsigned int __count = 0
+                                int __owner = 0
+                                unsigned int __nusers = 0
+                                int __kind = 0
+                                short int __spins = 0
+                                short int __elision = 0
+                                __pthread_list_t __list = {
+                                    __pthread_internal_list *__prev = NULL
+                                    __pthread_internal_list *__next = NULL
+                                }
+                            }
+                            char[] __size = [0 <repeats 40 times>]
+                            long int __align = 0
+                        }
+                    }
+                    condition_variable cv = {
+                        __condvar _M_cond = {
+                            __gthread_cond_t _M_cond = <union> {
+                                __pthread_cond_s __data = {
+                                    __atomic_wide_counter __wseq = <union> {
+                                        long long unsigned int __value64 = 0
+                                        struct __value32 = {...}
+                                    }
+                                    __atomic_wide_counter __g1_start = <union> {
+                                        long long unsigned int __value64 = 0
+                                        struct __value32 = {...}
+                                    }
+                                    unsigned int[] __g_size = [0, 0]
+                                    unsigned int __g1_orig_size = 0
+                                    unsigned int __wrefs = 0
+                                    unsigned int[] __g_signals = [0, 0]
+                                    unsigned int __unused_initialized_1 = 0
+                                    unsigned int __unused_initialized_2 = 0
+                                }
+                                char[] __size = [0 <repeats 48 times>]
+                                long long int __align = 0
+                            }
+                        }
+                    }
+                    unsigned int state = 0
+                })
+                Waiter *_M_end_of_storage = 0x7d3ba6be0880 (<points to #0>)
+            }
+        }
+    }
+    condition_variable _topology_cv = {
+        __condvar _M_cond = {
+            __gthread_cond_t _M_cond = <union> {
+                __pthread_cond_s __data = {
+                    __atomic_wide_counter __wseq = <union> {
+                        long long unsigned int __value64 = 0
+                        struct __value32 = {
+                            unsigned int __low = 0
+                            unsigned int __high = 0
+                        }
+                    }
+                    __atomic_wide_counter __g1_start = <union> {
+                        long long unsigned int __value64 = 0
+                        struct __value32 = {
+                            unsigned int __low = 0
+                            unsigned int __high = 0
+                        }
+                    }
+                    unsigned int[] __g_size = [0, 0]
+                    unsigned int __g1_orig_size = 0
+                    unsigned int __wrefs = 0
+                    unsigned int[] __g_signals = [0, 0]
+                    unsigned int __unused_initialized_1 = 0
+                    unsigned int __unused_initialized_2 = 0
+                }
+                char[] __size = [0 <repeats 48 times>]
+                long long int __align = 0
+            }
+        }
+    }
+    mutex _topology_mutex = {
+        __native_type _M_mutex = <union> {
+            __pthread_mutex_s __data = {
+                int __lock = 0
+                unsigned int __count = 0
+                int __owner = 0
+                unsigned int __nusers = 0
+                int __kind = 0
+                short int __spins = 0
+                short int __elision = 0
+                __pthread_list_t __list = {
+                    __pthread_internal_list *__prev = NULL
+                    __pthread_internal_list *__next = NULL
+                }
+            }
+            char[] __size = [0 <repeats 40 times>]
+            long int __align = 0
+        }
+    }
+    size_t _num_topologies = 0
+    list<tf::Taskflow, std::allocator<tf::Taskflow> > _taskflows = {
+        _List_impl _M_impl = {
+            _Node_header _M_node = {
+                _List_node_base *_M_next = 0x7b6ba5b006e0 (<#1> {
+                    _List_node_base *_M_next = 0x7b6ba5b006e0 (<points to #1>)
+                    _List_node_base *_M_prev = 0x7b6ba5b006e0 (<points to #1>)
+                })
+                _List_node_base *_M_prev = 0x7b6ba5b006e0 (<points to #1>)
+                size_t _M_size = 0
+            }
+        }
+    }
+    Freelist<tf::Node*> _buffers = {
+        vector<tf::Freelist<tf::Node*>::Bucket, std::allocator<tf::Freelist<tf::Node*>::Bucket> > _buckets = {
+            _Vector_impl _M_impl = {
+                Bucket *_M_start = 0x7d1ba6be0080 ({
+                    mutex mutex = {
+                        __native_type _M_mutex = <union> {
+                            __pthread_mutex_s __data = {
+                                int __lock = 0
+                                unsigned int __count = 0
+                                int __owner = 0
+                                unsigned int __nusers = 0
+                                int __kind = 0
+                                short int __spins = 0
+                                short int __elision = 0
+                                __pthread_list_t __list = {
+                                    __pthread_internal_list *__prev = NULL
+                                    __pthread_internal_list *__next = NULL
+                                }
+                            }
+                            char[] __size = [0 <repeats 40 times>]
+                            long int __align = 0
+                        }
+                    }
+                    UnboundedTaskQueue<tf::Node*> queue = {
+                        atomic<long int> _top = {
+                            __int_type _M_i = 0
+                        }
+                        atomic<long int> _bottom = {
+                            __int_type _M_i = 0
+                        }
+                        atomic<tf::UnboundedTaskQueue<tf::Node*>::Array*> _array = {
+                            __base_type _M_b = {
+                                Array *_M_p = 0x7b9ba6be0040 ({
+                                    int64_t C = 1024
+                                    int64_t M = 1023
+                                    atomic<tf::Node*> *S = 0x7dbba6be0100 ({
+                                        __base_type _M_b = {...}
+                                    })
+                                })
+                            }
+                        }
+                        vector<tf::UnboundedTaskQueue<tf::Node*>::Array*, std::allocator<tf::UnboundedTaskQueue<tf::Node*>::Array*> > _garbage = {
+                            _Vector_impl _M_impl = {
+                                Array **_M_start = 0x7c7ba6be0040
+                                Array **_M_finish = 0x7c7ba6be0040
+                                Array **_M_end_of_storage = 0x7c7ba6be0140
+                            }
+                        }
+                    }
+                })
+                Bucket *_M_finish = 0x7d1ba6be0680 (<#2> {
+                    mutex mutex = {
+                        __native_type _M_mutex = <union> {
+                            __pthread_mutex_s __data = {
+                                int __lock = 0
+                                unsigned int __count = 0
+                                int __owner = 0
+                                unsigned int __nusers = 0
+                                int __kind = 0
+                                short int __spins = 0
+                                short int __elision = 0
+                                __pthread_list_t __list = {
+                                    __pthread_internal_list *__prev = NULL
+                                    __pthread_internal_list *__next = NULL
+                                }
+                            }
+                            char[] __size = [0 <repeats 40 times>]
+                            long int __align = 0
+                        }
+                    }
+                    UnboundedTaskQueue<tf::Node*> queue = {
+                        atomic<long int> _top = {
+                            __int_type _M_i = 0
+                        }
+                        atomic<long int> _bottom = {
+                            __int_type _M_i = 0
+                        }
+                        atomic<tf::UnboundedTaskQueue<tf::Node*>::Array*> _array = {
+                            __base_type _M_b = {
+                                Array *_M_p = NULL
+                            }
+                        }
+                        vector<tf::UnboundedTaskQueue<tf::Node*>::Array*, std::allocator<tf::UnboundedTaskQueue<tf::Node*>::Array*> > _garbage = {
+                            _Vector_impl _M_impl = {
+                                Array **_M_start = NULL
+                                Array **_M_finish = NULL
+                                Array **_M_end_of_storage = NULL
+                            }
+                        }
+                    }
+                })
+                Bucket *_M_end_of_storage = 0x7d1ba6be0680 (<points to #2>)
+            }
+        }
+    }
+    shared_ptr<tf::WorkerInterface> _worker_interface = {
+        element_type *_M_ptr = NULL
+        __shared_count<(__gnu_cxx::_Lock_policy)2> _M_refcount = {
+            _Sp_counted_base<(__gnu_cxx::_Lock_policy)2> *_M_pi = NULL
+        }
+    }
+    unordered_set<std::shared_ptr<tf::ObserverInterface>, std::hash<std::shared_ptr<tf::ObserverInterface> >, std::equal_to<std::shared_ptr<tf::ObserverInterface> >, std::allocator<std::shared_ptr<tf::ObserverInterface> > > _observers = {
+        _Hashtable _M_h = {
+            _Hashtable_ebo_helper<std::hash<std::shared_ptr<tf::ObserverInterface> >, true> _M_hash = {
+                hash<std::shared_ptr<tf::ObserverInterface> > _M_obj = {}
+            }
+            _Hashtable_ebo_helper<std::equal_to<std::shared_ptr<tf::ObserverInterface> >, true> _M_equal = {
+                equal_to<std::shared_ptr<tf::ObserverInterface> > _M_obj = {}
+            }
+            _Hashtable_ebo_helper<std::allocator<std::__detail::_Hash_node<std::shared_ptr<tf::ObserverInterface>, false> >, true> _M_alloc = {
+                allocator<std::__detail::_Hash_node<std::shared_ptr<tf::ObserverInterface>, false> > _M_obj = {}
+            }
+            __node_base **_M_buckets = 0x7b6ba5b00750
+            size_type _M_bucket_count = 1
+            __node_base _M_before_begin = {
+                _Hash_node_base *_M_nxt = NULL
+            }
+            size_type _M_element_count = 0
+            _Prime_rehash_policy _M_rehash_policy = {
+                float _M_max_load_factor = 1.000000
+                size_t _M_next_resize = 0
+            }
+            __node_base *_M_single_bucket = NULL
+        }
+    }
+}
+taskflow: {
+    Graph &_graph = {
+        _Vector_impl _M_impl = {
+            unique_ptr<tf::Node, std::default_delete<tf::Node> > *_M_start = 0x7b9ba6be0430 ({
+                __uniq_ptr_data<tf::Node, std::default_delete<tf::Node>, true, true> _M_t = {
+                    tuple<tf::Node*, std::default_delete<tf::Node> > _M_t = {
+                        default_delete<tf::Node> _M_head_impl = {}
+                        Node *_M_head_impl = 0x7c7ba6be0900 ({
+                            nstate_t _nstate = 0
+                            atomic<int> _estate = {
+                                __int_type _M_i = 0
+                            }
+                            string _name = {
+                                _Alloc_hider _M_dataplus = {
+                                    char *_M_p = 0x7c7ba6be0918 ("")
+                                }
+                                size_type _M_string_length = 0
+                                union <anonymous> = <union> {
+                                    char[] _M_local_buf = [0, -66 <repeats 15 times>]
+                                    size_type _M_allocated_capacity = 13744632839234567680
+                                }
+                            }
+                            void *_data = NULL
+                            Topology *_topology = 0x7c3ba6be0050 ({
+                                Taskflow &_taskflow = {
+                                    Graph &_graph = {
+                                        _Vector_impl _M_impl = {...}
+                                    }
+                                    mutex _mutex = {
+                                        __native_type _M_mutex = {...}
+                                    }
+                                    string _name = {
+                                        _Alloc_hider _M_dataplus = {...}
+                                        size_type _M_string_length = 0
+                                        union <anonymous> = {...}
+                                    }
+                                    Graph _graph = {
+                                        _Vector_impl _M_impl = {...}
+                                    }
+                                    queue<std::shared_ptr<tf::Topology>, std::deque<std::shared_ptr<tf::Topology>, std::allocator<std::shared_ptr<tf::Topology> > > > _topologies = {
+                                        deque<std::shared_ptr<tf::Topology>, std::allocator<std::shared_ptr<tf::Topology> > > c = {...}
+                                    }
+                                    optional<std::_List_iterator<tf::Taskflow> > _satellite = {
+                                        _Optional_payload<std::_List_iterator<tf::Taskflow>, true, true, true> _M_payload = {...}
+                                    }
+                                }
+                                promise<void> _promise = {
+                                    shared_ptr<std::__future_base::_State_baseV2> _M_future = {
+                                        element_type *_M_ptr = 0x7baba6be0020 ({...})
+                                        __shared_count<(__gnu_cxx::_Lock_policy)2> _M_refcount = {...}
+                                    }
+                                    _Ptr_type _M_storage = {
+                                        __uniq_ptr_data<std::__future_base::_Result<void>, std::__future_base::_Result_base::_Deleter, true, true> _M_t = {...}
+                                    }
+                                }
+                                function<bool()> _pred = {
+                                    _Any_data _M_functor = <union> {
+                                        _Nocopy_types _M_unused = {...}
+                                        char[] _M_pod_data = [-1 <repeats 8 times>, 0 <repeats 8 times>]
+                                    }
+                                    bool(_Any_data &, const _Any_data &, _Manager_operation) _M_manager = 0x56314f8b12b9
+                                    bool(const _Any_data &) _M_invoker = 0x56314f8b126a
+                                }
+                                function<void()> _call = {
+                                    _Any_data _M_functor = <union> {
+                                        _Nocopy_types _M_unused = {...}
+                                        char[] _M_pod_data = [0 <repeats 16 times>]
+                                    }
+                                    bool(_Any_data &, const _Any_data &, _Manager_operation) _M_manager = 0x56314f8b14da
+                                    void(const _Any_data &) _M_invoker = 0x56314f8b1496
+                                }
+                                atomic<long unsigned int> _join_counter = {
+                                    __int_type _M_i = 0
+                                }
+                                atomic<int> _estate = {
+                                    __int_type _M_i = 0
+                                }
+                                exception_ptr _exception_ptr = {
+                                    void *_M_exception_object = NULL
+                                }
+                            })
+                            Node *_parent = NULL
+                            size_t _num_successors = 2
+                            SmallVector<tf::Node*, 4> _edges = {
+                                void *BeginX = 0x7c7ba6be0960
+                                void *EndX = 0x7c7ba6be0970
+                                void *CapacityX = 0x7c7ba6be0980
+                                U FirstEl = {
+                                    byte[] buff = [<unknown> (192), <unknown> (7), <unknown> (190), <unknown> (166), <unknown> (123 ('{')), <unknown> (124 ('|')), <unknown> (0), <unknown> (0)]
+                                }
+                                SmallVectorStorage<tf::Node*, 4> Storage = {
+                                    U[] InlineElts = [
+                                        {...},
+                                        {...},
+                                        {...}
+                                    ]
+                                }
+                            }
+                            atomic<long unsigned int> _join_counter = {
+                                __int_type _M_i = 0
+                            }
+                            handle_t _handle = {
+                                _Variadic_union<false, std::monostate, tf::Node::Static, tf::Node::Runtime, tf::Node::Subflow, tf::Node::Condition, tf::Node::MultiCondition, tf::Node::Module, tf::Node::Async, tf::Node::DependentAsync> _M_u = <union> {
+                                    _Uninitialized<std::monostate, true> _M_first = {
+                                        monostate _M_storage = {...}
+                                    }
+                                    _Variadic_union<false, tf::Node::Static, tf::Node::Runtime, tf::Node::Subflow, tf::Node::Condition, tf::Node::MultiCondition, tf::Node::Module, tf::Node::Async, tf::Node::DependentAsync> _M_rest = <union> {
+                                        _Uninitialized<tf::Node::Static, false> _M_first = {...}
+                                        _Variadic_union<false, tf::Node::Runtime, tf::Node::Subflow, tf::Node::Condition, tf::Node::MultiCondition, tf::Node::Module, tf::Node::Async, tf::Node::DependentAsync> _M_rest = {...}
+                                    }
+                                }
+                                __index_type _M_index = 1
+                            }
+                            unique_ptr<tf::Node::Semaphores, std::default_delete<tf::Node::Semaphores> > _semaphores = {
+                                __uniq_ptr_data<tf::Node::Semaphores, std::default_delete<tf::Node::Semaphores>, true, true> _M_t = {
+                                    tuple<tf::Node::Semaphores*, std::default_delete<tf::Node::Semaphores> > _M_t = {
+                                        default_delete<tf::Node::Semaphores> _M_head_impl = {...}
+                                        Semaphores *_M_head_impl = NULL
+                                    }
+                                }
+                            }
+                            exception_ptr _exception_ptr = {
+                                void *_M_exception_object = NULL
+                            }
+                        })
+                    }
+                }
+            })
+            unique_ptr<tf::Node, std::default_delete<tf::Node> > *_M_finish = 0x7b9ba6be0450 (<#0> {
+                __uniq_ptr_data<tf::Node, std::default_delete<tf::Node>, true, true> _M_t = {
+                    tuple<tf::Node*, std::default_delete<tf::Node> > _M_t = {
+                        default_delete<tf::Node> _M_head_impl = {}
+                        Node *_M_head_impl = NULL
+                    }
+                }
+            })
+            unique_ptr<tf::Node, std::default_delete<tf::Node> > *_M_end_of_storage = 0x7b9ba6be0450 (<points to #0>)
+        }
+    }
+    mutex _mutex = {
+        __native_type _M_mutex = <union> {
+            __pthread_mutex_s __data = {
+                int __lock = 0
+                unsigned int __count = 0
+                int __owner = 0
+                unsigned int __nusers = 0
+                int __kind = 0
+                short int __spins = 0
+                short int __elision = 0
+                __pthread_list_t __list = {
+                    __pthread_internal_list *__prev = NULL
+                    __pthread_internal_list *__next = NULL
+                }
+            }
+            char[] __size = [0 <repeats 40 times>]
+            long int __align = 0
+        }
+    }
+    string _name = {
+        _Alloc_hider _M_dataplus = {
+            char *_M_p = 0x7b6ba5b00550 ("")
+        }
+        size_type _M_string_length = 0
+        union <anonymous> = <union> {
+            char[] _M_local_buf = [0 <repeats 16 times>]
+            size_type _M_allocated_capacity = 0
+        }
+    }
+    Graph _graph = {
+        _Vector_impl _M_impl = {
+            unique_ptr<tf::Node, std::default_delete<tf::Node> > *_M_start = 0x7b9ba6be0430 ({
+                __uniq_ptr_data<tf::Node, std::default_delete<tf::Node>, true, true> _M_t = {
+                    tuple<tf::Node*, std::default_delete<tf::Node> > _M_t = {
+                        default_delete<tf::Node> _M_head_impl = {}
+                        Node *_M_head_impl = 0x7c7ba6be0900 ({
+                            nstate_t _nstate = 0
+                            atomic<int> _estate = {
+                                __int_type _M_i = 0
+                            }
+                            string _name = {
+                                _Alloc_hider _M_dataplus = {
+                                    char *_M_p = 0x7c7ba6be0918 ("")
+                                }
+                                size_type _M_string_length = 0
+                                union <anonymous> = <union> {
+                                    char[] _M_local_buf = [0, -66 <repeats 15 times>]
+                                    size_type _M_allocated_capacity = 13744632839234567680
+                                }
+                            }
+                            void *_data = NULL
+                            Topology *_topology = 0x7c3ba6be0050 ({
+                                Taskflow &_taskflow = {
+                                    Graph &_graph = {
+                                        _Vector_impl _M_impl = {...}
+                                    }
+                                    mutex _mutex = {
+                                        __native_type _M_mutex = {...}
+                                    }
+                                    string _name = {
+                                        _Alloc_hider _M_dataplus = {...}
+                                        size_type _M_string_length = 0
+                                        union <anonymous> = {...}
+                                    }
+                                    Graph _graph = {
+                                        _Vector_impl _M_impl = {...}
+                                    }
+                                    queue<std::shared_ptr<tf::Topology>, std::deque<std::shared_ptr<tf::Topology>, std::allocator<std::shared_ptr<tf::Topology> > > > _topologies = {
+                                        deque<std::shared_ptr<tf::Topology>, std::allocator<std::shared_ptr<tf::Topology> > > c = {...}
+                                    }
+                                    optional<std::_List_iterator<tf::Taskflow> > _satellite = {
+                                        _Optional_payload<std::_List_iterator<tf::Taskflow>, true, true, true> _M_payload = {...}
+                                    }
+                                }
+                                promise<void> _promise = {
+                                    shared_ptr<std::__future_base::_State_baseV2> _M_future = {
+                                        element_type *_M_ptr = 0x7baba6be0020 ({...})
+                                        __shared_count<(__gnu_cxx::_Lock_policy)2> _M_refcount = {...}
+                                    }
+                                    _Ptr_type _M_storage = {
+                                        __uniq_ptr_data<std::__future_base::_Result<void>, std::__future_base::_Result_base::_Deleter, true, true> _M_t = {...}
+                                    }
+                                }
+                                function<bool()> _pred = {
+                                    _Any_data _M_functor = <union> {
+                                        _Nocopy_types _M_unused = {...}
+                                        char[] _M_pod_data = [-1 <repeats 8 times>, 0 <repeats 8 times>]
+                                    }
+                                    bool(_Any_data &, const _Any_data &, _Manager_operation) _M_manager = 0x56314f8b12b9
+                                    bool(const _Any_data &) _M_invoker = 0x56314f8b126a
+                                }
+                                function<void()> _call = {
+                                    _Any_data _M_functor = <union> {
+                                        _Nocopy_types _M_unused = {...}
+                                        char[] _M_pod_data = [0 <repeats 16 times>]
+                                    }
+                                    bool(_Any_data &, const _Any_data &, _Manager_operation) _M_manager = 0x56314f8b14da
+                                    void(const _Any_data &) _M_invoker = 0x56314f8b1496
+                                }
+                                atomic<long unsigned int> _join_counter = {
+                                    __int_type _M_i = 0
+                                }
+                                atomic<int> _estate = {
+                                    __int_type _M_i = 0
+                                }
+                                exception_ptr _exception_ptr = {
+                                    void *_M_exception_object = NULL
+                                }
+                            })
+                            Node *_parent = NULL
+                            size_t _num_successors = 2
+                            SmallVector<tf::Node*, 4> _edges = {
+                                void *BeginX = 0x7c7ba6be0960
+                                void *EndX = 0x7c7ba6be0970
+                                void *CapacityX = 0x7c7ba6be0980
+                                U FirstEl = {
+                                    byte[] buff = [<unknown> (192), <unknown> (7), <unknown> (190), <unknown> (166), <unknown> (123 ('{')), <unknown> (124 ('|')), <unknown> (0), <unknown> (0)]
+                                }
+                                SmallVectorStorage<tf::Node*, 4> Storage = {
+                                    U[] InlineElts = [
+                                        {...},
+                                        {...},
+                                        {...}
+                                    ]
+                                }
+                            }
+                            atomic<long unsigned int> _join_counter = {
+                                __int_type _M_i = 0
+                            }
+                            handle_t _handle = {
+                                _Variadic_union<false, std::monostate, tf::Node::Static, tf::Node::Runtime, tf::Node::Subflow, tf::Node::Condition, tf::Node::MultiCondition, tf::Node::Module, tf::Node::Async, tf::Node::DependentAsync> _M_u = <union> {
+                                    _Uninitialized<std::monostate, true> _M_first = {
+                                        monostate _M_storage = {...}
+                                    }
+                                    _Variadic_union<false, tf::Node::Static, tf::Node::Runtime, tf::Node::Subflow, tf::Node::Condition, tf::Node::MultiCondition, tf::Node::Module, tf::Node::Async, tf::Node::DependentAsync> _M_rest = <union> {
+                                        _Uninitialized<tf::Node::Static, false> _M_first = {...}
+                                        _Variadic_union<false, tf::Node::Runtime, tf::Node::Subflow, tf::Node::Condition, tf::Node::MultiCondition, tf::Node::Module, tf::Node::Async, tf::Node::DependentAsync> _M_rest = {...}
+                                    }
+                                }
+                                __index_type _M_index = 1
+                            }
+                            unique_ptr<tf::Node::Semaphores, std::default_delete<tf::Node::Semaphores> > _semaphores = {
+                                __uniq_ptr_data<tf::Node::Semaphores, std::default_delete<tf::Node::Semaphores>, true, true> _M_t = {
+                                    tuple<tf::Node::Semaphores*, std::default_delete<tf::Node::Semaphores> > _M_t = {
+                                        default_delete<tf::Node::Semaphores> _M_head_impl = {...}
+                                        Semaphores *_M_head_impl = NULL
+                                    }
+                                }
+                            }
+                            exception_ptr _exception_ptr = {
+                                void *_M_exception_object = NULL
+                            }
+                        })
+                    }
+                }
+            })
+            unique_ptr<tf::Node, std::default_delete<tf::Node> > *_M_finish = 0x7b9ba6be0450 (<points to #0>)
+            unique_ptr<tf::Node, std::default_delete<tf::Node> > *_M_end_of_storage = 0x7b9ba6be0450 (<points to #0>)
+        }
+    }
+    queue<std::shared_ptr<tf::Topology>, std::deque<std::shared_ptr<tf::Topology>, std::allocator<std::shared_ptr<tf::Topology> > > > _topologies = {
+        deque<std::shared_ptr<tf::Topology>, std::allocator<std::shared_ptr<tf::Topology> > > c = {
+            _Deque_impl _M_impl = {
+                void *_M_map = 0x7bcba6be0080
+                size_t _M_map_size = 8
+                iterator _M_start = {
+                    void *_M_cur = 0x7cbba6be0310
+                    void *_M_first = 0x7cbba6be0300
+                    void *_M_last = 0x7cbba6be0500
+                    void *_M_node = 0x7bcba6be0098
+                }
+                iterator _M_finish = {
+                    void *_M_cur = 0x7cbba6be0310
+                    void *_M_first = 0x7cbba6be0300
+                    void *_M_last = 0x7cbba6be0500
+                    void *_M_node = 0x7bcba6be0098
+                }
+            }
+        }
+    }
+    optional<std::_List_iterator<tf::Taskflow> > _satellite = {
+        _Optional_payload<std::_List_iterator<tf::Taskflow>, true, true, true> _M_payload = {
+            _Storage<std::_List_iterator<tf::Taskflow>, true> _M_payload = <union> {
+                _Empty_byte _M_empty = {}
+                _List_iterator<tf::Taskflow> _M_value = {
+                    _List_node_base *_M_node = NULL
+                }
+            }
+            bool _M_engaged = false
+        }
+    }
 }
 ```
 </details>

@@ -819,7 +819,7 @@ static size_t _upf_uLEB_to_uint64(const uint8_t *leb, uint64_t *result) {
     static const uint8_t BITS_MASK = 0x7f;      // 01111111
     static const uint8_t CONTINUE_MASK = 0x80;  // 10000000
 
-    size_t i = 0;
+    int i = 0;
     uint8_t b = 0;
     int shift = 0;
     *result = 0;
@@ -829,7 +829,6 @@ static size_t _upf_uLEB_to_uint64(const uint8_t *leb, uint64_t *result) {
         *result |= (((uint64_t) (b & BITS_MASK)) << shift);
         shift += 7;
     } while (b & CONTINUE_MASK);
-
     return i;
 }
 
@@ -841,18 +840,17 @@ static size_t _upf_LEB_to_int64(const uint8_t *leb, int64_t *result) {
     static const uint8_t CONTINUE_MASK = 0x80;  // 10000000
     static const uint8_t SIGN_MASK = 0x40;      // 01000000
 
-    size_t i = 0;
+    int i = 0;
     uint8_t b = 0;
-    size_t shift = 0;
+    int shift = 0;
     *result = 0;
     do {
         b = leb[i++];
-        _UPF_ASSERT(shift < 57);
+        _UPF_ASSERT(shift <= 56 || (shift == 63 && (b == 1 || b == BITS_MASK)));
         *result |= (((uint64_t) (b & BITS_MASK)) << shift);
         shift += 7;
     } while (b & CONTINUE_MASK);
-    if ((shift < sizeof(*result) * 8) && (b & SIGN_MASK)) *result |= -(1LL << shift);
-
+    if ((shift < 64) && (b & SIGN_MASK)) *result |= -(1LL << shift);
     return i;
 }
 
@@ -3747,20 +3745,8 @@ __attribute__((no_sanitize_address)) static void _upf_print_type(_upf_indexed_st
             _upf_enum_vec enums = type->as.cenum.enums;
             const _upf_type *underlying_type = type->as.cenum.underlying_type;
 
-            int64_t enum_value;
-            if (underlying_type->kind == _UPF_TK_U4) {
-                uint32_t temp;
-                memcpy(&temp, data, sizeof(temp));
-                enum_value = temp;
-            } else if (underlying_type->kind == _UPF_TK_S4) {
-                int32_t temp;
-                memcpy(&temp, data, sizeof(temp));
-                enum_value = temp;
-            } else {
-                _UPF_WARN("Expected enum to use int32_t or uint32_t. Ignoring this type.");
-                _upf_bprintf("<enum>");
-                break;
-            }
+            int64_t enum_value = 0;
+            memcpy(&enum_value, data, underlying_type->size);
 
             const char *name = NULL;
             for (uint32_t i = 0; i < enums.length; i++) {

@@ -48,6 +48,22 @@ Examples and their outputs can be found in [examples](examples), and can be buil
 ```
 </details>
 
+<details>
+  <summary>cxxopts (<a href="https://github.com/jarro2783/cxxopts">src</a>)</summary>
+
+```c
+!examples/cxxopts.out
+```
+</details>
+
+<details>
+  <summary>taskflow (<a href="https://github.com/taskflow/taskflow">src</a>)</summary>
+
+```c
+!examples/taskflow.out
+```
+</details>
+
 ## Requirements
 
 - Works only on Linux

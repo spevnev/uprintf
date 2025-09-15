@@ -21,11 +21,13 @@ C_TESTS   ?= $(patsubst $(TEST_DIR)/%.c, %, $(wildcard $(TEST_DIR)/*.c))
 CXX_TESTS ?= $(patsubst $(TEST_DIR)/%.cc, %, $(wildcard $(TEST_DIR)/*.cc))
 
 
-EXAMPLE_CFLAGS := -Wall -Wextra -pedantic -I . -fsanitize=undefined,address,leak -std=c11 -O2 -g2
+EXAMPLE_COMMON_FLAGS := -Wall -Wextra -pedantic -I . -fsanitize=undefined,address,leak -g2 -O0
+EXAMPLE_CFLAGS       := $(EXAMPLE_COMMON_FLAGS) -std=c11
+EXAMPLE_CXXFLAGS     := $(EXAMPLE_COMMON_FLAGS) -std=c++17
 
-EXAMPLE_SRCS := $(wildcard $(EXAMPLE_DIR)/*.c)
-EXAMPLE_OUTS := $(EXAMPLE_SRCS:.c=.out)
-EXAMPLES     := $(patsubst %.c, $(BUILD_DIR)/%, $(EXAMPLE_SRCS))
+EXAMPLE_SRCS := $(wildcard $(EXAMPLE_DIR)/*.c $(EXAMPLE_DIR)/*.cc)
+EXAMPLE_OUTS := $(addsuffix .out, $(basename $(EXAMPLE_SRCS)))
+EXAMPLES     := $(addprefix $(BUILD_DIR)/, $(basename $(EXAMPLE_SRCS)))
 
 .PHONY: clean install uninstall examples readme test tests
 all: examples
@@ -81,6 +83,24 @@ $(BUILD_DIR)/$(EXAMPLE_DIR)/miniaudio: $(EXAMPLE_DIR)/miniaudio.c $(LIB_DIR)/min
 $(LIB_DIR)/miniaudio.h:
 	@mkdir -p $(@D)
 	wget https://raw.githubusercontent.com/mackron/miniaudio/refs/heads/master/miniaudio.h -O $@
+
+$(BUILD_DIR)/$(EXAMPLE_DIR)/cxxopts: $(EXAMPLE_DIR)/cxxopts.cc $(LIB_DIR)/cxxopts.hpp uprintf.h
+	@mkdir -p $(@D)
+	$(CXX) $(EXAMPLE_CXXFLAGS) -I $(LIB_DIR) -o $@ $<
+
+$(LIB_DIR)/cxxopts.hpp:
+	@mkdir -p $(@D)
+	wget https://raw.githubusercontent.com/jarro2783/cxxopts/refs/heads/master/include/cxxopts.hpp -O $@
+
+$(BUILD_DIR)/$(EXAMPLE_DIR)/taskflow: $(EXAMPLE_DIR)/taskflow.cc $(LIB_DIR)/taskflow uprintf.h
+	@mkdir -p $(@D)
+	$(CXX) $(EXAMPLE_CXXFLAGS) -I $(LIB_DIR) -o $@ $<
+
+$(LIB_DIR)/taskflow:
+	@mkdir -p $(@D)
+	git clone --depth 1 https://github.com/taskflow/taskflow $(LIB_DIR)/taskflow_src
+	mv $(LIB_DIR)/taskflow_src/taskflow $@
+	rm -rf $(LIB_DIR)/taskflow_src
 
 
 readme: README.md.in $(EXAMPLE_OUTS)
