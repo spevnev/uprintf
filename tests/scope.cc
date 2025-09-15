@@ -24,7 +24,15 @@ void fun1() {
     uprintf("I %S\n\n", I::f());
 }
 
-class C {
+struct P {
+    int *v = &I::v;
+    struct S {
+        int *v;
+    };
+    int **f() { return &v; }
+};
+
+class C : public P {
 public:
     char v = 'c';
     struct S {
@@ -32,7 +40,7 @@ public:
     };
     char *f() { return &v; }
 
-    void fun123() {
+    void fun() {
         S s = {v};
         uprintf("%d\n", &s);
 
@@ -42,6 +50,11 @@ public:
         uprintf("C %S\n", &this->v);
         uprintf("C %S\n", (S *) &this->v);
         uprintf("C %S\n\n", this->f());
+
+        uprintf("P %S\n", &(P::v));
+        uprintf("P %S\n", P::f());
+        uprintf("P %S\n", &this->P::v);
+        uprintf("P %S\n\n", this->P::f());
     }
 };
 
@@ -176,6 +189,6 @@ int main() {
     I::J::fun2();
     I::J::K::fun1();
     I::J::K::fun2();
-    I::C{}.fun123();
+    I::C{}.fun();
     return _upf_test_status;
 }

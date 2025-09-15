@@ -110,3 +110,8 @@ C {
     char v = 99 ('c')
 }
 C 99 ('c')
+
+P POINTER (1)
+P POINTER (1)
+P POINTER (1)
+P POINTER (1)

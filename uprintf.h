@@ -102,6 +102,7 @@ extern int _upf_test_status;
 #include <dlfcn.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <link.h>
 #include <setjmp.h>
 #include <stdarg.h>
@@ -447,6 +448,7 @@ typedef struct {
     _upf_type *type;
     size_t offset;
     int bit_size;  // non-zero means bit field
+    int inheritance;
 } _upf_member;
 
 _UPF_VECTOR_TYPEDEF(_upf_member_vec, _upf_member);
@@ -471,6 +473,13 @@ typedef struct {
 _UPF_VECTOR_TYPEDEF(_upf_function_vec, _upf_function);
 
 typedef struct {
+    int inheritance;
+    _upf_function function;
+} _upf_method;
+
+_UPF_VECTOR_TYPEDEF(_upf_method_vec, _upf_method);
+
+typedef struct {
     const char *name;
     int64_t value;
 } _upf_enum;
@@ -491,7 +500,7 @@ struct _upf_type {
         struct {
             bool is_declaration;
             _upf_member_vec members;
-            _upf_function_vec methods;
+            _upf_method_vec methods;
         } cstruct;
         struct {
             _upf_type *underlying_type;
@@ -1823,10 +1832,12 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                             _UPF_VECTOR_PUSH(&type.as.cstruct.members, member);
                         }
                     } break;
-                    case DW_TAG_subprogram:
-                        _UPF_VECTOR_PUSH(&type.as.cstruct.methods, _upf_parse_subprogram(cu, die, abbrev));
+                    case DW_TAG_subprogram: {
+                        _upf_method method = _UPF_ZERO_INIT;
+                        method.function = _upf_parse_subprogram(cu, die, abbrev);
+                        _UPF_VECTOR_PUSH(&type.as.cstruct.methods, method);
                         die = _upf_skip_die(cu, die, abbrev);
-                        break;
+                    } break;
                     case DW_TAG_inheritance: {
                         _upf_type *parent_type = NULL;
                         int64_t offset = -1;
@@ -1851,7 +1862,13 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                             for (uint32_t i = 0; i < parent_type->as.cstruct.members.length; i++) {
                                 _upf_member member = parent_type->as.cstruct.members.data[i];
                                 member.offset += offset;
+                                member.inheritance++;
                                 _UPF_VECTOR_PUSH(&type.as.cstruct.members, member);
+                            }
+                            for (uint32_t i = 0; i < parent_type->as.cstruct.methods.length; i++) {
+                                _upf_method method = parent_type->as.cstruct.methods.data[i];
+                                method.inheritance++;
+                                _UPF_VECTOR_PUSH(&type.as.cstruct.methods, method);
                             }
                         }
                     } break;
@@ -2036,7 +2053,35 @@ static void _upf_parse_import(_upf_cu *cu, const uint8_t *die, const _upf_abbrev
     _UPF_VECTOR_PUSH(&cu->ns_imports, import);
 }
 
+static void _upf_ns_parse_inheritance(_upf_cu *cu, const uint8_t *die, const _upf_abbrev *abbrev, _upf_ns_vec *nss) {
+    _UPF_ASSERT(cu != NULL && die != NULL && abbrev != NULL && nss != NULL);
+
+    const uint8_t *parent_die = NULL;
+    for (uint32_t i = 0; i < abbrev->attrs.length; i++) {
+        _upf_attr attr = abbrev->attrs.data[i];
+        if (attr.name == DW_AT_type) {
+            parent_die = cu->base + _upf_get_ref(die, attr.form);
+            break;
+        }
+        die += _upf_get_attr_size(die, attr.form);
+    }
+    _UPF_ASSERT(parent_die != NULL);
+
+    const _upf_abbrev *parent_abbrev;
+    _upf_get_abbrev(&parent_abbrev, cu, parent_die);
+    _UPF_ASSERT(parent_abbrev != NULL);
+
+    if (!parent_abbrev->has_children) return;
+
+    _upf_ns_import import = _UPF_ZERO_INIT;
+    import.nss = nss;
+    import.die = parent_die;
+    _UPF_VECTOR_PUSH(&cu->ns_imports, import);
+}
+
 static void _upf_parse_sub_namespace(_upf_cu *cu, const uint8_t *die, _upf_ns *ns, _upf_ns_vec *ns_stack) {
+    _UPF_ASSERT(cu != NULL && die != NULL && ns != NULL && ns_stack != NULL);
+
     const uint8_t *die_base = die;
 
     const _upf_abbrev *abbrev;
@@ -2182,11 +2227,17 @@ static _upf_ns *_upf_parse_ns_body(_upf_cu *cu, const uint8_t *die, _upf_ns_vec 
                 const char *type_name = _upf_get_type_name(cu, die, abbrev);
                 if (type_name != NULL) {
                     if (abbrev->has_children) {
+                        // Parse class/struct as namespace.
                         _upf_ns *class_ns = _upf_parse_ns_body(cu, _upf_skip_attrs(die, abbrev), ns_stack);
                         _upf_named_ns entry = _UPF_ZERO_INIT;
                         entry.name = type_name;
                         entry.ns = class_ns;
                         _UPF_VECTOR_PUSH(&ns->sub_nss, entry);
+
+                        _upf_ns_entry ns_entry = _UPF_ZERO_INIT;
+                        ns_entry.die = die_base;
+                        ns_entry.ns = class_ns;
+                        _UPF_VECTOR_PUSH(&cu->nss, ns_entry);
                     }
 
                     _upf_named_type type = _UPF_ZERO_INIT;
@@ -2195,6 +2246,8 @@ static _upf_ns *_upf_parse_ns_body(_upf_cu *cu, const uint8_t *die, _upf_ns_vec 
                     _UPF_VECTOR_PUSH(&ns->types, type);
                 }
             } break;
+            // Treat inheritance as namespace import.
+            case DW_TAG_inheritance:           _upf_ns_parse_inheritance(cu, die, abbrev, &ns->imported_nss); break;
             case DW_TAG_array_type:
             case DW_TAG_enumeration_type:
             case DW_TAG_pointer_type:
@@ -3177,6 +3230,7 @@ static _upf_type *_upf_cxx_new(void) {
         // Parse as "new type".
         type = _upf_parse_type_name();
     }
+    _UPF_ASSERT(type != NULL);
 
     // Optional parentheses- or brace-enclosed initializer.
     if (_upf_match_token(_UPF_TT_OPEN_PAREN)) {
@@ -3256,23 +3310,37 @@ static _upf_type *_upf_index(_upf_type *type) {
 
 static _upf_type *_upf_dot(_upf_type *type) {
     _upf_token dot = _upf_consume_token();
-    const char *member_name = _upf_expect_token(_UPF_TT_IDENTIFIER).string;
-
     if (dot.type == _UPF_TT_ARROW) type = _upf_dereference_type(type);
 
+    const char *member_name = _upf_expect_token(_UPF_TT_IDENTIFIER).string;
+    if (_upf_match_token(_UPF_TT_CXX_SCOPE)) {
+        type = _upf_get_type_by_name(member_name);
+        member_name = _upf_expect_token(_UPF_TT_IDENTIFIER).string;
+    }
+
     _UPF_ASSERT(type->kind == _UPF_TK_STRUCT || type->kind == _UPF_TK_UNION);
+
+    int inheritance = INT_MAX;
+    _upf_type *member_type = NULL;
     _upf_member_vec members = type->as.cstruct.members;
     for (uint32_t i = 0; i < members.length; i++) {
-        if (strcmp(members.data[i].name, member_name) == 0) {
-            return members.data[i].type;
+        if (strcmp(members.data[i].name, member_name) == 0 && members.data[i].inheritance < inheritance) {
+            member_type = members.data[i].type;
+            inheritance = members.data[i].inheritance;
         }
     }
-    _upf_function_vec methods = type->as.cstruct.methods;
+    if (member_type != NULL) return member_type;
+
+    _upf_method_vec methods = type->as.cstruct.methods;
+    const _upf_function *method_type = NULL;
     for (uint32_t i = 0; i < methods.length; i++) {
-        if (strcmp(methods.data[i].name, member_name) == 0) {
-            return _upf_get_function_type(&methods.data[i]);
+        if (strcmp(methods.data[i].function.name, member_name) == 0 && methods.data[i].inheritance < inheritance) {
+            method_type = &methods.data[i].function;
+            inheritance = methods.data[i].inheritance;
         }
     }
+    if (method_type != NULL) return _upf_get_function_type(method_type);
+
     return NULL;
 }
 
@@ -3656,9 +3724,8 @@ __attribute__((no_sanitize_address)) static void _upf_collect_circular_structs(_
     _upf_member_vec members = type->as.cstruct.members;
     for (uint32_t i = 0; i < members.length; i++) {
         const _upf_member *member = &members.data[i];
-        if (member->bit_size == 0) {  // non-zero bit_size means bit field
-            _upf_collect_circular_structs(seen, circular, data + member->offset, member->type, depth + 1);
-        }
+        if (member->bit_size > 0) continue;  // skip bit fields
+        _upf_collect_circular_structs(seen, circular, data + member->offset, member->type, depth + 1);
     }
 }
 
