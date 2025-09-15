@@ -23,12 +23,6 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-// ====================== CHECKS ==========================
-
-#ifndef __linux__
-#error [ERROR] uprintf only supports Linux
-#endif
-
 // ====================== HEADER ==========================
 
 #ifndef UPRINTF_H
@@ -238,6 +232,7 @@ extern Elf64_Dyn _DYNAMIC[];
 #define DW_AT_type 0x49
 #define DW_AT_ranges 0x55
 #define DW_AT_data_bit_offset 0x6b
+#define DW_AT_linkage_name 0x6e
 #define DW_AT_str_offsets_base 0x72
 #define DW_AT_addr_base 0x73
 #define DW_AT_rnglists_base 0x74
@@ -462,6 +457,7 @@ _UPF_VECTOR_TYPEDEF(_upf_named_type_vec, _upf_named_type);
 
 typedef struct {
     const char *name;
+    const char *linkage_name;
     const uint8_t *return_type_die;
     const uint8_t *specification_die;
     _upf_named_type_vec args;
@@ -1542,10 +1538,11 @@ static _upf_function _upf_parse_subprogram(const _upf_cu *cu, const uint8_t *die
     for (uint32_t i = 0; i < abbrev->attrs.length; i++) {
         _upf_attr attr = abbrev->attrs.data[i];
         switch (attr.name) {
-            case DW_AT_name:   function.name = _upf_get_str(cu, die, attr.form); break;
-            case DW_AT_type:   function.return_type_die = cu->base + _upf_get_ref(die, attr.form); break;
-            case DW_AT_low_pc: function.pc = _upf_get_addr(cu, die, attr.form); break;
-            case DW_AT_ranges: {
+            case DW_AT_name:         function.name = _upf_get_str(cu, die, attr.form); break;
+            case DW_AT_linkage_name: function.linkage_name = _upf_get_str(cu, die, attr.form); break;
+            case DW_AT_type:         function.return_type_die = cu->base + _upf_get_ref(die, attr.form); break;
+            case DW_AT_low_pc:       function.pc = _upf_get_addr(cu, die, attr.form); break;
+            case DW_AT_ranges:       {
                 _upf_range_vec ranges = _upf_get_ranges(cu, die, attr.form);
                 _UPF_ASSERT(ranges.length > 0);
                 function.pc = ranges.data[0].start;
@@ -1564,6 +1561,7 @@ static _upf_function _upf_parse_subprogram(const _upf_cu *cu, const uint8_t *die
         }
         die += _upf_get_attr_size(die, attr.form);
     }
+    if (function.linkage_name == NULL) function.linkage_name = function.name;
 
     if (abbrev->has_children && function.args.length == 0) {
         while (true) {
@@ -3955,8 +3953,9 @@ __attribute__((no_sanitize_address)) static void _upf_print_type(_upf_indexed_st
                     _UPF_ASSERT(function_name != NULL);
 
                     for (uint32_t j = 0; j < _upf_state.current_cu->extern_functions.length; j++) {
-                        if (strcmp(_upf_state.current_cu->extern_functions.data[j].name, function_name) == 0) {
-                            function = &_upf_state.current_cu->extern_functions.data[j];
+                        _upf_function *current = &_upf_state.current_cu->extern_functions.data[j];
+                        if (strcmp(current->name, function_name) == 0) {
+                            function = current;
                             break;
                         }
                     }
