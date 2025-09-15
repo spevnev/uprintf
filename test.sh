@@ -5,8 +5,8 @@ RED="\e[1;31m"
 GREEN="\e[1;32m"
 YELLOW="\e[1;33m"
 
-if [ "$#" -ne 6 ]; then
-    echo "usage: $(basename $0) <compiler_flags> <src> <test> <compiler> <o_level> <g_level>"
+if [ "$#" -ne 5 ]; then
+    echo "usage: $(basename $0) <compiler_flags> <src> <test> <compiler> <o_level>"
     exit 1
 fi
 
@@ -15,7 +15,6 @@ src=$2
 test=$3
 compiler=$4
 o_level=$5
-g_level=$6
 
 executables=(wdiff $compiler)
 for executable in "${executables[@]}"; do
@@ -25,9 +24,9 @@ for executable in "${executables[@]}"; do
     fi
 done
 
-test_id="$test-$compiler-$o_level-$g_level"
+test_id="$test-$compiler-$o_level"
 dir="$BUILD_DIR/test/$test"
-bin="$dir/$compiler-$o_level-$g_level"
+bin="$dir/$compiler-$o_level"
 log="$bin.log"
 output="$bin.out"
 baseline="$BASELINE_DIR/$test.out"
@@ -116,11 +115,11 @@ if [ $(use_shared_implementation) = true ]; then
         exit 1
     fi
 
-    $compiler $flags -$o_level -$g_level -c $src -o $object > $log 2>&1
+    $compiler $flags -$o_level -c $src -o $object > $log 2>&1
     ret=$?
-    $compiler $flags -$o_level -$g_level -o $bin $object $implementation >> $log 2>&1
+    $compiler $flags -$o_level -o $bin $object $implementation >> $log 2>&1
 else
-    $compiler $flags -$o_level -$g_level -o $bin $src > $log 2>&1
+    $compiler $flags -$o_level -o $bin $src > $log 2>&1
     ret=$?
 fi
 

@@ -8,14 +8,13 @@ TEST_DIR     := tests
 BASELINE_DIR := tests/baselines
 
 
-COMMON_FLAGS := -Wall -Wextra -Werror -pedantic -I . -DUPRINTF_TEST -fsanitize=undefined,address,leak
+COMMON_FLAGS := -Wall -Wextra -Werror -pedantic -I . -DUPRINTF_TEST -fsanitize=undefined,address,leak -g2
 CFLAGS       := $(COMMON_FLAGS) -std=c11
 CXXFLAGS     := $(COMMON_FLAGS) -std=c++11
 
 C_COMPILERS   ?= clang gcc
 CXX_COMPILERS ?= clang++ g++
 O_LEVELS      ?= O0 O2 O3 Os
-G_LEVELS      ?= g2 g3
 
 C_TESTS   ?= $(patsubst $(TEST_DIR)/%.c, %, $(wildcard $(TEST_DIR)/*.c))
 CXX_TESTS ?= $(patsubst $(TEST_DIR)/%.cc, %, $(wildcard $(TEST_DIR)/*.cc))
@@ -114,36 +113,34 @@ $(EXAMPLE_DIR)/%.out: $(BUILD_DIR)/$(EXAMPLE_DIR)/%
 
 
 test: tests
-tests: $(foreach O,$(O_LEVELS),$(foreach G,$(G_LEVELS),\
-			$(foreach C,$(C_COMPILERS),$(foreach T,$(C_TESTS),$(BUILD_DIR)/test/$T/$C-$O-$G)) \
-			$(foreach C,$(CXX_COMPILERS),$(foreach T,$(CXX_TESTS),$(BUILD_DIR)/test/$T/$C-$O-$G))))
+tests: $(foreach O,$(O_LEVELS),                                                               \
+			$(foreach C,$(C_COMPILERS),$(foreach T,$(C_TESTS),$(BUILD_DIR)/test/$T/$C-$O))    \
+			$(foreach C,$(CXX_COMPILERS),$(foreach T,$(CXX_TESTS),$(BUILD_DIR)/test/$T/$C-$O)))
 
 # Export all variables to subprocesses, i.e. test.sh
 export
 
 define C_TEST_TEMPLATE
-$(BUILD_DIR)/test/$1/$2-$3-$4: $(TEST_DIR)/$1.c $(BUILD_DIR)/impl/$2.o test.sh
-	@./test.sh "$(CFLAGS)" $$< $1 $2 $3 $4
+$(BUILD_DIR)/test/$1/$2-$3: $(TEST_DIR)/$1.c $(BUILD_DIR)/impl/$2.o test.sh
+	@./test.sh "$(CFLAGS)" $$< $1 $2 $3
 endef
 
 define CXX_TEST_TEMPLATE
-$(BUILD_DIR)/test/$1/$2-$3-$4: $(TEST_DIR)/$1.cc $(BUILD_DIR)/impl/$2.o test.sh
-	@./test.sh "$(CXXFLAGS)" $$< $1 $2 $3 $4
+$(BUILD_DIR)/test/$1/$2-$3: $(TEST_DIR)/$1.cc $(BUILD_DIR)/impl/$2.o test.sh
+	@./test.sh "$(CXXFLAGS)" $$< $1 $2 $3
 endef
 
-$(foreach O,$(O_LEVELS),                                      \
-	$(foreach G,$(G_LEVELS),                                  \
-		$(foreach C,$(C_COMPILERS),                           \
-			$(foreach T,$(C_TESTS),                           \
-				$(eval $(call C_TEST_TEMPLATE,$T,$C,$O,$G))   \
-			)                                                 \
-		)                                                     \
-		$(foreach C,$(CXX_COMPILERS),                         \
-			$(foreach T,$(CXX_TESTS),                         \
-				$(eval $(call CXX_TEST_TEMPLATE,$T,$C,$O,$G)) \
-			)                                                 \
-		)                                                     \
-	)                                                         \
+$(foreach O,$(O_LEVELS),                               \
+	$(foreach C,$(C_COMPILERS),                        \
+		$(foreach T,$(C_TESTS),                        \
+			$(eval $(call C_TEST_TEMPLATE,$T,$C,$O))   \
+		)                                              \
+	)                                                  \
+	$(foreach C,$(CXX_COMPILERS),                      \
+		$(foreach T,$(CXX_TESTS),                      \
+			$(eval $(call CXX_TEST_TEMPLATE,$T,$C,$O)) \
+		)                                              \
+	)                                                  \
 )
 
 define C_IMPL_TEMPLATE

@@ -3812,12 +3812,14 @@ __attribute__((no_sanitize_address)) static void _upf_print_type(_upf_indexed_st
             _upf_enum_vec enums = type->as.cenum.enums;
             const _upf_type *underlying_type = type->as.cenum.underlying_type;
 
-            int64_t enum_value = 0;
+            uint64_t enum_value = 0;
             memcpy(&enum_value, data, underlying_type->size);
 
+            // Use memcmp instead of comparison to avoid handling signed values,
+            // which when casted up require sign-extension.
             const char *name = NULL;
             for (uint32_t i = 0; i < enums.length; i++) {
-                if (enums.data[i].value == enum_value) {
+                if (memcmp(&enums.data[i].value, &enum_value, underlying_type->size) == 0) {
                     name = enums.data[i].name;
                     break;
                 }
