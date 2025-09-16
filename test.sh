@@ -115,15 +115,12 @@ if [ $(use_shared_implementation) = true ]; then
         exit 1
     fi
 
-    $compiler $flags -$o_level -c $src -o $object > $log 2>&1
-    ret=$?
-    $compiler $flags -$o_level -o $bin $object $implementation >> $log 2>&1
+    $compiler $flags -$o_level $src $implementation -o $bin > $log 2>&1
 else
     $compiler $flags -$o_level -o $bin $src > $log 2>&1
-    ret=$?
 fi
 
-if [ $ret -ne 0 ]; then
+if [ $? -ne 0 ]; then
     if [ $CI ]; then
         echo -e "$RED[COMPILATION FAILED]$RESET $test_id. Log:"
         cat $log
