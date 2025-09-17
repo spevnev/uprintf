@@ -71,8 +71,8 @@ extern int _upf_test_status;
 #define UPRINTF_MAX_DEPTH 10
 #endif
 
-#ifndef UPRINTF_IGNORE_STDIO_FILE
-#define UPRINTF_IGNORE_STDIO_FILE true
+#ifndef UPRINTF_IGNORE_STRUCTS
+#define UPRINTF_IGNORE_STRUCTS "FILE,pthread_mutex_t,pthread_cond_t"
 #endif
 
 #ifndef UPRINTF_ARRAY_COMPRESSION_THRESHOLD
@@ -711,6 +711,7 @@ typedef struct {
 
 struct _upf_state {
     _upf_memory_region *allocator;
+    _upf_cstr_vec ignored_structs;
     // has _upf_init finished
     bool is_init;
     // file loaded by dynamic linker (without debug info)
@@ -3694,10 +3695,19 @@ __attribute__((no_sanitize_address)) static void _upf_collect_circular_structs(_
     if (data == NULL || _upf_get_memory_region_end(data) == NULL) return;
 
     if (type->kind == _UPF_TK_POINTER) {
+        if (type->as.pointer.type == NULL) return;
         const uint8_t *ptr;
         memcpy(&ptr, data, sizeof(ptr));
-        if (type->as.pointer.type == NULL) return;
         _upf_collect_circular_structs(seen, circular, ptr, type->as.pointer.type, depth);
+        return;
+    }
+
+    if (type->kind == _UPF_TK_REFERENCE) {
+        if (type->as.reference.type == NULL) return;
+        const uint8_t *ptr;
+        memcpy(&ptr, data, sizeof(ptr));
+        if (ptr == NULL || _upf_get_memory_region_end(ptr) == NULL) return;
+        _upf_collect_circular_structs(seen, circular, ptr, type->as.reference.type, depth);
         return;
     }
 
@@ -3762,12 +3772,12 @@ __attribute__((no_sanitize_address)) static void _upf_print_type(_upf_indexed_st
     switch (type->kind) {
         case _UPF_TK_UNION:  _upf_bprintf("<union> "); __attribute__((fallthrough));  // Handle union as struct
         case _UPF_TK_STRUCT: {
-#if UPRINTF_IGNORE_STDIO_FILE
-            if (strcmp(type->name, "FILE") == 0) {
-                _upf_bprintf("<ignored>");
-                return;
+            for (uint32_t i = 0; i < _upf_state.ignored_structs.length; i++) {
+                if (strcmp(type->name, _upf_state.ignored_structs.data[i]) == 0) {
+                    _upf_bprintf("<ignored>");
+                    return;
+                }
             }
-#endif
 
             _upf_member_vec members = type->as.cstruct.members;
 
@@ -3931,7 +3941,7 @@ __attribute__((no_sanitize_address)) static void _upf_print_type(_upf_indexed_st
 
             // If it is a valid pointer, treat reference as a pointer,
             // otherwise assume that it is the data.
-            if (_upf_get_memory_region_end(ptr) == NULL) {
+            if (ptr == NULL || _upf_get_memory_region_end(ptr) == NULL) {
                 _upf_print_type(circular, data, type->as.reference.type, depth);
             } else {
                 _upf_print_type(circular, ptr, type->as.reference.type, depth);
@@ -4065,9 +4075,26 @@ static void *_upf_get_this_executable_address(void) {
     return base;
 }
 
-// =================== ENTRY POINTS =======================
+// ======================= MAIN ===========================
 
-__attribute__((constructor)) void _upf_init(void) {
+static void _upf_add_ignored_types(void) {
+    size_t str_length = sizeof(UPRINTF_IGNORE_STRUCTS);
+    char *str = (char *) _upf_alloc(str_length);
+    memcpy(str, UPRINTF_IGNORE_STRUCTS, str_length);
+    str[str_length] = '\0';
+
+    const char *start = str;
+    for (char *ch = str; *ch != '\0'; ch++) {
+        if (*ch != ',') continue;
+
+        _UPF_VECTOR_PUSH(&_upf_state.ignored_structs, start);
+        *ch = '\0';
+        start = ch + 1;
+    }
+    _UPF_VECTOR_PUSH(&_upf_state.ignored_structs, start);
+}
+
+__attribute__((constructor)) static void _upf_init(void) {
     if (setjmp(_upf_state.error_jmp_buf) != 0) return;
 
     if (access("/proc/self/exe", R_OK) != 0) _UPF_ERROR("Expected \"/proc/self/exe\" to be a valid path.");
@@ -4080,6 +4107,7 @@ __attribute__((constructor)) void _upf_init(void) {
     _upf_parse_dwarf();
 
     _upf_init_parsing_rules();
+    _upf_add_ignored_types();
 
     _upf_state.size = _UPF_INITIAL_BUFFER_SIZE;
     _upf_state.buffer = (char *) malloc(_upf_state.size * sizeof(*_upf_state.buffer));
@@ -4087,7 +4115,7 @@ __attribute__((constructor)) void _upf_init(void) {
     _upf_state.is_init = true;
 }
 
-__attribute__((destructor)) void _upf_fini(void) {
+__attribute__((destructor)) static void _upf_fini(void) {
     if (_upf_state.file != NULL) munmap(_upf_state.file, _upf_state.file_size);
     free(_upf_state.buffer);
     _upf_free_allocator();

@@ -1,5 +1,5 @@
 #include <stdio.h>
-#define UPRINTF_IGNORE_STDIO_FILE 0
+#define UPRINTF_IGNORE_STRUCTS ""
 #define UPRINTF_IMPLEMENTATION
 #include "uprintf.h"
 

@@ -4517,7 +4517,7 @@ option | description | default
 -|-|-
 `UPRINTF_INDENTATION_WIDTH` | The number of spaces to use for indentation | 4
 `UPRINTF_MAX_DEPTH` | Limits the nesting depth of structures. Negative values remove the limit | 10
-`UPRINTF_IGNORE_STDIO_FILE` | Should `stdio.h`'s `FILE` be ignored | true
+`UPRINTF_IGNORE_STRUCTS` | Comma-separated list of struct names whose values should not be printed | FILE,pthread_mutex_t,pthread_cond_t
 `UPRINTF_ARRAY_COMPRESSION_THRESHOLD` | The number of consecutive identical array elements before they get compressed. Non-positive values disable compression | 4
 `UPRINTF_MAX_STRING_LENGTH` | The length before the string gets truncated. Non-positive values remove the limit | 200
 
