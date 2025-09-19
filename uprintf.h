@@ -302,11 +302,11 @@ int _upf_test_status = EXIT_SUCCESS;
 
 // ====================== ERRORS ==========================
 
-#define _UPF_LOG(type, ...)                         \
-    do {                                            \
-        fprintf(stderr, "(uprintf) [%s] ", (type)); \
-        fprintf(stderr, __VA_ARGS__);               \
-        fprintf(stderr, "\n");                      \
+#define _UPF_LOG(type, ...)                       \
+    do {                                          \
+        fprintf(stderr, "(uprintf) [%s] ", type); \
+        fprintf(stderr, __VA_ARGS__);             \
+        fprintf(stderr, "\n");                    \
     } while (0)
 
 #define _UPF_WARN(...)                      \
@@ -331,42 +331,6 @@ int _upf_test_status = EXIT_SUCCESS;
 
 #define _UPF_NO_DEBUG_INFO_ERROR "Ensure that the executable contains debugging information of at least 2nd level (-g2 or -g3)."
 
-// ====================== VECTOR ==========================
-
-#define _UPF_INITIAL_VECTOR_CAPACITY 4
-
-#define _UPF_VECTOR_TYPEDEF(name, type) \
-    typedef struct {                    \
-        uint32_t capacity;              \
-        uint32_t length;                \
-        type *data;                     \
-    } name
-
-#define _UPF_VECTOR_PUSH(vec, element)                                  \
-    do {                                                                \
-        if ((vec)->capacity == 0) {                                     \
-            (vec)->capacity = _UPF_INITIAL_VECTOR_CAPACITY;             \
-            uint32_t size = (vec)->capacity * sizeof(*(vec)->data);     \
-            *((void **) &(vec)->data) = _upf_alloc(size);               \
-        } else if ((vec)->capacity == (vec)->length) {                  \
-            uint32_t old_size = (vec)->capacity * sizeof(*(vec)->data); \
-            (vec)->capacity *= 2;                                       \
-            void *new_data = _upf_alloc(old_size * 2);                  \
-            memcpy(new_data, (vec)->data, old_size);                    \
-            *((void **) &(vec)->data) = new_data;                       \
-        }                                                               \
-        (vec)->data[(vec)->length++] = (element);                       \
-    } while (0)
-
-#define _UPF_VECTOR_TOP(vec) (vec)->data[(vec)->length - 1]
-
-#define _UPF_VECTOR_UNORDERED_REMOVE(vec, index)   \
-    do {                                           \
-        _UPF_ASSERT(index < (vec)->length);        \
-        (vec)->data[index] = _UPF_VECTOR_TOP(vec); \
-        (vec)->length--;                           \
-    } while (0)
-
 // ======================= C++ ============================
 
 #ifdef __cplusplus
@@ -382,6 +346,24 @@ namespace uprintf {
 #endif
 
 // ====================== TYPES ===========================
+
+#define _UPF_VECTOR_TYPEDEF(name, type) \
+    typedef struct {                    \
+        uint32_t capacity;              \
+        uint32_t length;                \
+        type *data;                     \
+    } name
+
+#define _UPF_MAP_TYPEDEF(name, key_t, value_t) \
+    typedef struct {                           \
+        uint32_t capacity;                     \
+        uint32_t size;                         \
+        struct {                               \
+            uint32_t hash;                     \
+            key_t key;                         \
+            value_t value;                     \
+        } *data;                               \
+    } name
 
 _UPF_VECTOR_TYPEDEF(_upf_size_t_vec, size_t);
 _UPF_VECTOR_TYPEDEF(_upf_cstr_vec, const char *);
@@ -408,9 +390,6 @@ typedef struct {
 } _upf_abbrev;
 
 _UPF_VECTOR_TYPEDEF(_upf_abbrev_vec, _upf_abbrev);
-
-typedef struct _upf_type _upf_type;
-_UPF_VECTOR_TYPEDEF(_upf_type_ptr_vec, struct _upf_type *);
 
 typedef enum {
     _UPF_TK_STRUCT,
@@ -439,16 +418,6 @@ typedef enum {
 } _upf_type_kind;
 
 typedef struct {
-    const char *name;
-    _upf_type *type;
-    size_t offset;
-    int bit_size;  // non-zero means bit field
-    int inheritance;
-} _upf_member;
-
-_UPF_VECTOR_TYPEDEF(_upf_member_vec, _upf_member);
-
-typedef struct {
     const uint8_t *die;
     const char *name;
 } _upf_named_type;
@@ -469,6 +438,7 @@ typedef struct {
 _UPF_VECTOR_TYPEDEF(_upf_function_vec, _upf_function);
 
 typedef struct {
+    // Number of inheritance levels from where the method originates.
     int inheritance;
     _upf_function function;
 } _upf_method;
@@ -486,6 +456,21 @@ _UPF_VECTOR_TYPEDEF(_upf_enum_vec, _upf_enum);
 #define _UPF_MOD_VOLATILE 1 << 1
 #define _UPF_MOD_RESTRICT 1 << 2
 #define _UPF_MOD_ATOMIC 1 << 3
+
+typedef struct _upf_type _upf_type;
+_UPF_VECTOR_TYPEDEF(_upf_type_ptr_vec, struct _upf_type *);
+
+typedef struct {
+    const char *name;
+    _upf_type *type;
+    size_t offset;
+    // Bit size is not zero only for bit field.
+    int bit_size;
+    // Number of inheritance levels from where the member originates.
+    int inheritance;
+} _upf_member;
+
+_UPF_VECTOR_TYPEDEF(_upf_member_vec, _upf_member);
 
 struct _upf_type {
     const char *name;
@@ -527,13 +512,6 @@ struct _upf_type {
 _UPF_VECTOR_TYPEDEF(_upf_type_vec, _upf_type *);
 
 typedef struct {
-    const uint8_t *die;
-    _upf_type *type_ptr;
-} _upf_type_map_entry;
-
-_UPF_VECTOR_TYPEDEF(_upf_type_map_vec, _upf_type_map_entry);
-
-typedef struct {
     uint64_t start;
     uint64_t end;
 } _upf_range;
@@ -543,20 +521,17 @@ _UPF_VECTOR_TYPEDEF(_upf_range_vec, _upf_range);
 struct _upf_ns;
 _UPF_VECTOR_TYPEDEF(_upf_ns_vec, struct _upf_ns *);
 
-typedef struct {
-    const char *name;
-    struct _upf_ns *ns;
-} _upf_named_ns;
-
-_UPF_VECTOR_TYPEDEF(_upf_named_ns_vec, _upf_named_ns);
+_UPF_MAP_TYPEDEF(_upf_name_type_map, const char *, const uint8_t *);
+_UPF_MAP_TYPEDEF(_upf_name_function_map, const char *, _upf_function);
+_UPF_MAP_TYPEDEF(_upf_name_ns_map, const char *, struct _upf_ns *);
 
 typedef struct _upf_ns {
     bool is_visited;
-    _upf_named_type_vec vars;
-    _upf_named_type_vec types;
-    _upf_function_vec functions;
+    _upf_name_type_map vars;
+    _upf_name_type_map types;
+    _upf_name_function_map functions;
     _upf_ns_vec imported_nss;
-    _upf_named_ns_vec sub_nss;
+    _upf_name_ns_map sub_nss;
 } _upf_ns;
 
 typedef struct _upf_ns_node {
@@ -569,21 +544,14 @@ typedef struct {
     _upf_ns_node *tail;
 } _upf_ns_queue;
 
-typedef struct {
-    const uint8_t *die;
-    _upf_ns *ns;
-} _upf_ns_entry;
-
-_UPF_VECTOR_TYPEDEF(_upf_ns_map, _upf_ns_entry);
-
 struct _upf_scope;
 _UPF_VECTOR_TYPEDEF(_upf_scope_vec, struct _upf_scope *);
 
 typedef struct _upf_scope {
     _upf_range_vec ranges;
     _upf_scope_vec scopes;
-    _upf_named_type_vec vars;
-    _upf_named_type_vec types;
+    _upf_name_type_map vars;
+    _upf_name_type_map types;
     _upf_ns_vec nss;
 } _upf_scope;
 
@@ -595,7 +563,7 @@ typedef struct {
     uint64_t rnglists_base;
     _upf_abbrev_vec abbrevs;
     _upf_scope scope;
-    _upf_function_vec extern_functions;
+    _upf_name_function_map extern_functions;
 } _upf_cu;
 
 _UPF_VECTOR_TYPEDEF(_upf_cu_vec, _upf_cu);
@@ -607,32 +575,22 @@ typedef struct {
 
 _UPF_VECTOR_TYPEDEF(_upf_ns_import_vec, _upf_ns_import);
 
-typedef struct {
-    const uint8_t *die;
-    _upf_ns_vec nss;
-} _upf_declaration;
-
-_UPF_VECTOR_TYPEDEF(_upf_declaration_vec, _upf_declaration);
-
-typedef struct {
-    const uint8_t *die;
-    _upf_scope *scope;
-} _upf_specification;
-
-_UPF_VECTOR_TYPEDEF(_upf_specification_vec, _upf_specification);
+_UPF_MAP_TYPEDEF(_upf_die_ns_map, const uint8_t *, _upf_ns *);
+_UPF_MAP_TYPEDEF(_upf_die_nss_map, const uint8_t *, _upf_ns_vec);
+_UPF_MAP_TYPEDEF(_upf_die_scope_map, const uint8_t *, _upf_scope *);
 
 typedef struct {
     _upf_cu *cu;
     // All namespaces.
-    _upf_ns_map nss;
+    _upf_die_ns_map nss;
     // Current namespaces.
     _upf_ns_vec ns_stack;
     // List of namespaces that need to be imported.
     _upf_ns_import_vec ns_imports;
     // List of declared functions that may be specified later.
-    _upf_declaration_vec declared_functions;
+    _upf_die_nss_map declared_functions;
     // List of specified functions that weren't declared yet.
-    _upf_specification_vec specified_functions;
+    _upf_die_scope_map specified_functions;
 } _upf_parsing_info;
 
 typedef enum {
@@ -706,35 +664,39 @@ typedef struct {
 } _upf_parse_rule;
 
 typedef struct {
-    const char *name;
-    uint64_t pc;
-} _upf_extern_function;
-
-_UPF_VECTOR_TYPEDEF(_upf_extern_function_vec, _upf_extern_function);
+    const void *data;
+    // Hashing `type` as pointer works because it is unique thanks to caching.
+    const _upf_type *type;
+} _upf_struct_key;
 
 typedef struct {
-    const void *data;
-    const _upf_type *type;
+    // Set if struct appears more than once.
+    bool is_repeating;
+    // Set if struct was printed.
     bool is_visited;
-    int id;
-} _upf_indexed_struct;
+    // Set if struct was printed to reference later.
+    uint32_t id;
+} _upf_struct_info;
 
-_UPF_VECTOR_TYPEDEF(_upf_indexed_struct_vec, _upf_indexed_struct);
+_UPF_MAP_TYPEDEF(_upf_struct_info_map, _upf_struct_key, _upf_struct_info);
+
+_UPF_MAP_TYPEDEF(_upf_pc_cstr_map, uint64_t, const char *);
+_UPF_MAP_TYPEDEF(_upf_die_type_map, const uint8_t *, _upf_type *);
 
 // =================== GLOBAL STATE =======================
 
 struct _upf_state {
     _upf_memory_region *allocator;
     _upf_cstr_vec ignored_structs;
-    // has _upf_init finished
     bool is_init;
-    // file loaded by dynamic linker (without debug info)
+    // Temporary global variable because expression cannot have the declaration.
+    uint32_t map_index;
+    // File loaded by dynamic linker (without debug info).
     const uint8_t *base;
-    // mmap-ed file (with debug info)
+    // mmap-ed file with debug info.
     uint8_t *file;
     off_t file_size;
     // DWARF info
-    bool is64bit;
     uint8_t offset_size;
     uint8_t address_size;
     // DWARF sections
@@ -747,10 +709,9 @@ struct _upf_state {
     const uint8_t *addr;
     const uint8_t *rnglists;
     // parsed DWARF info
-    _upf_type_map_vec type_map;
-    _upf_type_vec types;
+    _upf_die_type_map type_map;
     _upf_cu_vec cus;
-    _upf_extern_function_vec extern_functions;
+    _upf_pc_cstr_map extern_functions;
     // sequential id for enumerating repeating structs
     int struct_id;
     // valid memory regions
@@ -795,6 +756,7 @@ static void *_upf_alloc(size_t size) {
         _upf_state.allocator = _upf_allocator_new_region(capacity, NULL);
     }
 
+    // Align to pointer size.
     int alignment = _upf_state.allocator->length % sizeof(void *);
     if (alignment > 0) alignment = sizeof(void *) - alignment;
 
@@ -831,6 +793,159 @@ static char *_upf_new_string(const char *begin, const char *end) {
 }
 
 static char *_upf_copy_string(const char *str) { return _upf_new_string(str, str + strlen(str)); }
+
+// ====================== VECTOR ==========================
+
+#define _UPF_INITIAL_VECTOR_CAPACITY 4
+
+#define _UPF_VECTOR_PUSH(vec, element)                                  \
+    do {                                                                \
+        if ((vec)->capacity == 0) {                                     \
+            (vec)->capacity = _UPF_INITIAL_VECTOR_CAPACITY;             \
+            uint32_t size = (vec)->capacity * sizeof(*(vec)->data);     \
+            *((void **) &(vec)->data) = _upf_alloc(size);               \
+        } else if ((vec)->capacity == (vec)->length) {                  \
+            uint32_t old_size = (vec)->capacity * sizeof(*(vec)->data); \
+            (vec)->capacity *= 2;                                       \
+            void *new_data = _upf_alloc(old_size * 2);                  \
+            memcpy(new_data, (vec)->data, old_size);                    \
+            *((void **) &(vec)->data) = new_data;                       \
+        }                                                               \
+        (vec)->data[(vec)->length++] = element;                         \
+    } while (0)
+
+#define _UPF_VECTOR_TOP(vec) (vec)->data[(vec)->length - 1]
+
+// ===================== HASHMAP ==========================
+
+#define _UPF_INITIAL_MAP_CAPACITY 6
+#define _UPF_MAP_LOAD_FACTOR 0.75F
+
+#define _UPF_OFFSET_OF(container_ptr, member_name) ((size_t) &((container_ptr)->member_name) - (size_t) (container_ptr))
+
+// FNV-1a
+static uint32_t _upf_hash(const void *data, size_t size) {
+    const uint8_t *bytes = (const uint8_t *) data;
+    uint32_t hash = 0x811c9dc5;
+    for (size_t i = 0; i < size; i++) {
+        hash ^= bytes[i];
+        hash *= 0x01000193;
+    }
+    return hash;
+}
+
+static void _upf_map_impl_init(uint8_t **data, uint32_t *capacity, size_t entry_size) {
+    if (*capacity > 0) return;
+
+    *capacity = _UPF_INITIAL_MAP_CAPACITY;
+    size_t size = *capacity * entry_size;
+    *data = (uint8_t *) _upf_alloc(size);
+    memset(*data, 0, size);
+}
+
+static uint32_t _upf_map_impl_hash_key(void *key, bool is_key_str, size_t key_size) {
+    uint32_t hash;
+    if (is_key_str) {
+        const char *str = *((const char **) key);
+        hash = _upf_hash(str, strlen(str));
+    } else {
+        hash = _upf_hash(key, key_size);
+    }
+    // Hash value 0 is reserved to mark unused entries.
+    if (hash == 0) hash++;
+    return hash;
+}
+
+static bool _upf_map_impl_keys_equal(const void *a, const void *b, bool is_key_str, uint32_t n) {
+    if (!is_key_str) return memcmp(a, b, n) == 0;
+    return strcmp(*((const char **) a), *((const char **) b)) == 0;
+}
+
+#define _UPF_MAP_GET_ENTRY(data, index, entry_size) (&(data)[(index) * (entry_size)])
+#define _UPF_MAP_GET_HASH(data, index, entry_size) (*((uint32_t *) _UPF_MAP_GET_ENTRY(data, index, entry_size)))
+
+static bool _upf_map_impl_find(const uint8_t *data, uint32_t capacity, size_t entry_size, void *key, bool is_key_str, size_t key_size,
+                               size_t key_offset, uint32_t *result) {
+    if (capacity == 0) return false;
+
+    uint32_t index = _upf_map_impl_hash_key(key, is_key_str, key_size) % capacity;
+    while (_UPF_MAP_GET_HASH(data, index, entry_size) > 0) {
+        const uint8_t *current_key = &_UPF_MAP_GET_ENTRY(data, index, entry_size)[key_offset];
+        if (_upf_map_impl_keys_equal(key, current_key, is_key_str, key_size)) {
+            *result = index;
+            return true;
+        }
+        index = (index + 1) % capacity;
+    }
+    *result = index;
+    return false;
+}
+
+static void _upf_map_impl_set(uint8_t **data, uint32_t *size, uint32_t *capacity, size_t entry_size, void *key, bool is_key_str,
+                              size_t key_size, size_t key_offset, void *value, size_t value_size, size_t value_offset) {
+    _UPF_ASSERT(data != NULL && size != NULL && capacity != NULL && key != NULL && value != NULL);
+
+    if (*size >= *capacity * _UPF_MAP_LOAD_FACTOR) {
+        uint32_t new_capacity = *capacity * 2;
+        size_t size = new_capacity * entry_size;
+        uint8_t *new_data = (uint8_t *) _upf_alloc(size);
+        memset(new_data, 0, size);
+
+        for (uint32_t i = 0; i < *capacity; i++) {
+            uint32_t hash = _UPF_MAP_GET_HASH(*data, i, entry_size);
+            if (hash == 0) continue;
+
+            uint32_t new_index = hash % new_capacity;
+            while (_UPF_MAP_GET_HASH(new_data, new_index, entry_size) > 0) new_index = (new_index + 1) % new_capacity;
+            memcpy(_UPF_MAP_GET_ENTRY(new_data, new_index, entry_size), _UPF_MAP_GET_ENTRY(*data, i, entry_size), entry_size);
+        }
+        *data = new_data;
+        *capacity = new_capacity;
+    }
+
+    uint32_t index;
+    bool exists = _upf_map_impl_find(*data, *capacity, entry_size, key, is_key_str, key_size, key_offset, &index);
+    if (!exists) *size = *size + 1;
+
+    uint8_t *new_entry = _UPF_MAP_GET_ENTRY(*data, index, entry_size);
+    uint32_t hash = _upf_map_impl_hash_key(key, is_key_str, key_size);
+    memcpy(new_entry, &hash, sizeof(hash));
+    memcpy(&new_entry[key_offset], key, key_size);
+    memcpy(&new_entry[value_offset], value, value_size);
+}
+
+#undef _UPF_MAP_GET_ENTRY
+#undef _UPF_MAP_GET_HASH
+
+// Returns pointer to the value if it exists, or NULL if it doesn't.
+#define _UPF_MAP_IMPL_GET(map, search_key, is_key_str)                                                                            \
+    ((map)->capacity > 0                                                                                                          \
+         ? _upf_map_impl_find((uint8_t *) (map)->data, (map)->capacity, sizeof(*(map)->data), (void *) &(search_key), is_key_str, \
+                              sizeof((map)->data->key), _UPF_OFFSET_OF((map)->data, key), &_upf_state.map_index)                  \
+               ? &(map)->data[_upf_state.map_index].value                                                                         \
+               : NULL                                                                                                             \
+         : NULL)
+
+// Initialize map before calling OFFSET_OF since it has a UB when container is NULL.
+#define _UPF_MAP_IMPL_SET(map, entry_key, is_key_str, entry_value)                                                                         \
+    (_upf_map_impl_init((uint8_t **) &(map)->data, &(map)->capacity, sizeof(*(map)->data)),                                                \
+     _upf_map_impl_set((uint8_t **) &(map)->data, &(map)->size, &(map)->capacity, sizeof(*(map)->data), (void *) &(entry_key), is_key_str, \
+                       sizeof((map)->data->key), _UPF_OFFSET_OF((map)->data, key), (void *) &(entry_value), sizeof((map)->data->value),    \
+                       _UPF_OFFSET_OF((map)->data, value)))
+
+#define _UPF_MAP_GET(map, search_key) _UPF_MAP_IMPL_GET(map, search_key, false)
+#define _UPF_MAP_STR_GET(map, search_key) _UPF_MAP_IMPL_GET(map, search_key, true)
+
+// NOLINTNEXTLINE(bugprone-sizeof-expression)
+#define _UPF_MAP_SET(map, entry_key, entry_value) _UPF_MAP_IMPL_SET(map, entry_key, false, entry_value)
+// NOLINTNEXTLINE(bugprone-sizeof-expression)
+#define _UPF_MAP_STR_SET(map, entry_key, entry_value) _UPF_MAP_IMPL_SET(map, entry_key, true, entry_value)
+
+#define _UPF_MAP_RESET(map)                                                                      \
+    do {                                                                                         \
+        (map)->size = 0;                                                                         \
+        if ((map)->data != NULL) memset((map)->data, 0, sizeof(*(map)->data) * (map)->capacity); \
+    } while (0)
 
 // ====================== DWARF ===========================
 
@@ -1325,27 +1440,18 @@ static int _upf_get_type_modifier(uint64_t tag) {
 static _upf_type *_upf_new_type(_upf_type type) {
     _upf_type *type_ptr = (_upf_type *) _upf_alloc(sizeof(type));
     memcpy(type_ptr, &type, sizeof(type));
-    _UPF_VECTOR_PUSH(&_upf_state.types, type_ptr);
     return type_ptr;
 }
 
 static _upf_type *_upf_new_type2(const uint8_t *type_die, _upf_type type) {
     _UPF_ASSERT(type_die != NULL);
 
-    for (uint32_t i = 0; i < _upf_state.type_map.length; i++) {
-        _upf_type_map_entry entry = _upf_state.type_map.data[i];
-        if (entry.die == type_die) return entry.type_ptr;
-    }
+    _upf_type **opt_type_ptr = _UPF_MAP_GET(&_upf_state.type_map, type_die);
+    if (opt_type_ptr != NULL) return *opt_type_ptr;
 
     _upf_type *type_ptr = (_upf_type *) _upf_alloc(sizeof(type));
     memcpy(type_ptr, &type, sizeof(type));
-
-    _upf_type_map_entry entry = _UPF_ZERO_INIT;
-    entry.die = type_die;
-    entry.type_ptr = type_ptr;
-
-    _UPF_VECTOR_PUSH(&_upf_state.type_map, entry);
-
+    _UPF_MAP_SET(&_upf_state.type_map, type_die, type_ptr);
     return type_ptr;
 }
 
@@ -1531,10 +1637,8 @@ static _upf_function _upf_parse_subprogram(const _upf_cu *cu, const uint8_t *die
 static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
     _UPF_ASSERT(cu != NULL && die != NULL);
 
-    for (uint32_t i = 0; i < _upf_state.type_map.length; i++) {
-        _upf_type_map_entry entry = _upf_state.type_map.data[i];
-        if (entry.die == die) return entry.type_ptr;
-    }
+    _upf_type **opt_type_ptr = _UPF_MAP_GET(&_upf_state.type_map, die);
+    if (opt_type_ptr != NULL) return *opt_type_ptr;
 
     const uint8_t *die_base = die;
 
@@ -1985,11 +2089,10 @@ static void _upf_parse_import(_upf_parsing_info *p, const uint8_t *die, const _u
         die += _upf_get_attr_size(die, attr.form);
     }
     _UPF_ASSERT(import.die != NULL);
-
     _UPF_VECTOR_PUSH(&p->ns_imports, import);
 }
 
-static void _upf_ns_parse_inheritance(_upf_parsing_info *p, const uint8_t *die, const _upf_abbrev *abbrev, _upf_ns_vec *nss) {
+static void _upf_parse_inheritance(_upf_parsing_info *p, const uint8_t *die, const _upf_abbrev *abbrev, _upf_ns_vec *nss) {
     _UPF_ASSERT(p != NULL && die != NULL && abbrev != NULL && nss != NULL);
 
     const uint8_t *parent_die = NULL;
@@ -2007,6 +2110,7 @@ static void _upf_ns_parse_inheritance(_upf_parsing_info *p, const uint8_t *die, 
     _upf_get_abbrev(&parent_abbrev, p->cu, parent_die);
     _UPF_ASSERT(parent_abbrev != NULL);
 
+    // Add the import only if inherited class is not empty.
     if (!parent_abbrev->has_children) return;
 
     _upf_ns_import import = _UPF_ZERO_INIT;
@@ -2084,7 +2188,7 @@ static _upf_scope *_upf_parse_scope(_upf_parsing_info *p, const uint8_t *die, co
                 _upf_named_type var = _upf_parse_variable(p->cu, die, abbrev);
                 if (var.name == NULL) break;
                 _UPF_ASSERT(var.die != NULL);
-                _UPF_VECTOR_PUSH(&scope->vars, var);
+                _UPF_MAP_STR_SET(&scope->vars, var.name, var.die);
             } break;
             case DW_TAG_array_type:
             case DW_TAG_class_type:
@@ -2103,11 +2207,7 @@ static _upf_scope *_upf_parse_scope(_upf_parsing_info *p, const uint8_t *die, co
             case DW_TAG_base_type:
             case DW_TAG_rvalue_reference_type: {
                 const char *type_name = _upf_get_type_name(p->cu, die, abbrev);
-                if (type_name == NULL) break;
-                _upf_named_type type = _UPF_ZERO_INIT;
-                type.die = die_base;
-                type.name = type_name;
-                _UPF_VECTOR_PUSH(&scope->types, type);
+                if (type_name != NULL) _UPF_MAP_STR_SET(&scope->types, type_name, die_base);
             } break;
             case DW_TAG_lexical_block:
             case DW_TAG_inlined_subroutine: {
@@ -2133,22 +2233,18 @@ static void _upf_add_function_scope(_upf_parsing_info *p, const uint8_t *die_bas
 
     if (scope == NULL) {
         // Function doesn't have a scope, look for its specification.
-        for (uint32_t i = 0; i < p->specified_functions.length; i++) {
-            if (p->specified_functions.data[i].die == die_base) {
-                scope = p->specified_functions.data[i].scope;
-                _UPF_VECTOR_UNORDERED_REMOVE(&p->specified_functions, i);
-
-                _upf_add_current_nss(p, &scope->nss);
-                _UPF_VECTOR_PUSH(&p->cu->scope.scopes, scope);
-                break;
-            }
+        _upf_scope **opt_scope = _UPF_MAP_GET(&p->specified_functions, die_base);
+        if (opt_scope != NULL) {
+            scope = *opt_scope;
+            _upf_add_current_nss(p, &scope->nss);
+            _UPF_VECTOR_PUSH(&p->cu->scope.scopes, scope);
+            return;
         }
 
         // There is none, save the declaration.
-        _upf_declaration declaration = _UPF_ZERO_INIT;
-        declaration.die = die_base;
-        _upf_add_current_nss(p, &declaration.nss);
-        _UPF_VECTOR_PUSH(&p->declared_functions, declaration);
+        _upf_ns_vec nss = _UPF_ZERO_INIT;
+        _upf_add_current_nss(p, &nss);
+        _UPF_MAP_SET(&p->declared_functions, die_base, nss);
         return;
     }
 
@@ -2160,26 +2256,21 @@ static void _upf_add_function_scope(_upf_parsing_info *p, const uint8_t *die_bas
     }
 
     // Function is a specification, look for the matching declaration.
-    for (uint32_t i = 0; i < p->declared_functions.length; i++) {
-        if (p->declared_functions.data[i].die == function.specification_die) {
-            scope->nss = p->declared_functions.data[i].nss;
-            _UPF_VECTOR_UNORDERED_REMOVE(&p->declared_functions, i);
-            _UPF_VECTOR_PUSH(&p->cu->scope.scopes, scope);
-            return;
-        }
+    _upf_ns_vec *opt_nss = _UPF_MAP_GET(&p->declared_functions, function.specification_die);
+    if (opt_nss != NULL) {
+        scope->nss = *opt_nss;
+        _UPF_VECTOR_PUSH(&p->cu->scope.scopes, scope);
+        return;
     }
 
     // There is no matching declaration, save the specification.
-    _upf_specification specification = _UPF_ZERO_INIT;
-    specification.die = die_base;
-    specification.scope = scope;
-    _UPF_VECTOR_PUSH(&p->specified_functions, specification);
+    _UPF_MAP_SET(&p->specified_functions, die_base, scope);
 }
 
 static _upf_ns *_upf_parse_ns_body(_upf_parsing_info *p, const uint8_t *die);
 
-static void _upf_parse_sub_namespace(_upf_parsing_info *p, const uint8_t *die, _upf_ns *ns) {
-    _UPF_ASSERT(p != NULL && die != NULL && ns != NULL);
+static void _upf_parse_ns(_upf_parsing_info *p, const uint8_t *die, _upf_ns *current_ns) {
+    _UPF_ASSERT(p != NULL && die != NULL && current_ns != NULL);
 
     const uint8_t *die_base = die;
 
@@ -2198,21 +2289,11 @@ static void _upf_parse_sub_namespace(_upf_parsing_info *p, const uint8_t *die, _
         die += _upf_get_attr_size(die, attr.form);
     }
 
+    // Add namespace even if it doesn't have any children in order to resolve the import.
     _upf_ns *sub_ns = abbrev->has_children ? _upf_parse_ns_body(p, die) : NULL;
-
-    if (name == NULL || export_symbols) _UPF_VECTOR_PUSH(&ns->imported_nss, sub_ns);
-
-    if (name != NULL) {
-        _upf_named_ns entry = _UPF_ZERO_INIT;
-        entry.name = name;
-        entry.ns = sub_ns;
-        _UPF_VECTOR_PUSH(&ns->sub_nss, entry);
-    }
-
-    _upf_ns_entry ns_entry = _UPF_ZERO_INIT;
-    ns_entry.die = die_base;
-    ns_entry.ns = sub_ns;
-    _UPF_VECTOR_PUSH(&p->nss, ns_entry);
+    if (name == NULL || export_symbols) _UPF_VECTOR_PUSH(&current_ns->imported_nss, sub_ns);
+    if (name != NULL) _UPF_MAP_STR_SET(&current_ns->sub_nss, name, sub_ns);
+    _UPF_MAP_SET(&p->nss, die_base, sub_ns);
 }
 
 static _upf_ns *_upf_parse_ns_body(_upf_parsing_info *p, const uint8_t *die) {
@@ -2234,35 +2315,24 @@ static _upf_ns *_upf_parse_ns_body(_upf_parsing_info *p, const uint8_t *die) {
                 _upf_named_type var = _upf_parse_variable(p->cu, die, abbrev);
                 if (var.name == NULL) break;
                 _UPF_ASSERT(var.die != NULL);
-                _UPF_VECTOR_PUSH(&ns->vars, var);
+                _UPF_MAP_STR_SET(&ns->vars, var.name, var.die);
             } break;
             case DW_TAG_class_type:
             case DW_TAG_structure_type:
             case DW_TAG_union_type:     {
                 const char *type_name = _upf_get_type_name(p->cu, die, abbrev);
                 if (type_name == NULL) break;
-
-                _upf_named_type type = _UPF_ZERO_INIT;
-                type.die = die_base;
-                type.name = type_name;
-                _UPF_VECTOR_PUSH(&ns->types, type);
+                _UPF_MAP_STR_SET(&ns->types, type_name, die_base);
 
                 // If class/struct has children, parse it as a namespace.
                 if (!abbrev->has_children) break;
+
                 _upf_ns *class_ns = _upf_parse_ns_body(p, _upf_skip_attrs(die, abbrev));
-
-                _upf_named_ns named_ns = _UPF_ZERO_INIT;
-                named_ns.name = type_name;
-                named_ns.ns = class_ns;
-                _UPF_VECTOR_PUSH(&ns->sub_nss, named_ns);
-
-                _upf_ns_entry ns_entry = _UPF_ZERO_INIT;
-                ns_entry.die = die_base;
-                ns_entry.ns = class_ns;
-                _UPF_VECTOR_PUSH(&p->nss, ns_entry);
+                _UPF_MAP_STR_SET(&ns->sub_nss, type_name, class_ns);
+                _UPF_MAP_SET(&p->nss, die_base, class_ns);
             } break;
             // Treat inheritance as namespace import.
-            case DW_TAG_inheritance:           _upf_ns_parse_inheritance(p, die, abbrev, &ns->imported_nss); break;
+            case DW_TAG_inheritance:           _upf_parse_inheritance(p, die, abbrev, &ns->imported_nss); break;
             case DW_TAG_array_type:
             case DW_TAG_enumeration_type:
             case DW_TAG_pointer_type:
@@ -2277,12 +2347,7 @@ static _upf_ns *_upf_parse_ns_body(_upf_parsing_info *p, const uint8_t *die) {
             case DW_TAG_base_type:
             case DW_TAG_rvalue_reference_type: {
                 const char *type_name = _upf_get_type_name(p->cu, die, abbrev);
-                if (type_name == NULL) break;
-
-                _upf_named_type type = _UPF_ZERO_INIT;
-                type.die = die_base;
-                type.name = type_name;
-                _UPF_VECTOR_PUSH(&ns->types, type);
+                if (type_name != NULL) _UPF_MAP_STR_SET(&ns->types, type_name, die_base);
             } break;
             case DW_TAG_subprogram: {
                 _upf_function function = _upf_parse_subprogram(p->cu, die, abbrev);
@@ -2290,11 +2355,11 @@ static _upf_ns *_upf_parse_ns_body(_upf_parsing_info *p, const uint8_t *die) {
                 _upf_add_function_scope(p, die_base, function, scope);
 
                 if (function.name == NULL) break;
-                _UPF_VECTOR_PUSH(&ns->functions, function);
-                if (function.is_external) _UPF_VECTOR_PUSH(&p->cu->extern_functions, function);
+                _UPF_MAP_STR_SET(&ns->functions, function.name, function);
+                if (function.is_external) _UPF_MAP_STR_SET(&p->cu->extern_functions, function.name, function);
             } break;
             case DW_TAG_imported_module: _upf_parse_import(p, die, abbrev, &ns->imported_nss); break;
-            case DW_TAG_namespace:       _upf_parse_sub_namespace(p, die_base, ns); break;
+            case DW_TAG_namespace:       _upf_parse_ns(p, die_base, ns); break;
         }
         die = _upf_skip_die(p->cu, die, abbrev);
     }
@@ -2307,15 +2372,9 @@ static _upf_ns *_upf_parse_ns_body(_upf_parsing_info *p, const uint8_t *die) {
 static void _upf_resolve_ns_imports(_upf_parsing_info *p) {
     _UPF_ASSERT(p != NULL);
     for (uint32_t i = 0; i < p->ns_imports.length; i++) {
-        bool found = false;
-        for (uint32_t j = 0; j < p->nss.length; j++) {
-            if (p->ns_imports.data[i].die != p->nss.data[j].die) continue;
-
-            _UPF_VECTOR_PUSH(p->ns_imports.data[i].nss, p->nss.data[j].ns);
-            found = true;
-            break;
-        }
-        if (!found) _UPF_ERROR("Failed to resolve namespace import.");
+        _upf_ns **opt_ns = _UPF_MAP_GET(&p->nss, p->ns_imports.data[i].die);
+        if (opt_ns == NULL) _UPF_ERROR("Failed to resolve namespace import.");
+        _UPF_VECTOR_PUSH(p->ns_imports.data[i].nss, *opt_ns);
     }
 }
 
@@ -2409,14 +2468,13 @@ static void _upf_parse_dwarf(void) {
         memcpy(&length, die, sizeof(uint32_t));
         die += sizeof(uint32_t);
 
-        _upf_state.is64bit = false;
+        bool is64bit = false;
         if (length == UINT32_MAX) {
             memcpy(&length, die, sizeof(uint64_t));
             die += sizeof(uint64_t);
-            _upf_state.is64bit = true;
+            is64bit = true;
         }
-
-        _upf_state.offset_size = _upf_state.is64bit ? 8 : 4;
+        _upf_state.offset_size = is64bit ? 8 : 4;
 
         const uint8_t *next = die + length;
 
@@ -2429,10 +2487,8 @@ static void _upf_parse_dwarf(void) {
         die += sizeof(type);
         if (type != DW_UT_compile) _UPF_ERROR("uprintf does NOT support split debug information.");
 
-        uint8_t address_size = *die;
-        _UPF_ASSERT(_upf_state.address_size == 0 || _upf_state.address_size == address_size);
-        _upf_state.address_size = address_size;
-        die += sizeof(address_size);
+        _upf_state.address_size = *die;
+        die += sizeof(_upf_state.address_size);
 
         const uint8_t *abbrev_table = _upf_state.abbrev + _upf_offset_cast(die);
         die += _upf_state.offset_size;
@@ -2475,29 +2531,16 @@ static void _upf_parse_extern_functions(void) {
         if (symbol_idx == STN_UNDEF) continue;
 
         Elf64_Sym symbol = symbol_table[symbol_idx];
-        const char *symbol_name = string_table + symbol.st_name;
         uint64_t symbol_address = *((uint64_t *) (_upf_state.base + rela.r_offset));
-
-        _upf_extern_function extern_function = _UPF_ZERO_INIT;
-        extern_function.name = symbol_name;
-        extern_function.pc = symbol_address;
-        _UPF_VECTOR_PUSH(&_upf_state.extern_functions, extern_function);
+        const char *symbol_name = string_table + symbol.st_name;
+        _UPF_MAP_SET(&_upf_state.extern_functions, symbol_address, symbol_name);
     }
 }
 
 static _upf_function *_upf_get_extern_function(uint64_t absolute_pc) {
-    for (uint32_t i = 0; i < _upf_state.extern_functions.length; i++) {
-        if (_upf_state.extern_functions.data[i].pc != absolute_pc) continue;
-
-        const char *function_name = _upf_state.extern_functions.data[i].name;
-        _UPF_ASSERT(function_name != NULL);
-
-        for (uint32_t j = 0; j < _upf_state.current_cu->extern_functions.length; j++) {
-            _upf_function *function = &_upf_state.current_cu->extern_functions.data[j];
-            if (strcmp(function->name, function_name) == 0) return function;
-        }
-    }
-    return NULL;
+    const char **opt_function_name = _UPF_MAP_GET(&_upf_state.extern_functions, absolute_pc);
+    if (opt_function_name == NULL) return NULL;
+    return _UPF_MAP_STR_GET(&_upf_state.current_cu->extern_functions, *opt_function_name);
 }
 
 // ======================= ELF ============================
@@ -2770,9 +2813,8 @@ static _upf_ns *_upf_ns_find_sub_ns(_upf_ns *ns, const char *name) {
     _UPF_ASSERT(ns != NULL && name != NULL);
     if (ns->is_visited) return NULL;
 
-    for (uint32_t i = 0; i < ns->sub_nss.length; i++) {
-        if (strcmp(ns->sub_nss.data[i].name, name) == 0) return ns->sub_nss.data[i].ns;
-    }
+    _upf_ns **opt_ns = _UPF_MAP_STR_GET(&ns->sub_nss, name);
+    if (opt_ns != NULL) return *opt_ns;
 
     for (uint32_t i = 0; i < ns->imported_nss.length; i++) {
         ns->is_visited = true;
@@ -2891,54 +2933,43 @@ static void *_upf_scope_search(bool search_global_scope, const _upf_cstr_vec *ns
 }
 
 static void *_upf_ns_get_identifier_cb(const _upf_ns *ns, const void *data) {
-    _UPF_ASSERT(data != NULL);
-    for (uint32_t i = 0; i < ns->vars.length; i++) {
-        if (strcmp(ns->vars.data[i].name, (const char *) data) == 0) {
-            return _upf_parse_type(_upf_state.current_cu, ns->vars.data[i].die);
-        }
-    }
-    for (uint32_t i = 0; i < ns->functions.length; i++) {
-        if (strcmp(ns->functions.data[i].name, (const char *) data) == 0) {
-            return _upf_get_function_type(&ns->functions.data[i]);
-        }
-    }
+    _UPF_ASSERT(ns != NULL && data != NULL);
+
+    const uint8_t **opt_var_die = _UPF_MAP_STR_GET(&ns->vars, data);
+    if (opt_var_die != NULL) return _upf_parse_type(_upf_state.current_cu, *opt_var_die);
+
+    const _upf_function *opt_function = _UPF_MAP_STR_GET(&ns->functions, data);
+    if (opt_function != NULL) return _upf_get_function_type(opt_function);
     return NULL;
 }
 
 static void *_upf_scope_get_identifier_cb(const _upf_scope *scope, const void *data) {
-    _UPF_ASSERT(data != NULL);
-    for (uint32_t i = 0; i < scope->vars.length; i++) {
-        if (strcmp(scope->vars.data[i].name, (const char *) data) == 0) {
-            return _upf_parse_type(_upf_state.current_cu, scope->vars.data[i].die);
-        }
-    }
+    _UPF_ASSERT(scope != NULL && data != NULL);
+    const uint8_t **opt_var_die = _UPF_MAP_STR_GET(&scope->vars, data);
+    if (opt_var_die != NULL) return _upf_parse_type(_upf_state.current_cu, *opt_var_die);
     return NULL;
 }
 
 static void *_upf_ns_get_type_cb(const _upf_ns *ns, const void *data) {
-    _UPF_ASSERT(data != NULL);
-    for (uint32_t i = 0; i < ns->types.length; i++) {
-        if (strcmp(ns->types.data[i].name, (const char *) data) == 0) {
-            return _upf_parse_type(_upf_state.current_cu, ns->types.data[i].die);
-        }
-    }
+    _UPF_ASSERT(ns != NULL && data != NULL);
+    const uint8_t **opt_type_die = _UPF_MAP_STR_GET(&ns->types, data);
+    if (opt_type_die != NULL) return _upf_parse_type(_upf_state.current_cu, *opt_type_die);
     return NULL;
 }
 
 static void *_upf_scope_get_type_cb(const _upf_scope *scope, const void *data) {
-    _UPF_ASSERT(data != NULL);
-    for (uint32_t i = 0; i < scope->types.length; i++) {
-        if (strcmp(scope->types.data[i].name, (const char *) data) == 0) {
-            return _upf_parse_type(_upf_state.current_cu, scope->types.data[i].die);
-        }
-    }
+    _UPF_ASSERT(scope != NULL && data != NULL);
+    const uint8_t **opt_type_die = _UPF_MAP_STR_GET(&scope->types, data);
+    if (opt_type_die != NULL) return _upf_parse_type(_upf_state.current_cu, *opt_type_die);
     return NULL;
 }
 
 static void *_upf_ns_get_function_by_pc_cb(const _upf_ns *ns, const void *data) {
-    _UPF_ASSERT(data != NULL);
-    for (uint32_t i = 0; i < ns->functions.length; i++) {
-        if (ns->functions.data[i].pc == *((const uint64_t *) data)) return &ns->functions.data[i];
+    _UPF_ASSERT(ns != NULL && data != NULL);
+    uint64_t pc = *((const uint64_t *) data);
+    for (uint32_t i = 0; i < ns->functions.capacity; i++) {
+        if (ns->functions.data[i].hash == 0) continue;
+        if (ns->functions.data[i].value.pc == pc) return &ns->functions.data[i].value;
     }
     return NULL;
 }
@@ -3569,10 +3600,9 @@ static bool _upf_is_primitive(const _upf_type *type) {
     _UPF_ERROR("Invalid type: %d.", type->kind);
 }
 
-__attribute__((no_sanitize_address)) static void _upf_find_repeating_structs(_upf_indexed_struct_vec *visited,
-                                                                             _upf_indexed_struct_vec *repeating, const uint8_t *data,
+__attribute__((no_sanitize_address)) static void _upf_find_repeating_structs(_upf_struct_info_map *structs, const uint8_t *data,
                                                                              const _upf_type *type, int depth) {
-    _UPF_ASSERT(visited != NULL && repeating != NULL && type != NULL);
+    _UPF_ASSERT(structs != NULL && type != NULL);
 
     if (UPRINTF_MAX_DEPTH >= 0 && depth >= UPRINTF_MAX_DEPTH) return;
     if (data == NULL || _upf_get_memory_region_end(data) == NULL) return;
@@ -3581,7 +3611,7 @@ __attribute__((no_sanitize_address)) static void _upf_find_repeating_structs(_up
         if (type->as.pointer.type == NULL) return;
         const uint8_t *ptr;
         memcpy(&ptr, data, sizeof(ptr));
-        _upf_find_repeating_structs(visited, repeating, ptr, type->as.pointer.type, depth);
+        _upf_find_repeating_structs(structs, ptr, type->as.pointer.type, depth);
         return;
     }
 
@@ -3590,33 +3620,30 @@ __attribute__((no_sanitize_address)) static void _upf_find_repeating_structs(_up
         const uint8_t *ptr;
         memcpy(&ptr, data, sizeof(ptr));
         if (ptr == NULL || _upf_get_memory_region_end(ptr) == NULL) return;
-        _upf_find_repeating_structs(visited, repeating, ptr, type->as.reference.type, depth);
+        _upf_find_repeating_structs(structs, ptr, type->as.reference.type, depth);
         return;
     }
 
     if (type->kind != _UPF_TK_STRUCT && type->kind != _UPF_TK_UNION) return;
 
-    for (uint32_t i = 0; i < repeating->length; i++) {
-        if (repeating->data[i].data == data && repeating->data[i].type == type) return;
+    _upf_struct_key key = _UPF_ZERO_INIT;
+    key.data = data;
+    key.type = type;
+
+    _upf_struct_info *opt_value = _UPF_MAP_GET(structs, key);
+    if (opt_value != NULL) {
+        opt_value->is_repeating = true;
+        return;
     }
 
-    for (uint32_t i = 0; i < visited->length; i++) {
-        if (visited->data[i].data == data && visited->data[i].type == type) {
-            _UPF_VECTOR_PUSH(repeating, visited->data[i]);
-            return;
-        }
-    }
-
-    _upf_indexed_struct indexed_struct = _UPF_ZERO_INIT;
-    indexed_struct.data = data;
-    indexed_struct.type = type;
-    _UPF_VECTOR_PUSH(visited, indexed_struct);
+    _upf_struct_info new_struct_info = _UPF_ZERO_INIT;
+    _UPF_MAP_SET(structs, key, new_struct_info);
 
     _upf_member_vec members = type->as.cstruct.members;
     for (uint32_t i = 0; i < members.length; i++) {
         const _upf_member *member = &members.data[i];
         if (member->bit_size > 0) continue;  // skip bit fields
-        _upf_find_repeating_structs(visited, repeating, data + member->offset, member->type, depth + 1);
+        _upf_find_repeating_structs(structs, data + member->offset, member->type, depth + 1);
     }
 }
 
@@ -3735,9 +3762,9 @@ __attribute__((no_sanitize_address)) static void _upf_print_char_ptr(const char 
 // [] -> arrays
 // {} -> structs/unions
 // <> -> meta information, e.g. unnamed, unknown, invalid, out of bounds, truncated, etc.
-__attribute__((no_sanitize_address)) static void _upf_print_type(_upf_indexed_struct_vec *repeating, const uint8_t *data,
-                                                                 const _upf_type *type, int depth) {
-    _UPF_ASSERT(repeating != NULL && type != NULL);
+__attribute__((no_sanitize_address)) static void _upf_print_type(_upf_struct_info_map *structs, const uint8_t *data, const _upf_type *type,
+                                                                 int depth) {
+    _UPF_ASSERT(structs != NULL && type != NULL);
 
     if (UPRINTF_MAX_DEPTH >= 0 && depth >= UPRINTF_MAX_DEPTH) {
         switch (type->kind) {
@@ -3779,17 +3806,20 @@ __attribute__((no_sanitize_address)) static void _upf_print_type(_upf_indexed_st
                 return;
             }
 
-            for (uint32_t i = 0; i < repeating->length; i++) {
-                if (repeating->data[i].data == data && repeating->data[i].type == type) {
-                    if (repeating->data[i].is_visited) {
-                        _upf_bprintf("<points to #%d>", repeating->data[i].id);
-                        return;
-                    }
+            _upf_struct_key key = _UPF_ZERO_INIT;
+            key.data = data;
+            key.type = type;
 
-                    repeating->data[i].is_visited = true;
-                    repeating->data[i].id = _upf_state.struct_id++;
-                    _upf_bprintf("<#%d> ", repeating->data[i].id);
+            _upf_struct_info *opt_info = _UPF_MAP_GET(structs, key);
+            if (opt_info != NULL && opt_info->is_repeating) {
+                if (opt_info->is_visited) {
+                    _upf_bprintf("<points to #%d>", opt_info->id);
+                    return;
                 }
+
+                opt_info->is_visited = true;
+                opt_info->id = _upf_state.struct_id++;
+                _upf_bprintf("<#%d> ", opt_info->id);
             }
 
             _upf_bprintf("{\n");
@@ -3800,7 +3830,7 @@ __attribute__((no_sanitize_address)) static void _upf_print_type(_upf_indexed_st
                 _upf_print_type_name(member->type, true, false);
                 _upf_bprintf("%s = ", member->name);
                 if (member->bit_size == 0) {
-                    _upf_print_type(repeating, data + member->offset, member->type, depth + 1);
+                    _upf_print_type(structs, data + member->offset, member->type, depth + 1);
                 } else {
                     _upf_print_bit_field(data, member->offset, member->bit_size);
                 }
@@ -3826,7 +3856,7 @@ __attribute__((no_sanitize_address)) static void _upf_print_type(_upf_indexed_st
             }
 
             _upf_bprintf("%s (", name ? name : "<unknown>");
-            _upf_print_type(repeating, data, underlying_type, depth);
+            _upf_print_type(structs, data, underlying_type, depth);
             _upf_bprintf(")");
         } break;
         case _UPF_TK_ARRAY: {
@@ -3860,7 +3890,7 @@ __attribute__((no_sanitize_address)) static void _upf_print_type(_upf_indexed_st
                 if (!is_primitive) _upf_bprintf("%*s", UPRINTF_INDENTATION_WIDTH * (depth + 1), "");
 
                 const uint8_t *current = data + element_size * i;
-                _upf_print_type(repeating, current, element_type, depth + 1);
+                _upf_print_type(structs, current, element_type, depth + 1);
 
 #if UPRINTF_ARRAY_COMPRESSION_THRESHOLD > 0
                 size_t j = i;
@@ -3914,7 +3944,7 @@ __attribute__((no_sanitize_address)) static void _upf_print_type(_upf_indexed_st
             }
 
             if (pointed_type->kind == _UPF_TK_FUNCTION) {
-                _upf_print_type(repeating, (const uint8_t *) ptr, pointed_type, depth);
+                _upf_print_type(structs, (const uint8_t *) ptr, pointed_type, depth);
                 return;
             }
 
@@ -3924,7 +3954,7 @@ __attribute__((no_sanitize_address)) static void _upf_print_type(_upf_indexed_st
             }
 
             _upf_bprintf("%p (", ptr);
-            _upf_print_type(repeating, (const uint8_t *) ptr, pointed_type, depth);
+            _upf_print_type(structs, (const uint8_t *) ptr, pointed_type, depth);
             _upf_bprintf(")");
         } break;
         case _UPF_TK_REFERENCE: {
@@ -3934,9 +3964,9 @@ __attribute__((no_sanitize_address)) static void _upf_print_type(_upf_indexed_st
             // If it is a valid pointer, treat reference as a pointer,
             // otherwise assume that it is the data.
             if (ptr == NULL || _upf_get_memory_region_end(ptr) == NULL) {
-                _upf_print_type(repeating, data, type->as.reference.type, depth);
+                _upf_print_type(structs, data, type->as.reference.type, depth);
             } else {
-                _upf_print_type(repeating, ptr, type->as.reference.type, depth);
+                _upf_print_type(structs, ptr, type->as.reference.type, depth);
             }
         } break;
         case _UPF_TK_MEMBER_POINTER: _upf_bprintf("<member pointer>"); break;
@@ -4175,8 +4205,7 @@ __attribute__((noinline)) void _upf_uprintf(const char *file_path, int line, con
     _upf_cstr_vec args = _upf_get_args(_upf_copy_string(arg_str));
     size_t arg_idx = 0;
 
-    _upf_indexed_struct_vec visited = _UPF_ZERO_INIT;
-    _upf_indexed_struct_vec repeating = _UPF_ZERO_INIT;
+    _upf_struct_info_map structs = _UPF_ZERO_INIT;
 
     va_list va_args;
     va_start(va_args, arg_str);
@@ -4196,10 +4225,9 @@ __attribute__((noinline)) void _upf_uprintf(const char *file_path, int line, con
 
             const uint8_t *ptr = (const uint8_t *) va_arg(va_args, void *);
             const _upf_type *type = _upf_get_arg_type(args.data[arg_idx++]);
-            visited.length = 0;
-            repeating.length = 0;
-            _upf_find_repeating_structs(&visited, &repeating, ptr, type, 0);
-            _upf_print_type(&repeating, ptr, type, 0);
+            _UPF_MAP_RESET(&structs);
+            _upf_find_repeating_structs(&structs, ptr, type, 0);
+            _upf_print_type(&structs, ptr, type, 0);
         } else if (*ch == '\n' || *ch == '\0') {
             _UPF_ERROR("Unfinished format specifier at the end of the line at %s:%d.", file_path, line);
         } else {
@@ -4230,17 +4258,27 @@ __attribute__((noinline)) void _upf_uprintf(const char *file_path, int line, con
 #undef _UPF_ASSERT
 #undef _UPF_OUT_OF_MEMORY
 #undef _UPF_NO_DEBUG_INFO_ERROR
-#undef _UPF_INITIAL_VECTOR_CAPACITY
-#undef _UPF_VECTOR_TYPEDEF
-#undef _UPF_VECTOR_PUSH
-#undef _UPF_VECTOR_TOP
-#undef _UPF_VECTOR_UNORDERED_REMOVE
 #undef _UPF_ZERO_INIT
+#undef _UPF_VECTOR_TYPEDEF
+#undef _UPF_MAP_TYPEDEF
 #undef _UPF_MOD_CONST
 #undef _UPF_MOD_VOLATILE
 #undef _UPF_MOD_RESTRICT
 #undef _UPF_MOD_ATOMIC
 #undef _UPF_INITIAL_REGION_SIZE
+#undef _UPF_INITIAL_VECTOR_CAPACITY
+#undef _UPF_VECTOR_PUSH
+#undef _UPF_VECTOR_TOP
+#undef _UPF_INITIAL_MAP_CAPACITY
+#undef _UPF_MAP_LOAD_FACTOR
+#undef _UPF_OFFSET_OF
+#undef _UPF_MAP_IMPL_GET
+#undef _UPF_MAP_IMPL_SET
+#undef _UPF_MAP_GET
+#undef _UPF_MAP_STR_GET
+#undef _UPF_MAP_SET
+#undef _UPF_MAP_STR_SET
+#undef _UPF_MAP_RESET
 #undef _UPF_INITIAL_BUFFER_SIZE
 #undef _upf_bprintf
 
