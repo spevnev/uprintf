@@ -2,6 +2,7 @@
 #include "miniaudio.h"  // https://github.com/mackron/miniaudio
 #include <stdlib.h>
 
+#define UPRINTF_MAX_DEPTH -1
 #define UPRINTF_IMPLEMENTATION
 #include "uprintf.h"
 

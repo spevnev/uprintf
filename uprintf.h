@@ -1647,7 +1647,7 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
 
     const char *name = NULL;
     uint64_t subtype_offset = UINT64_MAX;
-    size_t size = UINT64_MAX;
+    uint64_t size = UINT64_MAX;
     int64_t encoding = 0;
     bool is_declaration = false;
     for (uint32_t i = 0; i < abbrev->attrs.length; i++) {
@@ -3528,6 +3528,13 @@ static const void *_upf_get_memory_region_end(const void *ptr) {
     return NULL;
 }
 
+static bool _upf_is_memory_readable(const uint8_t *ptr, uint64_t size) {
+    _UPF_ASSERT(ptr != NULL);
+    if (_upf_get_memory_region_end(ptr) == NULL) return false;
+    if (size == 0 || size == UINT64_MAX) return true;
+    return _upf_get_memory_region_end(ptr + size) != NULL;
+}
+
 // ===================== PRINTING =========================
 
 #define _UPF_INITIAL_BUFFER_SIZE 512
@@ -3605,22 +3612,15 @@ __attribute__((no_sanitize_address)) static void _upf_find_repeating_structs(_up
     _UPF_ASSERT(structs != NULL && type != NULL);
 
     if (UPRINTF_MAX_DEPTH >= 0 && depth >= UPRINTF_MAX_DEPTH) return;
-    if (data == NULL || _upf_get_memory_region_end(data) == NULL) return;
+    if (data == NULL || !_upf_is_memory_readable(data, type->size)) return;
 
-    if (type->kind == _UPF_TK_POINTER) {
-        if (type->as.pointer.type == NULL) return;
+    if (type->kind == _UPF_TK_POINTER || type->kind == _UPF_TK_REFERENCE) {
+        const _upf_type *ptr_type = type->kind == _UPF_TK_POINTER ? type->as.pointer.type : type->as.reference.type;
+        if (ptr_type == NULL) return;
+
         const uint8_t *ptr;
         memcpy(&ptr, data, sizeof(ptr));
-        _upf_find_repeating_structs(structs, ptr, type->as.pointer.type, depth);
-        return;
-    }
-
-    if (type->kind == _UPF_TK_REFERENCE) {
-        if (type->as.reference.type == NULL) return;
-        const uint8_t *ptr;
-        memcpy(&ptr, data, sizeof(ptr));
-        if (ptr == NULL || _upf_get_memory_region_end(ptr) == NULL) return;
-        _upf_find_repeating_structs(structs, ptr, type->as.reference.type, depth);
+        _upf_find_repeating_structs(structs, ptr, ptr_type, depth);
         return;
     }
 
@@ -3784,7 +3784,7 @@ __attribute__((no_sanitize_address)) static void _upf_print_type(_upf_struct_inf
         return;
     }
 
-    if (_upf_get_memory_region_end(data) == NULL) {
+    if (!_upf_is_memory_readable(data, type->size)) {
         _upf_bprintf("<out-of-bounds>");
         return;
     }
@@ -3958,15 +3958,18 @@ __attribute__((no_sanitize_address)) static void _upf_print_type(_upf_struct_inf
             _upf_bprintf(")");
         } break;
         case _UPF_TK_REFERENCE: {
+            const _upf_type *ref_type = type->as.reference.type;
+            _UPF_ASSERT(ref_type != NULL);
+
             const uint8_t *ptr;
             memcpy(&ptr, data, sizeof(ptr));
 
             // If it is a valid pointer, treat reference as a pointer,
             // otherwise assume that it is the data.
-            if (ptr == NULL || _upf_get_memory_region_end(ptr) == NULL) {
-                _upf_print_type(structs, data, type->as.reference.type, depth);
+            if (ptr == NULL || !_upf_is_memory_readable(ptr, ref_type->size)) {
+                _upf_print_type(structs, data, ref_type, depth);
             } else {
-                _upf_print_type(structs, ptr, type->as.reference.type, depth);
+                _upf_print_type(structs, ptr, ref_type, depth);
             }
         } break;
         case _UPF_TK_MEMBER_POINTER: _upf_bprintf("<member pointer>"); break;
