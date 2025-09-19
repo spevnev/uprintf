@@ -2,6 +2,7 @@
 #include <cstdlib>
 
 #define UPRINTF_IMPLEMENTATION
+#define UPRINTF_MAX_DEPTH -1
 #include "uprintf.h"
 
 int main() {

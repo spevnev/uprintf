@@ -556,6 +556,7 @@ typedef struct _upf_scope {
 } _upf_scope;
 
 typedef struct {
+    bool is_cxx;
     const uint8_t *base;
     uint64_t base_address;
     uint64_t addr_base;
@@ -631,9 +632,13 @@ typedef enum {
     _UPF_TT_QUESTION,
     _UPF_TT_COLON,
     _UPF_TT_ASSIGNMENT,
+
     _UPF_TT_CXX_CAST,
     _UPF_TT_CXX_NEW,
     _UPF_TT_CXX_SCOPE,
+    _UPF_TT_CXX_DECLTYPE,
+    _UPF_TT_CXX_NOEXCEPT,
+    _UPF_TT_CXX_TYPEID,
 
     _UPF_TT_COUNT
 } _upf_token_type;
@@ -694,8 +699,8 @@ struct _upf_state {
     // File loaded by dynamic linker (without debug info).
     const uint8_t *base;
     // mmap-ed file with debug info.
-    uint8_t *file;
-    off_t file_size;
+    uint8_t *elf_file;
+    off_t elf_file_size;
     // DWARF info
     uint8_t offset_size;
     uint8_t address_size;
@@ -864,6 +869,7 @@ static bool _upf_map_impl_keys_equal(const void *a, const void *b, bool is_key_s
 #define _UPF_MAP_GET_ENTRY(data, index, entry_size) (&(data)[(index) * (entry_size)])
 #define _UPF_MAP_GET_HASH(data, index, entry_size) (*((uint32_t *) _UPF_MAP_GET_ENTRY(data, index, entry_size)))
 
+// Find an element by the key, return whether it exists and write index to `result`.
 static bool _upf_map_impl_find(const uint8_t *data, uint32_t capacity, size_t entry_size, void *key, bool is_key_str, size_t key_size,
                                size_t key_offset, uint32_t *result) {
     if (capacity == 0) return false;
@@ -891,6 +897,7 @@ static void _upf_map_impl_set(uint8_t **data, uint32_t *size, uint32_t *capacity
         uint8_t *new_data = (uint8_t *) _upf_alloc(size);
         memset(new_data, 0, size);
 
+        // Rehash all the elements.
         for (uint32_t i = 0; i < *capacity; i++) {
             uint32_t hash = _UPF_MAP_GET_HASH(*data, i, entry_size);
             if (hash == 0) continue;
@@ -993,7 +1000,7 @@ static size_t _upf_LEB_to_int64(const uint8_t *leb, int64_t *result) {
 
 static uint64_t _upf_offset_cast(const uint8_t *die) {
     _UPF_ASSERT(die != NULL);
-
+    _UPF_ASSERT(_upf_state.offset_size <= sizeof(uint64_t));
     uint64_t offset = 0;
     memcpy(&offset, die, _upf_state.offset_size);
     return offset;
@@ -1001,7 +1008,7 @@ static uint64_t _upf_offset_cast(const uint8_t *die) {
 
 static uint64_t _upf_address_cast(const uint8_t *die) {
     _UPF_ASSERT(die != NULL);
-
+    _UPF_ASSERT(_upf_state.address_size <= sizeof(uint64_t));
     uint64_t address = 0;
     memcpy(&address, die, _upf_state.address_size);
     return address;
@@ -1009,7 +1016,6 @@ static uint64_t _upf_address_cast(const uint8_t *die) {
 
 static size_t _upf_get_attr_size(const uint8_t *die, uint64_t form) {
     _UPF_ASSERT(die != NULL);
-
     switch (form) {
         case DW_FORM_addr:     return _upf_state.address_size;
         case DW_FORM_strx1:
@@ -1081,12 +1087,11 @@ static size_t _upf_get_attr_size(const uint8_t *die, uint64_t form) {
         case DW_FORM_flag_present:
         case DW_FORM_implicit_const: return 0;
     }
-    _UPF_ERROR("Invalid DWARF attribute type(form): %lu.", form);
+    _UPF_ERROR("Invalid DWARF attribute type: 0x%lx.", form);
 }
 
 static uint64_t _upf_get_x_offset(const uint8_t *die, uint64_t form) {
     _UPF_ASSERT(die != NULL);
-
     uint64_t offset = 0;
     switch (form) {
         case DW_FORM_strx1:
@@ -1100,12 +1105,11 @@ static uint64_t _upf_get_x_offset(const uint8_t *die, uint64_t form) {
         case DW_FORM_addrx:
         case DW_FORM_strx:   _upf_uLEB_to_uint64(die, &offset); return offset;
     }
-    _UPF_ERROR("Invalid DWARF x-* type(form): %lu.", form);
+    _UPF_ERROR("Invalid DWARF addrx/strx type: 0x%lx.", form);
 }
 
 static const char *_upf_get_str(const _upf_cu *cu, const uint8_t *die, uint64_t form) {
     _UPF_ASSERT(cu != NULL && die != NULL);
-
     switch (form) {
         case DW_FORM_strp:      return _upf_state.str + _upf_offset_cast(die);
         case DW_FORM_line_strp: _UPF_ASSERT(_upf_state.line_str != NULL); return _upf_state.line_str + _upf_offset_cast(die);
@@ -1120,12 +1124,11 @@ static const char *_upf_get_str(const _upf_cu *cu, const uint8_t *die, uint64_t 
             return _upf_state.str + _upf_offset_cast(_upf_state.str_offsets + cu->str_offsets_base + offset);
         }
     }
-    _UPF_ERROR("Invalid DWARF string type(form): %lu.", form);
+    _UPF_ERROR("Invalid DWARF string type: 0x%lx.", form);
 }
 
 static uint64_t _upf_get_ref(const uint8_t *die, uint64_t form) {
     _UPF_ASSERT(die != NULL);
-
     uint64_t ref = 0;
     switch (form) {
         case DW_FORM_ref1:
@@ -1134,7 +1137,7 @@ static uint64_t _upf_get_ref(const uint8_t *die, uint64_t form) {
         case DW_FORM_ref8:      memcpy(&ref, die, _upf_get_attr_size(die, form)); return ref;
         case DW_FORM_ref_udata: _upf_uLEB_to_uint64(die, &ref); return ref;
     }
-    _UPF_ERROR("Only references within single compilation unit are supported.");
+    _UPF_ERROR("Reference to different compilation units are not supported.");
 }
 
 static bool _upf_is_data(uint64_t form) {
@@ -1153,7 +1156,6 @@ static bool _upf_is_data(uint64_t form) {
 
 static int64_t _upf_get_data(const uint8_t *die, _upf_attr attr) {
     _UPF_ASSERT(die != NULL);
-
     switch (attr.form) {
         case DW_FORM_data1:
         case DW_FORM_data2:
@@ -1163,7 +1165,7 @@ static int64_t _upf_get_data(const uint8_t *die, _upf_attr attr) {
             memcpy(&data, die, _upf_get_attr_size(die, attr.form));
             return data;
         } break;
-        case DW_FORM_data16:         _UPF_ERROR("16 byte data blocks aren't supported.");
+        case DW_FORM_data16:         _UPF_ERROR("16 byte data blocks are not supported.");
         case DW_FORM_implicit_const: return attr.implicit_const;
         case DW_FORM_sdata:          {
             int64_t data = 0;
@@ -1176,7 +1178,7 @@ static int64_t _upf_get_data(const uint8_t *die, _upf_attr attr) {
             return data;
         } break;
     }
-    _UPF_ERROR("Invalid DWARF data type(form): %lu.", attr.form);
+    _UPF_ERROR("Invalid DWARF data type: 0x%lx.", attr.form);
 }
 
 static bool _upf_is_addr(uint64_t form) {
@@ -1193,7 +1195,6 @@ static bool _upf_is_addr(uint64_t form) {
 
 static uint64_t _upf_get_addr(const _upf_cu *cu, const uint8_t *die, uint64_t form) {
     _UPF_ASSERT(cu != NULL && die != NULL);
-
     switch (form) {
         case DW_FORM_addr:   return _upf_address_cast(die);
         case DW_FORM_addrx1:
@@ -1206,18 +1207,17 @@ static uint64_t _upf_get_addr(const _upf_cu *cu, const uint8_t *die, uint64_t fo
             return _upf_address_cast(_upf_state.addr + offset);
         }
     }
-    _UPF_ERROR("Invalid DWARF address type(form): %lu.", form);
+    _UPF_ERROR("Invalid DWARF address type: 0x%lx.", form);
 }
 
 static bool _upf_get_flag(const uint8_t *die, uint64_t form) {
     if (form == DW_FORM_flag_present) return true;
     if (form == DW_FORM_flag) return *die;
-    _UPF_ERROR("Invalid DWARF flag type(form): %lu.", form);
+    _UPF_ERROR("Invalid DWARF flag type: 0x%lx.", form);
 }
 
 static size_t _upf_get_abbrev(const _upf_abbrev **abbrev, const _upf_cu *cu, const uint8_t *die) {
     _UPF_ASSERT(abbrev != NULL && cu != NULL);
-
     uint64_t code;
     size_t offset = _upf_uLEB_to_uint64(die, &code);
     *abbrev = code == 0 ? NULL : &cu->abbrevs.data[code - 1];
@@ -1237,7 +1237,6 @@ static _upf_range_vec _upf_get_ranges(const _upf_cu *cu, const uint8_t *die, uin
         uint64_t rnglist_offset = _upf_offset_cast(_upf_state.rnglists + cu->rnglists_base + index * _upf_state.offset_size);
         rnglist = _upf_state.rnglists + cu->rnglists_base + rnglist_offset;
     }
-    _UPF_ASSERT(rnglist != NULL);
 
     uint64_t base = cu->base_address;
     _upf_range_vec ranges = _UPF_ZERO_INIT;
@@ -1311,11 +1310,7 @@ static _upf_range_vec _upf_get_ranges(const _upf_cu *cu, const uint8_t *die, uin
 
 static const uint8_t *_upf_skip_attrs(const uint8_t *die, const _upf_abbrev *abbrev) {
     _UPF_ASSERT(die != NULL && abbrev != NULL);
-
-    for (uint32_t i = 0; i < abbrev->attrs.length; i++) {
-        die += _upf_get_attr_size(die, abbrev->attrs.data[i].form);
-    }
-
+    for (uint32_t i = 0; i < abbrev->attrs.length; i++) die += _upf_get_attr_size(die, abbrev->attrs.data[i].form);
     return die;
 }
 
@@ -1344,11 +1339,10 @@ static _upf_abbrev_vec _upf_parse_abbrevs(const uint8_t *abbrev_table) {
     uint64_t code;
     _upf_abbrev_vec abbrevs = _UPF_ZERO_INIT;
     while (true) {
-        _upf_abbrev abbrev = _UPF_ZERO_INIT;
-        abbrev.tag = UINT64_MAX;
-
         abbrev_table += _upf_uLEB_to_uint64(abbrev_table, &code);
         if (code == 0) break;
+
+        _upf_abbrev abbrev = _UPF_ZERO_INIT;
         abbrev_table += _upf_uLEB_to_uint64(abbrev_table, &abbrev.tag);
 
         abbrev.has_children = *abbrev_table;
@@ -1366,7 +1360,6 @@ static _upf_abbrev_vec _upf_parse_abbrevs(const uint8_t *abbrev_table) {
         _UPF_VECTOR_PUSH(&abbrevs, abbrev);
         _UPF_ASSERT(code == abbrevs.length);
     }
-
     return abbrevs;
 }
 
@@ -1376,14 +1369,14 @@ static _upf_type_kind _upf_get_base_type_kind(int64_t encoding, int64_t size) {
             if (size == 1) return _UPF_TK_BOOL;
             _UPF_WARN("Expected boolean to be 1 byte long. Ignoring this type.");
             return _UPF_TK_UNKNOWN;
-        case DW_ATE_address: _UPF_WARN("Segmented addresses aren't supported. Ignoring this type."); return _UPF_TK_UNKNOWN;
+        case DW_ATE_address: _UPF_WARN("Segmented addresses are not supported. Ignoring this type."); return _UPF_TK_UNKNOWN;
         case DW_ATE_signed:
             switch (size) {
                 case 1:  return _UPF_TK_S1;
                 case 2:  return _UPF_TK_S2;
                 case 4:  return _UPF_TK_S4;
                 case 8:  return _UPF_TK_S8;
-                case 16: _UPF_WARN("16 byte integers aren't supported. Ignoring this type."); return _UPF_TK_UNKNOWN;
+                case 16: _UPF_WARN("16 byte integers are not supported. Ignoring this type."); return _UPF_TK_UNKNOWN;
                 default: _UPF_WARN("Expected integer to be 1, 2, 4, 8 or 16 bytes long. Ignoring this type."); return _UPF_TK_UNKNOWN;
             }
         case DW_ATE_signed_char:
@@ -1396,7 +1389,7 @@ static _upf_type_kind _upf_get_base_type_kind(int64_t encoding, int64_t size) {
                 case 2:  return _UPF_TK_U2;
                 case 4:  return _UPF_TK_U4;
                 case 8:  return _UPF_TK_U8;
-                case 16: _UPF_WARN("16 byte unsigned integers aren't supported. Ignoring this type."); return _UPF_TK_UNKNOWN;
+                case 16: _UPF_WARN("16 byte unsigned integers are not supported. Ignoring this type."); return _UPF_TK_UNKNOWN;
                 default: _UPF_WARN("Expected integer to be 1, 2, 4, 8 or 16 bytes long. Ignoring this type."); return _UPF_TK_UNKNOWN;
             }
         case DW_ATE_unsigned_char:
@@ -1404,9 +1397,10 @@ static _upf_type_kind _upf_get_base_type_kind(int64_t encoding, int64_t size) {
             _UPF_WARN("Expected char to be 1 byte long. Ignoring this type.");
             return _UPF_TK_UNKNOWN;
         case DW_ATE_ASCII:
-        case DW_ATE_UCS:
+        case DW_ATE_UCS:   _UPF_WARN("UCS and ASCII DWARF types are not supported. Ignoring this type."); return _UPF_TK_UNKNOWN;
         case DW_ATE_UTF:
-            _UPF_WARN("C shouldn't have character encodings besides DW_ATE_(un)signed_char. Ignoring this type.");
+            if (size == 1) return _UPF_TK_UCHAR;
+            _UPF_WARN("UTF-16 and UTF-32 are not supported. Ignoring this type.");
             return _UPF_TK_UNKNOWN;
         case DW_ATE_signed_fixed:
         case DW_ATE_unsigned_fixed: _UPF_WARN("C shouldn't have fixed-point decimals. Ignoring this type."); return _UPF_TK_UNKNOWN;
@@ -1414,12 +1408,12 @@ static _upf_type_kind _upf_get_base_type_kind(int64_t encoding, int64_t size) {
             switch (size) {
                 case 4:  return _UPF_TK_F4;
                 case 8:  return _UPF_TK_F8;
-                case 16: _UPF_WARN("16 byte floats aren't supported. Ignoring this type."); return _UPF_TK_UNKNOWN;
+                case 16: _UPF_WARN("16 byte floats are not supported. Ignoring this type."); return _UPF_TK_UNKNOWN;
                 default: _UPF_WARN("Expected floats to be 4, 8 or 16 bytes long. Ignoring this type."); return _UPF_TK_UNKNOWN;
             }
-        case DW_ATE_complex_float:   _UPF_WARN("Complex floats aren't supported. Ignoring this type."); return _UPF_TK_UNKNOWN;
-        case DW_ATE_imaginary_float: _UPF_WARN("Imaginary floats aren't supported. Ignoring this type."); return _UPF_TK_UNKNOWN;
-        case DW_ATE_decimal_float:   _UPF_WARN("Decimal floats aren't supported. Ignoring this type."); return _UPF_TK_UNKNOWN;
+        case DW_ATE_complex_float:   _UPF_WARN("Complex floats are not supported. Ignoring this type."); return _UPF_TK_UNKNOWN;
+        case DW_ATE_imaginary_float: _UPF_WARN("Imaginary floats are not supported. Ignoring this type."); return _UPF_TK_UNKNOWN;
+        case DW_ATE_decimal_float:   _UPF_WARN("Decimal floats are not supported. Ignoring this type."); return _UPF_TK_UNKNOWN;
         case DW_ATE_packed_decimal:  _UPF_WARN("C shouldn't have packed decimals. Ignoring this type."); return _UPF_TK_UNKNOWN;
         case DW_ATE_numeric_string:  _UPF_WARN("C shouldn't have numeric strings. Ignoring this type."); return _UPF_TK_UNKNOWN;
         case DW_ATE_edited:          _UPF_WARN("C shouldn't have edited strings. Ignoring this type."); return _UPF_TK_UNKNOWN;
@@ -1434,7 +1428,7 @@ static int _upf_get_type_modifier(uint64_t tag) {
         case DW_TAG_restrict_type: return _UPF_MOD_RESTRICT;
         case DW_TAG_atomic_type:   return _UPF_MOD_ATOMIC;
     }
-    _UPF_ERROR("Invalid DWARF type modifier: %lu.", tag);
+    _UPF_ERROR("Invalid DWARF type modifier: 0x%lx.", tag);
 }
 
 static _upf_type *_upf_new_type(_upf_type type) {
@@ -1481,7 +1475,7 @@ static bool _upf_is_pointer(const _upf_type *type) {
     return false;
 }
 
-static _upf_type *_upf_dereference_type(_upf_type *type_ptr) {
+static _upf_type *_upf_dereference_type(const _upf_type *type_ptr) {
     _UPF_ASSERT(_upf_is_pointer(type_ptr));
     if (type_ptr->kind == _UPF_TK_POINTER) return type_ptr->as.pointer.type;
     if (type_ptr->as.array.lengths.length <= 1) return type_ptr->as.array.element_type;
@@ -1489,6 +1483,7 @@ static _upf_type *_upf_dereference_type(_upf_type *type_ptr) {
 }
 
 static _upf_type *_upf_get_reference_to_type(_upf_type *type_ptr) {
+    _UPF_ASSERT(type_ptr != NULL);
     _upf_type type = _UPF_ZERO_INIT;
     type.kind = _UPF_TK_REFERENCE;
     type.as.reference.type = type_ptr;
@@ -1661,7 +1656,7 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                 if (_upf_is_data(attr.form)) {
                     size = _upf_get_data(die, attr);
                 } else {
-                    _UPF_WARN("Non-constant type sizes aren't supported. Marking size as unknown.");
+                    _UPF_WARN("Non-constant type sizes are not supported. Marking size as unknown.");
                 }
                 break;
         }
@@ -1671,8 +1666,8 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
     switch (abbrev->tag) {
         case DW_TAG_array_type: {
             _UPF_ASSERT(subtype_offset != UINT64_MAX);
-
             _upf_type *element_type = _upf_parse_type(cu, cu->base + subtype_offset);
+
             _upf_type type = _UPF_ZERO_INIT;
             type.name = name;
             type.kind = _UPF_TK_ARRAY;
@@ -1689,7 +1684,7 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                 if (abbrev == NULL) break;
 
                 if (abbrev->tag == DW_TAG_enumeration_type) {
-                    _UPF_WARN("Enumerator array subranges aren't unsupported. Ignoring this type.");
+                    _UPF_WARN("Enumerator array subranges are not supported. Ignoring this type.");
                     goto unknown_type;
                 }
                 _UPF_ASSERT(abbrev->tag == DW_TAG_subrange_type);
@@ -1704,7 +1699,7 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                                 length = _upf_get_data(die, attr);
                                 if (attr.name == DW_AT_upper_bound) length++;
                             } else {
-                                _UPF_WARN("Non-constant array lengths aren't supported. Marking it unknown.");
+                                _UPF_WARN("Non-constant array lengths are not supported. Marking it unknown.");
                             }
                             break;
                     }
@@ -1769,7 +1764,7 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                         case DW_AT_name: cenum.name = _upf_get_str(cu, die, attr.form); break;
                         case DW_AT_const_value:
                             if (!_upf_is_data(attr.form)) {
-                                _UPF_WARN("Non-constant enum values aren't supported. Ignoring this type.");
+                                _UPF_WARN("Non-constant enum values are not supported. Ignoring this type.");
                                 goto unknown_type;
                             }
                             cenum.value = _upf_get_data(die, attr);
@@ -1848,7 +1843,7 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                                     if (_upf_is_data(attr.form)) {
                                         member.offset = _upf_get_data(die, attr);
                                     } else {
-                                        _UPF_WARN("Non-constant member offsets aren't supported. Skipping this field.");
+                                        _UPF_WARN("Non-constant member offsets are not supported. Skipping this field.");
                                         add_member = false;
                                     }
                                     break;
@@ -1860,7 +1855,7 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                                     if (_upf_is_data(attr.form)) {
                                         member.bit_size = _upf_get_data(die, attr);
                                     } else {
-                                        _UPF_WARN("Non-constant bit field sizes aren't supported. Skipping this field.");
+                                        _UPF_WARN("Non-constant bit field sizes are not supported. Skipping this field.");
                                         add_member = false;
                                     }
                                     break;
@@ -1891,7 +1886,7 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                                     if (_upf_is_data(attr.form)) {
                                         offset = _upf_get_data(die, attr);
                                     } else {
-                                        _UPF_WARN("Non-constant member offsets aren't supported. Skipping this field.");
+                                        _UPF_WARN("Non-constant member offsets are not supported. Skipping this field.");
                                         add_members = false;
                                     }
                                     break;
@@ -1945,7 +1940,7 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                             if (_upf_is_data(attr.form)) {
                                 member.bit_size = _upf_get_data(die, attr);
                             } else {
-                                _UPF_WARN("Non-constant bit field sizes aren't supported. Skipping this field.");
+                                _UPF_WARN("Non-constant bit field sizes are not supported. Skipping this field.");
                                 add_member = false;
                             }
                             break;
@@ -2385,7 +2380,13 @@ static bool _upf_is_language_c(int64_t language) {
         case DW_LANG_C99:
         case DW_LANG_C11:
         case DW_LANG_C17:
-        case DW_LANG_C23:
+        case DW_LANG_C23: return true;
+        default:          return false;
+    }
+}
+
+static bool _upf_is_language_cxx(int64_t language) {
+    switch (language) {
         case DW_LANG_C_plus_plus:
         case DW_LANG_C_plus_plus_03:
         case DW_LANG_C_plus_plus_11:
@@ -2435,9 +2436,18 @@ static void _upf_parse_cu(const uint8_t *cu_base, const uint8_t *die, const uint
                 ranges_attr = attr;
                 ranges_die = die;
                 break;
-            case DW_AT_language:
-                if (!_upf_is_language_c(_upf_get_data(die, attr))) return;
-                break;
+            case DW_AT_language: {
+                int64_t lang = _upf_get_data(die, attr);
+                if (_upf_is_language_c(lang)) {
+                    break;
+                } else if (_upf_is_language_cxx(lang)) {
+                    cu.is_cxx = true;
+                    break;
+                } else {
+                    // Skip CU if it is not C or C++.
+                    return;
+                }
+            } break;
         }
 
         die += _upf_get_attr_size(die, attr.form);
@@ -2522,7 +2532,6 @@ static void _upf_parse_extern_functions(void) {
         _UPF_WARN("Failed to find all required ELF sections. Ignoring extern functions.");
         return;
     }
-    _UPF_ASSERT(((void *) _upf_state.base) < ((void *) string_table));  // d_ptr may sometimes be relative to the base
 
     for (int i = 0; i < rela_size; i++) {
         Elf64_Rela rela = rela_table[i];
@@ -2549,17 +2558,18 @@ static void _upf_parse_elf(void) {
     struct stat file_info;
     if (stat("/proc/self/exe", &file_info) == -1) _UPF_ERROR("Failed to stat \"/proc/self/exe\": %s.", strerror(errno));
     size_t size = file_info.st_size;
-    _upf_state.file_size = size;
 
     int fd = open("/proc/self/exe", O_RDONLY);
-    _UPF_ASSERT(fd != -1);
+    if (fd == -1) _UPF_ERROR("Failed to open \"/proc/self/exe\": %s.", strerror(errno));
 
     // A new instance of file must be mmap-ed because the one loaded in memory
     // only contains information needed at runtime, and doesn't include debug
     // information, section table, etc.
     uint8_t *file = (uint8_t *) mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
     _UPF_ASSERT(file != MAP_FAILED);
-    _upf_state.file = file;
+
+    _upf_state.elf_file = file;
+    _upf_state.elf_file_size = size;
 
     close(fd);
 
@@ -2652,6 +2662,14 @@ static void _upf_new_token(_upf_token_type kind, const char *string) {
     _UPF_VECTOR_PUSH(&_upf_state.tokens, token);
 }
 
+static const _upf_token *_upf_find_keyword(const _upf_token *keywords, size_t length, const char *str, size_t str_len) {
+    _UPF_ASSERT(keywords != NULL && str != NULL);
+    for (size_t i = 0; i < length; i++) {
+        if (str_len == strlen(keywords[i].string) && strncmp(str, keywords[i].string, str_len) == 0) return &keywords[i];
+    }
+    return NULL;
+}
+
 static void _upf_tokenize(const char *string) {
     _UPF_ASSERT(string != NULL);
 
@@ -2697,11 +2715,14 @@ static void _upf_tokenize(const char *string) {
         {_UPF_TT_SIZEOF, "sizeof"},
         {_UPF_TT_ALIGNOF, "_Alignof"},
         {_UPF_TT_ALIGNOF, "alignof"},
-        {_UPF_TT_CXX_CAST, "static_cast"},
-        {_UPF_TT_CXX_CAST, "reinterpret_cast"},
-        {_UPF_TT_CXX_CAST, "dynamic_cast"},
-        {_UPF_TT_CXX_CAST, "const_cast"},
-        {_UPF_TT_CXX_NEW, "new"},
+    };
+
+    static const _upf_token cxx_keywords[] = {
+        {_UPF_TT_STRUCT, "class"},          {_UPF_TT_ALIGNOF, "alignas"},
+        {_UPF_TT_CXX_CAST, "static_cast"},  {_UPF_TT_CXX_CAST, "reinterpret_cast"},
+        {_UPF_TT_CXX_CAST, "dynamic_cast"}, {_UPF_TT_CXX_CAST, "const_cast"},
+        {_UPF_TT_CXX_NEW, "new"},           {_UPF_TT_CXX_DECLTYPE, "decltype"},
+        {_UPF_TT_CXX_NOEXCEPT, "noexcept"}, {_UPF_TT_CXX_TYPEID, "typeid"},
     };
 
     const char *ch = string;
@@ -2728,16 +2749,18 @@ static void _upf_tokenize(const char *string) {
         } else if (('a' <= *ch && *ch <= 'z') || ('A' <= *ch && *ch <= 'Z') || *ch == '_') {
             const char *end = ch;
             while (('a' <= *end && *end <= 'z') || ('A' <= *end && *end <= 'Z') || ('0' <= *end && *end <= '9') || *end == '_') end++;
-            size_t string_len = end - ch;
+            size_t str_len = end - ch;
 
-            bool found = false;
-            for (size_t i = 0; i < sizeof(keywords) / sizeof(*keywords) && !found; i++) {
-                if (string_len == strlen(keywords[i].string) && strncmp(ch, keywords[i].string, string_len) == 0) {
-                    _UPF_VECTOR_PUSH(&_upf_state.tokens, keywords[i]);
-                    found = true;
-                }
+            const _upf_token *keyword = _upf_find_keyword(keywords, sizeof(keywords) / sizeof(*keywords), ch, str_len);
+            if (keyword == NULL && _upf_state.current_cu->is_cxx) {
+                keyword = _upf_find_keyword(cxx_keywords, sizeof(cxx_keywords) / sizeof(*cxx_keywords), ch, str_len);
             }
-            if (!found) _upf_new_token(_UPF_TT_IDENTIFIER, _upf_new_string(ch, end));
+
+            if (keyword == NULL) {
+                _upf_new_token(_UPF_TT_IDENTIFIER, _upf_new_string(ch, end));
+            } else {
+                _UPF_VECTOR_PUSH(&_upf_state.tokens, *keyword);
+            }
 
             ch = end;
         } else if (*ch == '"') {
@@ -2914,7 +2937,7 @@ static void *_upf_scope_search(bool search_global_scope, const _upf_cstr_vec *ns
             ns = _upf_scope_resolve_ns(ns_names, _upf_state.current_scopes.data[i]);
             if (ns != NULL) break;
         }
-        _UPF_ASSERT(ns != NULL);
+        if (ns == NULL) _UPF_ERROR("Failed to find namespace at %s:%d.", _upf_state.file_path, _upf_state.line);
         return _upf_ns_bfs(ns, ns_callback, data);
     }
 
@@ -2986,6 +3009,9 @@ static _upf_function *_upf_get_function_by_pc(uint64_t pc) {
 }
 
 // ====================== PARSER ==========================
+
+// Pratt parser of C/C++ expressions.
+// C grammar: https://www.quut.com/c/ANSI-C-grammar-y.html
 
 static _upf_parse_rule _upf_parse_rules[_UPF_TT_COUNT] = _UPF_ZERO_INIT;
 
@@ -3095,7 +3121,8 @@ static _upf_type *_upf_parse_type_name(void) {
                     identifier = _upf_expect_token(_UPF_TT_IDENTIFIER).string;
                 }
                 break;
-            default: parsed_type = true; break;
+            case _UPF_TT_CXX_DECLTYPE: _UPF_ERROR("decltype is not supported at %s:%d.", _upf_state.file_path, _upf_state.line);
+            default:                   parsed_type = true; break;
         }
     }
     if (identifier == NULL && type_specifiers_idx == 0) return NULL;
@@ -3150,7 +3177,7 @@ static _upf_type *_upf_parse_type_name(void) {
                     break;
                 case 2:
                     if (sizeof(long double) != sizeof(double)) {
-                        _UPF_WARN("Long doubles aren't supported. Ignoring this type.");
+                        _UPF_WARN("Long doubles are not supported. Ignoring this type.");
                         type.kind = _UPF_TK_UNKNOWN;
                         type.size = sizeof(long double);
                         break;
@@ -3288,6 +3315,17 @@ static _upf_type *_upf_cxx_scope(void) {
         return _upf_identifier();
     }
 }
+
+static _upf_type *_upf_cxx_noexcept(void) {
+    _upf_consume_token();
+    _upf_expect_token(_UPF_TT_OPEN_PAREN);
+    _upf_consume_parens(_UPF_TT_OPEN_PAREN, _UPF_TT_CLOSE_PAREN);
+    return _upf_get_bool_type();
+}
+
+static _upf_type *_upf_cxx_typeid(void) { _UPF_ERROR("typeid is not supported at %s:%d.", _upf_state.file_path, _upf_state.line); }
+
+static _upf_type *_upf_cxx_lambda(void) { _UPF_ERROR("lambdas are not supported at %s:%d.", _upf_state.file_path, _upf_state.line); }
 
 static _upf_type *_upf_unary(void) {
     _upf_token unop = _upf_consume_token();
@@ -3457,34 +3495,36 @@ static void _upf_init_parsing_rules(void) {
 #define _UPF_DEFINE_RULE(token, prefix, infix, precedence) _upf_parse_rules[token] = (_upf_parse_rule) {prefix, infix, precedence}
 #endif
     // clang-format off
-    _UPF_DEFINE_RULE(_UPF_TT_NUMBER,           _upf_number,     NULL,            _UPF_PREC_NONE      );
-    _UPF_DEFINE_RULE(_UPF_TT_STRING,           _upf_string,     NULL,            _UPF_PREC_NONE      );
-    _UPF_DEFINE_RULE(_UPF_TT_IDENTIFIER,       _upf_identifier, NULL,            _UPF_PREC_NONE      );
-    _UPF_DEFINE_RULE(_UPF_TT_GENERIC,          _upf_generic,    NULL,            _UPF_PREC_NONE      );
-    _UPF_DEFINE_RULE(_UPF_TT_SIZEOF,           _upf_sizeof,     NULL,            _UPF_PREC_NONE      );
-    _UPF_DEFINE_RULE(_UPF_TT_ALIGNOF,          _upf_alignof,    NULL,            _UPF_PREC_NONE      );
-    _UPF_DEFINE_RULE(_UPF_TT_CXX_CAST,         _upf_cxx_cast,   NULL,            _UPF_PREC_NONE      );
-    _UPF_DEFINE_RULE(_UPF_TT_CXX_NEW,          _upf_cxx_new,    NULL,            _UPF_PREC_NONE      );
-    _UPF_DEFINE_RULE(_UPF_TT_CXX_SCOPE,        _upf_cxx_scope,  NULL,            _UPF_PREC_NONE      );
-    _UPF_DEFINE_RULE(_UPF_TT_UNARY,            _upf_unary,      NULL,            _UPF_PREC_NONE      );
-    _UPF_DEFINE_RULE(_UPF_TT_OPEN_PAREN,       _upf_paren,      _upf_call,       _UPF_PREC_POSTFIX   );
-    _UPF_DEFINE_RULE(_UPF_TT_INCREMENT,        _upf_unary,      _upf_postfix,    _UPF_PREC_POSTFIX   );
-    _UPF_DEFINE_RULE(_UPF_TT_OPEN_BRACKET,     NULL,            _upf_index,      _UPF_PREC_POSTFIX   );
-    _UPF_DEFINE_RULE(_UPF_TT_DOT,              NULL,            _upf_dot,        _UPF_PREC_POSTFIX   );
-    _UPF_DEFINE_RULE(_UPF_TT_ARROW,            NULL,            _upf_dot,        _UPF_PREC_POSTFIX   );
-    _UPF_DEFINE_RULE(_UPF_TT_DOT_STAR,         NULL,            _upf_dot_star,   _UPF_PREC_POSTFIX   );
-    _UPF_DEFINE_RULE(_UPF_TT_ARROW_STAR,       NULL,            _upf_dot_star,   _UPF_PREC_POSTFIX   );
-    _UPF_DEFINE_RULE(_UPF_TT_FACTOR,           NULL,            _upf_binary,     _UPF_PREC_FACTOR    );
-    _UPF_DEFINE_RULE(_UPF_TT_STAR,             _upf_unary,      _upf_binary,     _UPF_PREC_FACTOR    );
-    _UPF_DEFINE_RULE(_UPF_TT_PLUS,             _upf_unary,      _upf_binary,     _UPF_PREC_TERM      );
-    _UPF_DEFINE_RULE(_UPF_TT_MINUS,            _upf_unary,      _upf_binary,     _UPF_PREC_TERM      );
-    _UPF_DEFINE_RULE(_UPF_TT_AMPERSAND,        _upf_unary,      _upf_binary,     _UPF_PREC_LOGICAL   );
-    _UPF_DEFINE_RULE(_UPF_TT_LESS_THAN,        _upf_unary,      _upf_binary,     _UPF_PREC_LOGICAL   );
-    _UPF_DEFINE_RULE(_UPF_TT_GREATER_THAN,     _upf_unary,      _upf_binary,     _UPF_PREC_LOGICAL   );
-    _UPF_DEFINE_RULE(_UPF_TT_DOUBLE_AMPERSAND, NULL,            _upf_binary,     _UPF_PREC_LOGICAL   );
-    _UPF_DEFINE_RULE(_UPF_TT_LOGICAL,          NULL,            _upf_binary,     _UPF_PREC_LOGICAL   );
-    _UPF_DEFINE_RULE(_UPF_TT_QUESTION,         NULL,            _upf_ternary,    _UPF_PREC_TERNARY   );
-    _UPF_DEFINE_RULE(_UPF_TT_ASSIGNMENT,       NULL,            _upf_assignment, _UPF_PREC_ASSIGNMENT);
+    _UPF_DEFINE_RULE(_UPF_TT_NUMBER,           _upf_number,       NULL,            _UPF_PREC_NONE      );
+    _UPF_DEFINE_RULE(_UPF_TT_STRING,           _upf_string,       NULL,            _UPF_PREC_NONE      );
+    _UPF_DEFINE_RULE(_UPF_TT_IDENTIFIER,       _upf_identifier,   NULL,            _UPF_PREC_NONE      );
+    _UPF_DEFINE_RULE(_UPF_TT_GENERIC,          _upf_generic,      NULL,            _UPF_PREC_NONE      );
+    _UPF_DEFINE_RULE(_UPF_TT_SIZEOF,           _upf_sizeof,       NULL,            _UPF_PREC_NONE      );
+    _UPF_DEFINE_RULE(_UPF_TT_ALIGNOF,          _upf_alignof,      NULL,            _UPF_PREC_NONE      );
+    _UPF_DEFINE_RULE(_UPF_TT_CXX_CAST,         _upf_cxx_cast,     NULL,            _UPF_PREC_NONE      );
+    _UPF_DEFINE_RULE(_UPF_TT_UNARY,            _upf_unary,        NULL,            _UPF_PREC_NONE      );
+    _UPF_DEFINE_RULE(_UPF_TT_CXX_NEW,          _upf_cxx_new,      NULL,            _UPF_PREC_NONE      );
+    _UPF_DEFINE_RULE(_UPF_TT_CXX_SCOPE,        _upf_cxx_scope,    NULL,            _UPF_PREC_NONE      );
+    _UPF_DEFINE_RULE(_UPF_TT_CXX_NOEXCEPT,     _upf_cxx_noexcept, NULL,            _UPF_PREC_NONE      );
+    _UPF_DEFINE_RULE(_UPF_TT_CXX_TYPEID,       _upf_cxx_typeid,   NULL,            _UPF_PREC_NONE      );
+    _UPF_DEFINE_RULE(_UPF_TT_OPEN_PAREN,       _upf_paren,        _upf_call,       _UPF_PREC_POSTFIX   );
+    _UPF_DEFINE_RULE(_UPF_TT_INCREMENT,        _upf_unary,        _upf_postfix,    _UPF_PREC_POSTFIX   );
+    _UPF_DEFINE_RULE(_UPF_TT_OPEN_BRACKET,     _upf_cxx_lambda,   _upf_index,      _UPF_PREC_POSTFIX   );
+    _UPF_DEFINE_RULE(_UPF_TT_DOT,              NULL,              _upf_dot,        _UPF_PREC_POSTFIX   );
+    _UPF_DEFINE_RULE(_UPF_TT_ARROW,            NULL,              _upf_dot,        _UPF_PREC_POSTFIX   );
+    _UPF_DEFINE_RULE(_UPF_TT_DOT_STAR,         NULL,              _upf_dot_star,   _UPF_PREC_POSTFIX   );
+    _UPF_DEFINE_RULE(_UPF_TT_ARROW_STAR,       NULL,              _upf_dot_star,   _UPF_PREC_POSTFIX   );
+    _UPF_DEFINE_RULE(_UPF_TT_FACTOR,           NULL,              _upf_binary,     _UPF_PREC_FACTOR    );
+    _UPF_DEFINE_RULE(_UPF_TT_STAR,             _upf_unary,        _upf_binary,     _UPF_PREC_FACTOR    );
+    _UPF_DEFINE_RULE(_UPF_TT_PLUS,             _upf_unary,        _upf_binary,     _UPF_PREC_TERM      );
+    _UPF_DEFINE_RULE(_UPF_TT_MINUS,            _upf_unary,        _upf_binary,     _UPF_PREC_TERM      );
+    _UPF_DEFINE_RULE(_UPF_TT_AMPERSAND,        _upf_unary,        _upf_binary,     _UPF_PREC_LOGICAL   );
+    _UPF_DEFINE_RULE(_UPF_TT_LESS_THAN,        _upf_unary,        _upf_binary,     _UPF_PREC_LOGICAL   );
+    _UPF_DEFINE_RULE(_UPF_TT_GREATER_THAN,     _upf_unary,        _upf_binary,     _UPF_PREC_LOGICAL   );
+    _UPF_DEFINE_RULE(_UPF_TT_DOUBLE_AMPERSAND, NULL,              _upf_binary,     _UPF_PREC_LOGICAL   );
+    _UPF_DEFINE_RULE(_UPF_TT_LOGICAL,          NULL,              _upf_binary,     _UPF_PREC_LOGICAL   );
+    _UPF_DEFINE_RULE(_UPF_TT_QUESTION,         NULL,              _upf_ternary,    _UPF_PREC_TERNARY   );
+    _UPF_DEFINE_RULE(_UPF_TT_ASSIGNMENT,       NULL,              _upf_assignment, _UPF_PREC_ASSIGNMENT);
     // clang-format on
 #undef _UPF_DEFINE_RULE
 }
@@ -3539,22 +3579,22 @@ static bool _upf_is_memory_readable(const uint8_t *ptr, uint64_t size) {
 
 #define _UPF_INITIAL_BUFFER_SIZE 512
 
-#define _upf_bprintf(...)                                                                         \
-    while (true) {                                                                                \
-        int bytes = snprintf(_upf_state.ptr, _upf_state.free, __VA_ARGS__);                       \
-        if (bytes < 0) _UPF_ERROR("Unexpected error occurred in snprintf: %s.", strerror(errno)); \
-        if ((uint32_t) bytes >= _upf_state.free) {                                                \
-            uint32_t used = _upf_state.size - _upf_state.free;                                    \
-            _upf_state.size *= 2;                                                                 \
-            _upf_state.buffer = (char *) realloc(_upf_state.buffer, _upf_state.size);             \
-            if (_upf_state.buffer == NULL) _UPF_OUT_OF_MEMORY();                                  \
-            _upf_state.ptr = _upf_state.buffer + used;                                            \
-            _upf_state.free = _upf_state.size - used;                                             \
-            continue;                                                                             \
-        }                                                                                         \
-        _upf_state.free -= bytes;                                                                 \
-        _upf_state.ptr += bytes;                                                                  \
-        break;                                                                                    \
+#define _upf_bprintf(...)                                                             \
+    while (true) {                                                                    \
+        int bytes = snprintf(_upf_state.ptr, _upf_state.free, __VA_ARGS__);           \
+        _UPF_ASSERT(bytes >= 0);                                                      \
+        if ((uint32_t) bytes >= _upf_state.free) {                                    \
+            uint32_t used = _upf_state.size - _upf_state.free;                        \
+            _upf_state.size *= 2;                                                     \
+            _upf_state.buffer = (char *) realloc(_upf_state.buffer, _upf_state.size); \
+            if (_upf_state.buffer == NULL) _UPF_OUT_OF_MEMORY();                      \
+            _upf_state.ptr = _upf_state.buffer + used;                                \
+            _upf_state.free = _upf_state.size - used;                                 \
+            continue;                                                                 \
+        }                                                                             \
+        _upf_state.free -= bytes;                                                     \
+        _upf_state.ptr += bytes;                                                      \
+        break;                                                                        \
     }
 
 static const char *_upf_escape_char(char ch) {
@@ -3604,7 +3644,7 @@ static bool _upf_is_primitive(const _upf_type *type) {
         case _UPF_TK_VOID:
         case _UPF_TK_UNKNOWN:        return true;
     }
-    _UPF_ERROR("Invalid type: %d.", type->kind);
+    _UPF_ASSERT(false && "Unreachable");
 }
 
 __attribute__((no_sanitize_address)) static void _upf_find_repeating_structs(_upf_struct_info_map *structs, const uint8_t *data,
@@ -4167,7 +4207,7 @@ __attribute__((constructor)) static void _upf_init(void) {
 }
 
 __attribute__((destructor)) static void _upf_fini(void) {
-    if (_upf_state.file != NULL) munmap(_upf_state.file, _upf_state.file_size);
+    if (_upf_state.elf_file != NULL) munmap(_upf_state.elf_file, _upf_state.elf_file_size);
     free(_upf_state.buffer);
     _upf_free_allocator();
 }
