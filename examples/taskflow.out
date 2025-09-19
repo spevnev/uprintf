@@ -24,9 +24,9 @@ executor: {
     }
     vector<tf::Worker, std::allocator<tf::Worker> > _workers = {
         _Vector_impl _M_impl = {
-            void *_M_start = 0x7eb6cf7e0400
-            void *_M_finish = 0x7eb6cf7e9c00
-            void *_M_end_of_storage = 0x7eb6cf7e9c00
+            void *_M_start = 0x7e2551be0400
+            void *_M_finish = 0x7e2551be9c00
+            void *_M_end_of_storage = 0x7e2551be9c00
         }
     }
     DefaultNotifier _notifier = {
@@ -35,9 +35,9 @@ executor: {
         }
         vector<tf::NonblockingNotifierV2::Waiter, std::allocator<tf::NonblockingNotifierV2::Waiter> > _waiters = {
             _Vector_impl _M_impl = {
-                Waiter *_M_start = 0x7db6cf7e0080 ({
+                Waiter *_M_start = 0x7d2551be0080 ({
                     atomic<long unsigned int> next = {
-                        __int_type _M_i = 7
+                        __int_type _M_i = 6
                     }
                     uint64_t epoch = 4398046511104
                     mutex mu = {
@@ -65,11 +65,17 @@ executor: {
                                 __pthread_cond_s __data = {
                                     __atomic_wide_counter __wseq = <union> {
                                         long long unsigned int __value64 = 2
-                                        struct __value32 = {...}
+                                        struct __value32 = {
+                                            unsigned int __low = 2
+                                            unsigned int __high = 0
+                                        }
                                     }
                                     __atomic_wide_counter __g1_start = <union> {
                                         long long unsigned int __value64 = 0
-                                        struct __value32 = {...}
+                                        struct __value32 = {
+                                            unsigned int __low = 0
+                                            unsigned int __high = 0
+                                        }
                                     }
                                     unsigned int[] __g_size = [0, 0]
                                     unsigned int __g1_orig_size = 0
@@ -85,7 +91,7 @@ executor: {
                     }
                     unsigned int state = 1
                 })
-                Waiter *_M_finish = 0x7db6cf7e0880 (<#0> {
+                Waiter *_M_finish = 0x7d2551be0880 (<#0> {
                     atomic<long unsigned int> next = {
                         __int_type _M_i = 0
                     }
@@ -115,11 +121,17 @@ executor: {
                                 __pthread_cond_s __data = {
                                     __atomic_wide_counter __wseq = <union> {
                                         long long unsigned int __value64 = 0
-                                        struct __value32 = {...}
+                                        struct __value32 = {
+                                            unsigned int __low = 0
+                                            unsigned int __high = 0
+                                        }
                                     }
                                     __atomic_wide_counter __g1_start = <union> {
                                         long long unsigned int __value64 = 0
-                                        struct __value32 = {...}
+                                        struct __value32 = {
+                                            unsigned int __low = 0
+                                            unsigned int __high = 0
+                                        }
                                     }
                                     unsigned int[] __g_size = [0, 0]
                                     unsigned int __g1_orig_size = 0
@@ -135,7 +147,7 @@ executor: {
                     }
                     unsigned int state = 0
                 })
-                Waiter *_M_end_of_storage = 0x7db6cf7e0880 (<points to #0>)
+                Waiter *_M_end_of_storage = 0x7d2551be0880 (<points to #0>)
             }
         }
     }
@@ -192,11 +204,11 @@ executor: {
     list<tf::Taskflow, std::allocator<tf::Taskflow> > _taskflows = {
         _List_impl _M_impl = {
             _Node_header _M_node = {
-                _List_node_base *_M_next = 0x7be6ce7006e0 (<#1> {
-                    _List_node_base *_M_next = 0x7be6ce7006e0 (<points to #1>)
-                    _List_node_base *_M_prev = 0x7be6ce7006e0 (<points to #1>)
+                _List_node_base *_M_next = 0x7b5550b006e0 (<#1> {
+                    _List_node_base *_M_next = 0x7b5550b006e0 (<points to #1>)
+                    _List_node_base *_M_prev = 0x7b5550b006e0 (<points to #1>)
                 })
-                _List_node_base *_M_prev = 0x7be6ce7006e0 (<points to #1>)
+                _List_node_base *_M_prev = 0x7b5550b006e0 (<points to #1>)
                 size_t _M_size = 0
             }
         }
@@ -204,7 +216,7 @@ executor: {
     Freelist<tf::Node*> _buffers = {
         vector<tf::Freelist<tf::Node*>::Bucket, std::allocator<tf::Freelist<tf::Node*>::Bucket> > _buckets = {
             _Vector_impl _M_impl = {
-                Bucket *_M_start = 0x7d96cf7e0080 ({
+                Bucket *_M_start = 0x7d0551be0080 ({
                     mutex mutex = {
                         __native_type _M_mutex = <union> {
                             __pthread_mutex_s __data = {
@@ -233,25 +245,27 @@ executor: {
                         }
                         atomic<tf::UnboundedTaskQueue<tf::Node*>::Array*> _array = {
                             __base_type _M_b = {
-                                Array *_M_p = 0x7c16cf7e0040 ({
+                                Array *_M_p = 0x7b8551be0040 ({
                                     int64_t C = 1024
                                     int64_t M = 1023
-                                    atomic<tf::Node*> *S = 0x7e36cf7e0100 ({
-                                        __base_type _M_b = {...}
+                                    atomic<tf::Node*> *S = 0x7da551be0100 ({
+                                        __base_type _M_b = {
+                                            Node *_M_p = 0xbebebebebebebebe (<out-of-bounds>)
+                                        }
                                     })
                                 })
                             }
                         }
                         vector<tf::UnboundedTaskQueue<tf::Node*>::Array*, std::allocator<tf::UnboundedTaskQueue<tf::Node*>::Array*> > _garbage = {
                             _Vector_impl _M_impl = {
-                                Array **_M_start = 0x7cf6cf7e0040
-                                Array **_M_finish = 0x7cf6cf7e0040
-                                Array **_M_end_of_storage = 0x7cf6cf7e0140
+                                Array **_M_start = 0x7c6551be0040
+                                Array **_M_finish = 0x7c6551be0040
+                                Array **_M_end_of_storage = 0x7c6551be0140
                             }
                         }
                     }
                 })
-                Bucket *_M_finish = 0x7d96cf7e0680 (<#2> {
+                Bucket *_M_finish = 0x7d0551be0680 (<#2> {
                     mutex mutex = {
                         __native_type _M_mutex = <union> {
                             __pthread_mutex_s __data = {
@@ -292,7 +306,7 @@ executor: {
                         }
                     }
                 })
-                Bucket *_M_end_of_storage = 0x7d96cf7e0680 (<points to #2>)
+                Bucket *_M_end_of_storage = 0x7d0551be0680 (<points to #2>)
             }
         }
     }
@@ -313,7 +327,7 @@ executor: {
             _Hashtable_ebo_helper<std::allocator<std::__detail::_Hash_node<std::shared_ptr<tf::ObserverInterface>, false> >, true> _M_alloc = {
                 allocator<std::__detail::_Hash_node<std::shared_ptr<tf::ObserverInterface>, false> > _M_obj = {}
             }
-            __node_base **_M_buckets = 0x7be6ce700750
+            __node_base **_M_buckets = 0x7b5550b00750
             size_type _M_bucket_count = 1
             __node_base _M_before_begin = {
                 _Hash_node_base *_M_nxt = NULL
@@ -327,21 +341,21 @@ executor: {
         }
     }
 }
-taskflow: {
-    Graph &_graph = {
+taskflow: <#0> {
+    Graph &_graph = <#1> {
         _Vector_impl _M_impl = {
-            unique_ptr<tf::Node, std::default_delete<tf::Node> > *_M_start = 0x7c16cf7e0430 ({
+            unique_ptr<tf::Node, std::default_delete<tf::Node> > *_M_start = 0x7b8551be0430 ({
                 __uniq_ptr_data<tf::Node, std::default_delete<tf::Node>, true, true> _M_t = {
                     tuple<tf::Node*, std::default_delete<tf::Node> > _M_t = {
                         default_delete<tf::Node> _M_head_impl = {}
-                        Node *_M_head_impl = 0x7cf6cf7e0900 ({
+                        Node *_M_head_impl = 0x7c6551be0900 ({
                             nstate_t _nstate = 0
                             atomic<int> _estate = {
                                 __int_type _M_i = 0
                             }
                             string _name = {
                                 _Alloc_hider _M_dataplus = {
-                                    char *_M_p = 0x7cf6cf7e0918 ("")
+                                    char *_M_p = 0x7c6551be0918 ("")
                                 }
                                 size_type _M_string_length = 0
                                 union <anonymous> = <union> {
@@ -350,53 +364,74 @@ taskflow: {
                                 }
                             }
                             void *_data = NULL
-                            Topology *_topology = 0x7cb6cf7e0050 ({
-                                Taskflow &_taskflow = {
-                                    Graph &_graph = {
-                                        _Vector_impl _M_impl = {...}
-                                    }
-                                    mutex _mutex = {
-                                        __native_type _M_mutex = {...}
-                                    }
-                                    string _name = {
-                                        _Alloc_hider _M_dataplus = {...}
-                                        size_type _M_string_length = 0
-                                        union <anonymous> = {...}
-                                    }
-                                    Graph _graph = {
-                                        _Vector_impl _M_impl = {...}
-                                    }
-                                    queue<std::shared_ptr<tf::Topology>, std::deque<std::shared_ptr<tf::Topology>, std::allocator<std::shared_ptr<tf::Topology> > > > _topologies = {
-                                        deque<std::shared_ptr<tf::Topology>, std::allocator<std::shared_ptr<tf::Topology> > > c = {...}
-                                    }
-                                    optional<std::_List_iterator<tf::Taskflow> > _satellite = {
-                                        _Optional_payload<std::_List_iterator<tf::Taskflow>, true, true, true> _M_payload = {...}
-                                    }
-                                }
+                            Topology *_topology = 0x7c2551be0050 ({
+                                Taskflow &_taskflow = <points to #0>
                                 promise<void> _promise = {
                                     shared_ptr<std::__future_base::_State_baseV2> _M_future = {
-                                        element_type *_M_ptr = 0x7c26cf7e0020 ({...})
-                                        __shared_count<(__gnu_cxx::_Lock_policy)2> _M_refcount = {...}
+                                        element_type *_M_ptr = 0x7b9551be0020 ({
+                                            int(...) *_vptr._State_baseV2 = 0x55a13f8d59c0
+                                            _Ptr_type _M_result = {
+                                                __uniq_ptr_data<std::__future_base::_Result_base, std::__future_base::_Result_base::_Deleter, true, true> _M_t = {
+                                                    tuple<std::__future_base::_Result_base*, std::__future_base::_Result_base::_Deleter> _M_t = {
+                                                        _Deleter _M_head_impl = {}
+                                                        _Result_base *_M_head_impl = NULL
+                                                    }
+                                                }
+                                            }
+                                            __atomic_futex_unsigned<2147483648> _M_status = {
+                                                atomic<unsigned int> _M_data = {
+                                                    __int_type _M_i = 1
+                                                }
+                                            }
+                                            atomic_flag _M_retrieved = {
+                                                __atomic_flag_data_type _M_i = true
+                                            }
+                                            once_flag _M_once = {
+                                                __gthread_once_t _M_once = 2
+                                            }
+                                        })
+                                        __shared_count<(__gnu_cxx::_Lock_policy)2> _M_refcount = {
+                                            _Sp_counted_base<(__gnu_cxx::_Lock_policy)2> *_M_pi = 0x7b9551be0010 ({
+                                                int(...) *_vptr._Sp_counted_base = 0x2b
+                                                _Atomic_word _M_use_count = 0
+                                                _Atomic_word _M_weak_count = 0
+                                            })
+                                        }
                                     }
                                     _Ptr_type _M_storage = {
-                                        __uniq_ptr_data<std::__future_base::_Result<void>, std::__future_base::_Result_base::_Deleter, true, true> _M_t = {...}
+                                        __uniq_ptr_data<std::__future_base::_Result<void>, std::__future_base::_Result_base::_Deleter, true, true> _M_t = {
+                                            tuple<std::__future_base::_Result<void>*, std::__future_base::_Result_base::_Deleter> _M_t = {
+                                                _Deleter _M_head_impl = {}
+                                                _Result<void> *_M_head_impl = NULL
+                                            }
+                                        }
                                     }
                                 }
                                 function<bool()> _pred = {
                                     _Any_data _M_functor = <union> {
-                                        _Nocopy_types _M_unused = {...}
+                                        _Nocopy_types _M_unused = <union> {
+                                            void *_M_object = 0xffffffffffffffff
+                                            const void *_M_const_object = 0xffffffffffffffff
+                                            void() _M_function_pointer = <out-of-bounds>
+                                            <unnamed> _M_member_pointer = <member pointer>
+                                        }
                                         char[] _M_pod_data = [-1 <repeats 8 times>, 0 <repeats 8 times>]
                                     }
-                                    bool(_Any_data &, const _Any_data &, _Manager_operation) _M_manager = 0x5562ae2ea2b9
-                                    bool(const _Any_data &) _M_invoker = 0x5562ae2ea26a
+                                    bool(_Any_data &, const _Any_data &, _Manager_operation) _M_manager = 0x55a13f85bd9d
+                                    bool(const _Any_data &) _M_invoker = 0x55a13f85bd4e
                                 }
                                 function<void()> _call = {
                                     _Any_data _M_functor = <union> {
-                                        _Nocopy_types _M_unused = {...}
+                                        _Nocopy_types _M_unused = <union> {
+                                            void *_M_object = NULL
+                                            const void *_M_const_object = NULL
+                                            void() _M_function_pointer = NULL
+                                            <unnamed> _M_member_pointer = <member pointer>
+                                        }
                                         char[] _M_pod_data = [0 <repeats 16 times>]
                                     }
-                                    bool(_Any_data &, const _Any_data &, _Manager_operation) _M_manager = 0x5562ae2ea4da
-                                    void(const _Any_data &) _M_invoker = 0x5562ae2ea496
+                                    bool(_Any_data &, const _Any_data &, _Manager_operation) _M_manager = 0x55a13f85bfbe
+                                    void(const _Any_data &) _M_invoker = 0x55a13f85bf7a
                                 }
                                 atomic<long unsigned int> _join_counter = {
                                     __int_type _M_i = 0
@@ -411,17 +446,23 @@ taskflow: {
                             Node *_parent = NULL
                             size_t _num_successors = 2
                             SmallVector<tf::Node*, 4> _edges = {
-                                void *BeginX = 0x7cf6cf7e0960
-                                void *EndX = 0x7cf6cf7e0970
-                                void *CapacityX = 0x7cf6cf7e0980
+                                void *BeginX = 0x7c6551be0960
+                                void *EndX = 0x7c6551be0970
+                                void *CapacityX = 0x7c6551be0980
                                 U FirstEl = {
-                                    byte[] buff = [<unknown> (192), <unknown> (7), <unknown> (126 ('~')), <unknown> (207), <unknown> (246), <unknown> (124 ('|')), <unknown> (0), <unknown> (0)]
+                                    byte[] buff = [<unknown> (192), <unknown> (7), <unknown> (190), <unknown> (81 ('Q')), <unknown> (101 ('e')), <unknown> (124 ('|')), <unknown> (0), <unknown> (0)]
                                 }
                                 SmallVectorStorage<tf::Node*, 4> Storage = {
                                     U[] InlineElts = [
-                                        {...},
-                                        {...},
-                                        {...}
+                                        {
+                                            byte[] buff = [<unknown> (128), <unknown> (6), <unknown> (190), <unknown> (81 ('Q')), <unknown> (101 ('e')), <unknown> (124 ('|')), <unknown> (0), <unknown> (0)]
+                                        },
+                                        {
+                                            byte[] buff = [<unknown> (190) <repeats 8 times>]
+                                        },
+                                        {
+                                            byte[] buff = [<unknown> (190) <repeats 8 times>]
+                                        }
                                     ]
                                 }
                             }
@@ -431,11 +472,77 @@ taskflow: {
                             handle_t _handle = {
                                 _Variadic_union<false, std::monostate, tf::Node::Static, tf::Node::Runtime, tf::Node::Subflow, tf::Node::Condition, tf::Node::MultiCondition, tf::Node::Module, tf::Node::Async, tf::Node::DependentAsync> _M_u = <union> {
                                     _Uninitialized<std::monostate, true> _M_first = {
-                                        monostate _M_storage = {...}
+                                        monostate _M_storage = {}
                                     }
                                     _Variadic_union<false, tf::Node::Static, tf::Node::Runtime, tf::Node::Subflow, tf::Node::Condition, tf::Node::MultiCondition, tf::Node::Module, tf::Node::Async, tf::Node::DependentAsync> _M_rest = <union> {
-                                        _Uninitialized<tf::Node::Static, false> _M_first = {...}
-                                        _Variadic_union<false, tf::Node::Runtime, tf::Node::Subflow, tf::Node::Condition, tf::Node::MultiCondition, tf::Node::Module, tf::Node::Async, tf::Node::DependentAsync> _M_rest = {...}
+                                        _Uninitialized<tf::Node::Static, false> _M_first = {
+                                            __aligned_membuf<tf::Node::Static> _M_storage = {
+                                                unsigned char[] _M_storage = [0 <repeats 16 times>, 81 ('Q'), 1, 122 ('z'), 63 ('?'), 161, 85 ('U'), 0, 0, 13, 1, 122 ('z'), 63 ('?'), 161, 85 ('U'), 0, 0]
+                                            }
+                                        }
+                                        _Variadic_union<false, tf::Node::Runtime, tf::Node::Subflow, tf::Node::Condition, tf::Node::MultiCondition, tf::Node::Module, tf::Node::Async, tf::Node::DependentAsync> _M_rest = <union> {
+                                            _Uninitialized<tf::Node::Runtime, false> _M_first = {
+                                                __aligned_membuf<tf::Node::Runtime> _M_storage = {
+                                                    unsigned char[] _M_storage = [0 <repeats 16 times>, 81 ('Q'), 1, 122 ('z'), 63 ('?'), 161, 85 ('U'), 0, 0, 13, 1, 122 ('z'), 63 ('?'), 161, 85 ('U'), 0, 0]
+                                                }
+                                            }
+                                            _Variadic_union<false, tf::Node::Subflow, tf::Node::Condition, tf::Node::MultiCondition, tf::Node::Module, tf::Node::Async, tf::Node::DependentAsync> _M_rest = <union> {
+                                                _Uninitialized<tf::Node::Subflow, false> _M_first = {
+                                                    __aligned_membuf<tf::Node::Subflow> _M_storage = {
+                                                        unsigned char[] _M_storage = [0 <repeats 16 times>, 81 ('Q'), 1, 122 ('z'), 63 ('?'), 161, 85 ('U'), 0, 0, 13, 1, 122 ('z'), 63 ('?'), 161, 85 ('U'), 0, 0, 190 <repeats 24 times>]
+                                                    }
+                                                }
+                                                _Variadic_union<false, tf::Node::Condition, tf::Node::MultiCondition, tf::Node::Module, tf::Node::Async, tf::Node::DependentAsync> _M_rest = <union> {
+                                                    _Uninitialized<tf::Node::Condition, false> _M_first = {
+                                                        __aligned_membuf<tf::Node::Condition> _M_storage = {
+                                                            unsigned char[] _M_storage = [0 <repeats 16 times>, 81 ('Q'), 1, 122 ('z'), 63 ('?'), 161, 85 ('U'), 0, 0, 13, 1, 122 ('z'), 63 ('?'), 161, 85 ('U'), 0, 0]
+                                                        }
+                                                    }
+                                                    _Variadic_union<false, tf::Node::MultiCondition, tf::Node::Module, tf::Node::Async, tf::Node::DependentAsync> _M_rest = <union> {
+                                                        _Uninitialized<tf::Node::MultiCondition, false> _M_first = {
+                                                            __aligned_membuf<tf::Node::MultiCondition> _M_storage = {
+                                                                unsigned char[] _M_storage = [0 <repeats 16 times>, 81 ('Q'), 1, 122 ('z'), 63 ('?'), 161, 85 ('U'), 0, 0, 13, 1, 122 ('z'), 63 ('?'), 161, 85 ('U'), 0, 0]
+                                                            }
+                                                        }
+                                                        _Variadic_union<false, tf::Node::Module, tf::Node::Async, tf::Node::DependentAsync> _M_rest = <union> {
+                                                            _Uninitialized<tf::Node::Module, true> _M_first = {
+                                                                Module _M_storage = {
+                                                                    Graph &graph = {
+                                                                        _Vector_impl _M_impl = {
+                                                                            unique_ptr<tf::Node, std::default_delete<tf::Node> > *_M_start = NULL
+                                                                            unique_ptr<tf::Node, std::default_delete<tf::Node> > *_M_finish = NULL
+                                                                            unique_ptr<tf::Node, std::default_delete<tf::Node> > *_M_end_of_storage = 0x55a13f7a0151 ({
+                                                                                __uniq_ptr_data<tf::Node, std::default_delete<tf::Node>, true, true> _M_t = {
+                                                                                    tuple<tf::Node*, std::default_delete<tf::Node> > _M_t = {
+                                                                                        default_delete<tf::Node> _M_head_impl = {}
+                                                                                        Node *_M_head_impl = 0x48535441e5894855 (<out-of-bounds>)
+                                                                                    }
+                                                                                }
+                                                                            })
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+                                                            _Variadic_union<false, tf::Node::Async, tf::Node::DependentAsync> _M_rest = <union> {
+                                                                _Uninitialized<tf::Node::Async, false> _M_first = {
+                                                                    __aligned_membuf<tf::Node::Async> _M_storage = {
+                                                                        unsigned char[] _M_storage = [0 <repeats 16 times>, 81 ('Q'), 1, 122 ('z'), 63 ('?'), 161, 85 ('U'), 0, 0, 13, 1, 122 ('z'), 63 ('?'), 161, 85 ('U'), 0, 0, 190 <repeats 8 times>]
+                                                                    }
+                                                                }
+                                                                _Variadic_union<false, tf::Node::DependentAsync> _M_rest = <union> {
+                                                                    _Uninitialized<tf::Node::DependentAsync, false> _M_first = {
+                                                                        __aligned_membuf<tf::Node::DependentAsync> _M_storage = {
+                                                                            unsigned char[] _M_storage = [0 <repeats 16 times>, 81 ('Q'), 1, 122 ('z'), 63 ('?'), 161, 85 ('U'), 0, 0, 13, 1, 122 ('z'), 63 ('?'), 161, 85 ('U'), 0, 0, 190 <repeats 24 times>]
+                                                                        }
+                                                                    }
+                                                                    _Variadic_union<false> _M_rest = <union> {}
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                                 __index_type _M_index = 1
@@ -443,7 +550,7 @@ taskflow: {
                             unique_ptr<tf::Node::Semaphores, std::default_delete<tf::Node::Semaphores> > _semaphores = {
                                 __uniq_ptr_data<tf::Node::Semaphores, std::default_delete<tf::Node::Semaphores>, true, true> _M_t = {
                                     tuple<tf::Node::Semaphores*, std::default_delete<tf::Node::Semaphores> > _M_t = {
-                                        default_delete<tf::Node::Semaphores> _M_head_impl = {...}
+                                        default_delete<tf::Node::Semaphores> _M_head_impl = {}
                                         Semaphores *_M_head_impl = NULL
                                     }
                                 }
@@ -455,7 +562,7 @@ taskflow: {
                     }
                 }
             })
-            unique_ptr<tf::Node, std::default_delete<tf::Node> > *_M_finish = 0x7c16cf7e0450 (<#0> {
+            unique_ptr<tf::Node, std::default_delete<tf::Node> > *_M_finish = 0x7b8551be0450 (<#2> {
                 __uniq_ptr_data<tf::Node, std::default_delete<tf::Node>, true, true> _M_t = {
                     tuple<tf::Node*, std::default_delete<tf::Node> > _M_t = {
                         default_delete<tf::Node> _M_head_impl = {}
@@ -463,7 +570,7 @@ taskflow: {
                     }
                 }
             })
-            unique_ptr<tf::Node, std::default_delete<tf::Node> > *_M_end_of_storage = 0x7c16cf7e0450 (<points to #0>)
+            unique_ptr<tf::Node, std::default_delete<tf::Node> > *_M_end_of_storage = 0x7b8551be0450 (<points to #2>)
         }
     }
     mutex _mutex = {
@@ -487,7 +594,7 @@ taskflow: {
     }
     string _name = {
         _Alloc_hider _M_dataplus = {
-            char *_M_p = 0x7be6ce700550 ("")
+            char *_M_p = 0x7b5550b00550 ("")
         }
         size_type _M_string_length = 0
         union <anonymous> = <union> {
@@ -495,153 +602,23 @@ taskflow: {
             size_type _M_allocated_capacity = 0
         }
     }
-    Graph _graph = {
-        _Vector_impl _M_impl = {
-            unique_ptr<tf::Node, std::default_delete<tf::Node> > *_M_start = 0x7c16cf7e0430 ({
-                __uniq_ptr_data<tf::Node, std::default_delete<tf::Node>, true, true> _M_t = {
-                    tuple<tf::Node*, std::default_delete<tf::Node> > _M_t = {
-                        default_delete<tf::Node> _M_head_impl = {}
-                        Node *_M_head_impl = 0x7cf6cf7e0900 ({
-                            nstate_t _nstate = 0
-                            atomic<int> _estate = {
-                                __int_type _M_i = 0
-                            }
-                            string _name = {
-                                _Alloc_hider _M_dataplus = {
-                                    char *_M_p = 0x7cf6cf7e0918 ("")
-                                }
-                                size_type _M_string_length = 0
-                                union <anonymous> = <union> {
-                                    char[] _M_local_buf = [0, -66 <repeats 15 times>]
-                                    size_type _M_allocated_capacity = 13744632839234567680
-                                }
-                            }
-                            void *_data = NULL
-                            Topology *_topology = 0x7cb6cf7e0050 ({
-                                Taskflow &_taskflow = {
-                                    Graph &_graph = {
-                                        _Vector_impl _M_impl = {...}
-                                    }
-                                    mutex _mutex = {
-                                        __native_type _M_mutex = {...}
-                                    }
-                                    string _name = {
-                                        _Alloc_hider _M_dataplus = {...}
-                                        size_type _M_string_length = 0
-                                        union <anonymous> = {...}
-                                    }
-                                    Graph _graph = {
-                                        _Vector_impl _M_impl = {...}
-                                    }
-                                    queue<std::shared_ptr<tf::Topology>, std::deque<std::shared_ptr<tf::Topology>, std::allocator<std::shared_ptr<tf::Topology> > > > _topologies = {
-                                        deque<std::shared_ptr<tf::Topology>, std::allocator<std::shared_ptr<tf::Topology> > > c = {...}
-                                    }
-                                    optional<std::_List_iterator<tf::Taskflow> > _satellite = {
-                                        _Optional_payload<std::_List_iterator<tf::Taskflow>, true, true, true> _M_payload = {...}
-                                    }
-                                }
-                                promise<void> _promise = {
-                                    shared_ptr<std::__future_base::_State_baseV2> _M_future = {
-                                        element_type *_M_ptr = 0x7c26cf7e0020 ({...})
-                                        __shared_count<(__gnu_cxx::_Lock_policy)2> _M_refcount = {...}
-                                    }
-                                    _Ptr_type _M_storage = {
-                                        __uniq_ptr_data<std::__future_base::_Result<void>, std::__future_base::_Result_base::_Deleter, true, true> _M_t = {...}
-                                    }
-                                }
-                                function<bool()> _pred = {
-                                    _Any_data _M_functor = <union> {
-                                        _Nocopy_types _M_unused = {...}
-                                        char[] _M_pod_data = [-1 <repeats 8 times>, 0 <repeats 8 times>]
-                                    }
-                                    bool(_Any_data &, const _Any_data &, _Manager_operation) _M_manager = 0x5562ae2ea2b9
-                                    bool(const _Any_data &) _M_invoker = 0x5562ae2ea26a
-                                }
-                                function<void()> _call = {
-                                    _Any_data _M_functor = <union> {
-                                        _Nocopy_types _M_unused = {...}
-                                        char[] _M_pod_data = [0 <repeats 16 times>]
-                                    }
-                                    bool(_Any_data &, const _Any_data &, _Manager_operation) _M_manager = 0x5562ae2ea4da
-                                    void(const _Any_data &) _M_invoker = 0x5562ae2ea496
-                                }
-                                atomic<long unsigned int> _join_counter = {
-                                    __int_type _M_i = 0
-                                }
-                                atomic<int> _estate = {
-                                    __int_type _M_i = 0
-                                }
-                                exception_ptr _exception_ptr = {
-                                    void *_M_exception_object = NULL
-                                }
-                            })
-                            Node *_parent = NULL
-                            size_t _num_successors = 2
-                            SmallVector<tf::Node*, 4> _edges = {
-                                void *BeginX = 0x7cf6cf7e0960
-                                void *EndX = 0x7cf6cf7e0970
-                                void *CapacityX = 0x7cf6cf7e0980
-                                U FirstEl = {
-                                    byte[] buff = [<unknown> (192), <unknown> (7), <unknown> (126 ('~')), <unknown> (207), <unknown> (246), <unknown> (124 ('|')), <unknown> (0), <unknown> (0)]
-                                }
-                                SmallVectorStorage<tf::Node*, 4> Storage = {
-                                    U[] InlineElts = [
-                                        {...},
-                                        {...},
-                                        {...}
-                                    ]
-                                }
-                            }
-                            atomic<long unsigned int> _join_counter = {
-                                __int_type _M_i = 0
-                            }
-                            handle_t _handle = {
-                                _Variadic_union<false, std::monostate, tf::Node::Static, tf::Node::Runtime, tf::Node::Subflow, tf::Node::Condition, tf::Node::MultiCondition, tf::Node::Module, tf::Node::Async, tf::Node::DependentAsync> _M_u = <union> {
-                                    _Uninitialized<std::monostate, true> _M_first = {
-                                        monostate _M_storage = {...}
-                                    }
-                                    _Variadic_union<false, tf::Node::Static, tf::Node::Runtime, tf::Node::Subflow, tf::Node::Condition, tf::Node::MultiCondition, tf::Node::Module, tf::Node::Async, tf::Node::DependentAsync> _M_rest = <union> {
-                                        _Uninitialized<tf::Node::Static, false> _M_first = {...}
-                                        _Variadic_union<false, tf::Node::Runtime, tf::Node::Subflow, tf::Node::Condition, tf::Node::MultiCondition, tf::Node::Module, tf::Node::Async, tf::Node::DependentAsync> _M_rest = {...}
-                                    }
-                                }
-                                __index_type _M_index = 1
-                            }
-                            unique_ptr<tf::Node::Semaphores, std::default_delete<tf::Node::Semaphores> > _semaphores = {
-                                __uniq_ptr_data<tf::Node::Semaphores, std::default_delete<tf::Node::Semaphores>, true, true> _M_t = {
-                                    tuple<tf::Node::Semaphores*, std::default_delete<tf::Node::Semaphores> > _M_t = {
-                                        default_delete<tf::Node::Semaphores> _M_head_impl = {...}
-                                        Semaphores *_M_head_impl = NULL
-                                    }
-                                }
-                            }
-                            exception_ptr _exception_ptr = {
-                                void *_M_exception_object = NULL
-                            }
-                        })
-                    }
-                }
-            })
-            unique_ptr<tf::Node, std::default_delete<tf::Node> > *_M_finish = 0x7c16cf7e0450 (<points to #0>)
-            unique_ptr<tf::Node, std::default_delete<tf::Node> > *_M_end_of_storage = 0x7c16cf7e0450 (<points to #0>)
-        }
-    }
+    Graph _graph = <points to #1>
     queue<std::shared_ptr<tf::Topology>, std::deque<std::shared_ptr<tf::Topology>, std::allocator<std::shared_ptr<tf::Topology> > > > _topologies = {
         deque<std::shared_ptr<tf::Topology>, std::allocator<std::shared_ptr<tf::Topology> > > c = {
             _Deque_impl _M_impl = {
-                void *_M_map = 0x7c46cf7e0080
+                void *_M_map = 0x7bb551be0080
                 size_t _M_map_size = 8
                 iterator _M_start = {
-                    void *_M_cur = 0x7d36cf7e0310
-                    void *_M_first = 0x7d36cf7e0300
-                    void *_M_last = 0x7d36cf7e0500
-                    void *_M_node = 0x7c46cf7e0098
+                    void *_M_cur = 0x7ca551be0310
+                    void *_M_first = 0x7ca551be0300
+                    void *_M_last = 0x7ca551be0500
+                    void *_M_node = 0x7bb551be0098
                 }
                 iterator _M_finish = {
-                    void *_M_cur = 0x7d36cf7e0310
-                    void *_M_first = 0x7d36cf7e0300
-                    void *_M_last = 0x7d36cf7e0500
-                    void *_M_node = 0x7c46cf7e0098
+                    void *_M_cur = 0x7ca551be0310
+                    void *_M_first = 0x7ca551be0300
+                    void *_M_last = 0x7ca551be0500
+                    void *_M_node = 0x7bb551be0098
                 }
             }
         }

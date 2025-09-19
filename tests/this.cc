@@ -6,7 +6,7 @@ public:
     float f = 1.2F;
     const char *cstr = "str";
 
-    void foo() { uprintf("C: %S\n", this); }
+    __attribute__((noinline)) void foo() { uprintf("C: %S\n", this); }
 };
 
 int main() {

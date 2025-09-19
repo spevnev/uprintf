@@ -1,7 +1,7 @@
 Options: {
     string m_program = {
         _Alloc_hider _M_dataplus = {
-            char *_M_p = 0x7b4357300810 ("test")
+            char *_M_p = 0x7b3a0ed00810 ("test")
         }
         size_type _M_string_length = 4
         union <anonymous> = <union> {
@@ -11,7 +11,7 @@ Options: {
     }
     String m_help_string = {
         _Alloc_hider _M_dataplus = {
-            char *_M_p = 0x7b73581e0040 ("A brief description")
+            char *_M_p = 0x7b6a0fbe0040 ("A brief description")
         }
         size_type _M_string_length = 19
         union <anonymous> = <union> {
@@ -21,7 +21,7 @@ Options: {
     }
     string m_custom_help = {
         _Alloc_hider _M_dataplus = {
-            char *_M_p = 0x7b4357300850 ("[OPTION...]")
+            char *_M_p = 0x7b3a0ed00850 ("[OPTION...]")
         }
         size_type _M_string_length = 11
         union <anonymous> = <union> {
@@ -31,7 +31,7 @@ Options: {
     }
     string m_positional_help = {
         _Alloc_hider _M_dataplus = {
-            char *_M_p = 0x7b73581e0070 ("positional parameters")
+            char *_M_p = 0x7b6a0fbe0070 ("positional parameters")
         }
         size_type _M_string_length = 21
         union <anonymous> = <union> {
@@ -44,7 +44,7 @@ Options: {
     size_t m_width = 76
     bool m_tab_expansion = false
     shared_ptr<std::unordered_map<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::shared_ptr<cxxopts::OptionDetails>, std::hash<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::equal_to<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::allocator<std::pair<const std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::shared_ptr<cxxopts::OptionDetails> > > > > m_options = {
-        element_type *_M_ptr = 0x7bb3581e0030 ({
+        element_type *_M_ptr = 0x7baa0fbe0030 ({
             _Hashtable _M_h = {
                 _Hashtable_ebo_helper<std::hash<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, true> _M_hash = {
                     hash<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > _M_obj = {}
@@ -55,15 +55,15 @@ Options: {
                 _Hashtable_ebo_helper<std::allocator<std::__detail::_Hash_node<std::pair<const std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::shared_ptr<cxxopts::OptionDetails> >, true> >, true> _M_alloc = {
                     allocator<std::__detail::_Hash_node<std::pair<const std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::shared_ptr<cxxopts::OptionDetails> >, true> > _M_obj = {}
                 }
-                __node_base **_M_buckets = 0x7bf3581e0040
+                __node_base **_M_buckets = 0x7bea0fbe0040
                 size_type _M_bucket_count = 13
                 __node_base _M_before_begin = {
-                    _Hash_node_base *_M_nxt = 0x7ba3581e04a0 ({
-                        _Hash_node_base *_M_nxt = 0x7ba3581e0320 ({
-                            _Hash_node_base *_M_nxt = 0x7ba3581e0260 ({
-                                _Hash_node_base *_M_nxt = 0x7ba3581e0380 ({
-                                    _Hash_node_base *_M_nxt = 0x7ba3581e0200 ({
-                                        _Hash_node_base *_M_nxt = 0x7ba3581e0140 ({...})
+                    _Hash_node_base *_M_nxt = 0x7b9a0fbe04a0 ({
+                        _Hash_node_base *_M_nxt = 0x7b9a0fbe0320 ({
+                            _Hash_node_base *_M_nxt = 0x7b9a0fbe0260 ({
+                                _Hash_node_base *_M_nxt = 0x7b9a0fbe0380 ({
+                                    _Hash_node_base *_M_nxt = 0x7b9a0fbe0200 ({
+                                        _Hash_node_base *_M_nxt = 0x7b9a0fbe0140 ({...})
                                     })
                                 })
                             })
@@ -79,8 +79,8 @@ Options: {
             }
         })
         __shared_count<(__gnu_cxx::_Lock_policy)2> _M_refcount = {
-            _Sp_counted_base<(__gnu_cxx::_Lock_policy)2> *_M_pi = 0x7bb3581e0020 ({
-                int(...) *_vptr._Sp_counted_base = 0x55f73452e440
+            _Sp_counted_base<(__gnu_cxx::_Lock_policy)2> *_M_pi = 0x7baa0fbe0020 ({
+                int(...) *_vptr._Sp_counted_base = 0x557ec5439440
                 _Atomic_word _M_use_count = 1
                 _Atomic_word _M_weak_count = 1
             })
@@ -104,7 +104,7 @@ Options: {
             _Hashtable_ebo_helper<std::allocator<std::__detail::_Hash_node<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, true> >, true> _M_alloc = {
                 allocator<std::__detail::_Hash_node<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, true> > _M_obj = {}
             }
-            __node_base **_M_buckets = 0x7b43573008f0
+            __node_base **_M_buckets = 0x7b3a0ed008f0
             size_type _M_bucket_count = 1
             __node_base _M_before_begin = {
                 _Hash_node_base *_M_nxt = NULL
@@ -119,9 +119,9 @@ Options: {
     }
     vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > m_group = {
         _Vector_impl _M_impl = {
-            basic_string<char, std::char_traits<char>, std::allocator<char> > *_M_start = 0x7b73581e0100 ({
+            basic_string<char, std::char_traits<char>, std::allocator<char> > *_M_start = 0x7b6a0fbe0100 ({
                 _Alloc_hider _M_dataplus = {
-                    char *_M_p = 0x7b73581e0110 ("")
+                    char *_M_p = 0x7b6a0fbe0110 ("")
                 }
                 size_type _M_string_length = 0
                 union <anonymous> = <union> {
@@ -129,17 +129,17 @@ Options: {
                     size_type _M_allocated_capacity = 13744632839234567680
                 }
             })
-            basic_string<char, std::char_traits<char>, std::allocator<char> > *_M_finish = 0x7b73581e0120 (<#0> {
+            basic_string<char, std::char_traits<char>, std::allocator<char> > *_M_finish = 0x7b6a0fbe0120 (<#0> {
                 _Alloc_hider _M_dataplus = {
                     char *_M_p = 0x2000000202 (<out-of-bounds>)
                 }
                 size_type _M_string_length = 26
                 union <anonymous> = <union> {
-                    char[] _M_local_buf = [64 ('@'), 1, 30, 88 ('X'), 115 ('s'), 123 ('{'), 0, 0, 3, 0 <repeats 7 times>]
-                    size_type _M_allocated_capacity = 135735329816896
+                    char[] _M_local_buf = [64 ('@'), 1, -66, 15, 106 ('j'), 123 ('{'), 0, 0, 3, 0 <repeats 7 times>]
+                    size_type _M_allocated_capacity = 135695460860224
                 }
             })
-            basic_string<char, std::char_traits<char>, std::allocator<char> > *_M_end_of_storage = 0x7b73581e0120 (<points to #0>)
+            basic_string<char, std::char_traits<char>, std::allocator<char> > *_M_end_of_storage = 0x7b6a0fbe0120 (<points to #0>)
         }
     }
     map<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, cxxopts::HelpGroupDetails, std::less<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::allocator<std::pair<const std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, cxxopts::HelpGroupDetails> > > m_help = {
@@ -148,9 +148,9 @@ Options: {
                 less<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > _M_key_compare = {}
                 _Rb_tree_node_base _M_header = {
                     _Rb_tree_color _M_color = _S_red (0)
-                    void *_M_parent = 0x7c23581e0040
-                    void *_M_left = 0x7c23581e0040
-                    void *_M_right = 0x7c23581e0040
+                    void *_M_parent = 0x7c1a0fbe0040
+                    void *_M_left = 0x7c1a0fbe0040
+                    void *_M_right = 0x7c1a0fbe0040
                 }
                 size_t _M_node_count = 1
             }
@@ -169,16 +169,16 @@ Result: {
             _Hashtable_ebo_helper<std::allocator<std::__detail::_Hash_node<std::pair<const std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, long unsigned int>, true> >, true> _M_alloc = {
                 allocator<std::__detail::_Hash_node<std::pair<const std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, long unsigned int>, true> > _M_obj = {}
             }
-            __node_base **_M_buckets = 0x7bf3581e01a0
+            __node_base **_M_buckets = 0x7bea0fbe01a0
             size_type _M_bucket_count = 13
             __node_base _M_before_begin = {
-                _Hash_node_base *_M_nxt = 0x7ba3581e0980 ({
-                    _Hash_node_base *_M_nxt = 0x7ba3581e08c0 ({
-                        _Hash_node_base *_M_nxt = 0x7ba3581e0860 ({
-                            _Hash_node_base *_M_nxt = 0x7ba3581e0800 ({
-                                _Hash_node_base *_M_nxt = 0x7ba3581e07a0 ({
-                                    _Hash_node_base *_M_nxt = 0x7ba3581e0740 ({
-                                        _Hash_node_base *_M_nxt = 0x7ba3581e0920 ({...})
+                _Hash_node_base *_M_nxt = 0x7b9a0fbe0980 ({
+                    _Hash_node_base *_M_nxt = 0x7b9a0fbe08c0 ({
+                        _Hash_node_base *_M_nxt = 0x7b9a0fbe0860 ({
+                            _Hash_node_base *_M_nxt = 0x7b9a0fbe0800 ({
+                                _Hash_node_base *_M_nxt = 0x7b9a0fbe07a0 ({
+                                    _Hash_node_base *_M_nxt = 0x7b9a0fbe0740 ({
+                                        _Hash_node_base *_M_nxt = 0x7b9a0fbe0920 ({...})
                                     })
                                 })
                             })
@@ -205,13 +205,13 @@ Result: {
             _Hashtable_ebo_helper<std::allocator<std::__detail::_Hash_node<std::pair<long unsigned int const, cxxopts::OptionValue>, false> >, true> _M_alloc = {
                 allocator<std::__detail::_Hash_node<std::pair<long unsigned int const, cxxopts::OptionValue>, false> > _M_obj = {}
             }
-            __node_base **_M_buckets = 0x7bf3581e00f0
+            __node_base **_M_buckets = 0x7bea0fbe00f0
             size_type _M_bucket_count = 13
             __node_base _M_before_begin = {
-                _Hash_node_base *_M_nxt = 0x7ba3581e0680 ({
-                    _Hash_node_base *_M_nxt = 0x7ba3581e0620 ({
-                        _Hash_node_base *_M_nxt = 0x7ba3581e05c0 (<#0> {
-                            _Hash_node_base *_M_nxt = 0x7ba3581e0500 ({
+                _Hash_node_base *_M_nxt = 0x7b9a0fbe0680 ({
+                    _Hash_node_base *_M_nxt = 0x7b9a0fbe0620 ({
+                        _Hash_node_base *_M_nxt = 0x7b9a0fbe05c0 (<#0> {
+                            _Hash_node_base *_M_nxt = 0x7b9a0fbe0500 ({
                                 _Hash_node_base *_M_nxt = NULL
                             })
                         })
@@ -235,10 +235,10 @@ Result: {
     }
     vector<cxxopts::KeyValue, std::allocator<cxxopts::KeyValue> > m_defaults = {
         _Vector_impl _M_impl = {
-            KeyValue *_M_start = 0x7c53581e02c0 ({
+            KeyValue *_M_start = 0x7c4a0fbe02c0 ({
                 string m_key = {
                     _Alloc_hider _M_dataplus = {
-                        char *_M_p = 0x7c53581e02d0 ("help")
+                        char *_M_p = 0x7c4a0fbe02d0 ("help")
                     }
                     size_type _M_string_length = 4
                     union <anonymous> = <union> {
@@ -248,7 +248,7 @@ Result: {
                 }
                 string m_value = {
                     _Alloc_hider _M_dataplus = {
-                        char *_M_p = 0x7c53581e02f0 ("false")
+                        char *_M_p = 0x7c4a0fbe02f0 ("false")
                     }
                     size_type _M_string_length = 5
                     union <anonymous> = <union> {
@@ -257,7 +257,7 @@ Result: {
                     }
                 }
             })
-            KeyValue *_M_finish = 0x7c53581e0380 ({
+            KeyValue *_M_finish = 0x7c4a0fbe0380 ({
                 string m_key = {
                     _Alloc_hider _M_dataplus = {
                         char *_M_p = 0xbebebebebebebebe (<out-of-bounds>)
@@ -279,12 +279,12 @@ Result: {
                     }
                 }
             })
-            KeyValue *_M_end_of_storage = 0x7c53581e03c0 ({
+            KeyValue *_M_end_of_storage = 0x7c4a0fbe03c0 ({
                 string m_key = {
                     _Alloc_hider _M_dataplus = {
                         char *_M_p = 0xcc6e96b9cc6e96b9 (<out-of-bounds>)
                     }
-                    size_type _M_string_length = 136697402491888
+                    size_type _M_string_length = 136657533535216
                     union <anonymous> = <union> {
                         char[] _M_local_buf = [0 <repeats 16 times>]
                         size_type _M_allocated_capacity = 0
@@ -296,7 +296,7 @@ Result: {
                     }
                     size_type _M_string_length = 0
                     union <anonymous> = <union> {
-                        char[] _M_local_buf = [3, 17, 0, 0, -16, 0, 0, 0, 96 ('`'), 0 <repeats 7 times>]
+                        char[] _M_local_buf = [3, 17, 0, 0, -16, 0, 0, 0, 97 ('a'), 0 <repeats 7 times>]
                         size_type _M_allocated_capacity = 1030792155395
                     }
                 }

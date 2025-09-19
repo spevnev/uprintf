@@ -3719,7 +3719,7 @@ static void _upf_print_type_name(const _upf_type *type, bool trailing_whitespace
             }
 
             if (type->as.pointer.type == NULL) {
-                _upf_bprintf("void");
+                _upf_bprintf("void ");
             } else {
                 _upf_print_type_name(type->as.pointer.type, true, is_return_type);
             }

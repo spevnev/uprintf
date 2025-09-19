@@ -73,19 +73,13 @@ function get_similarity {
 
     if [ $is_clang = true ]; then
         # These tests contain stdint.h types which have different typenames in gcc and clang.
-        # Baselines are generated from gcc, so decrease its similarity for clang:
+        # Baselines are generated from gcc, so it decreases the similarity for clang:
         if   [ "$test" = "struct" ];        then result=90;
         elif [ "$test" = "packed_struct" ]; then result=90;
-        elif [ "$test" = "primitives" ];    then result=95;
-        # Clang doesn't produce DW_AT_subprogram for external functions, so cross-CU
-        # retrieval of function definition doesn't work.
-        # Also, some GCC versions use "size_t" while others use "unsigned long int".
-        elif [ "$test" = "function" ]; then result=85; fi
+        elif [ "$test" = "primitives" ];    then result=95; fi
     else
-        # Some GCC versions use "size_t" while others use "unsigned long int".
-        if [ "$test" = "function" ]; then result=95;
         # GCC doesn't output the information about the second function.
-        elif [ "$test" = "reference" ]; then result=85; fi
+        if [ "$test" = "reference" ]; then result=85; fi
     fi
 
     # FILE has different implementation depending on stdio.h and it often has pointers
@@ -93,7 +87,9 @@ function get_similarity {
     # The primary goal is to check that there are no errors, i.e. segfaults, leaks.
     if [ "$test" = "stdio_file" ]; then result=10;
     # When union is initialized with pointers, its number members are different every time.
-    elif [ "$test" = "union" ]; then result=90; fi
+    elif [ "$test" = "union" ]; then result=90;
+    # Some GCC versions use "size_t" while others use "unsigned long int".
+    elif [ "$test" = "function" ]; then result=85; fi
 
     echo $result
 }
