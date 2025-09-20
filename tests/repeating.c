@@ -35,7 +35,7 @@ int main(void) {
     };
     a.b = &b;
 
-    uprintf("Circular struct: %S\n", &a);
+    uprintf("Repeating struct: %S\n", &a);
 
     return _upf_test_status;
 }

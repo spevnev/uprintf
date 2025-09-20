@@ -7,7 +7,7 @@ EXAMPLE_DIR  := examples
 TEST_DIR     := tests
 BASELINE_DIR := tests/baselines
 
-
+# Test flags
 COMMON_FLAGS := -Wall -Wextra -Werror -pedantic -I . -DUPRINTF_TEST -fsanitize=undefined,address,leak -g2
 CFLAGS       := $(COMMON_FLAGS) -std=c11
 CXXFLAGS     := $(COMMON_FLAGS) -std=c++11
@@ -19,12 +19,12 @@ O_LEVELS      ?= O0 O2 O3 Os
 C_TESTS   ?= $(patsubst $(TEST_DIR)/%.c, %, $(wildcard $(TEST_DIR)/*.c))
 CXX_TESTS ?= $(patsubst $(TEST_DIR)/%.cc, %, $(wildcard $(TEST_DIR)/*.cc))
 
-
+# Example flags
 EXAMPLE_COMMON_FLAGS := -Wall -Wextra -pedantic -I . -fsanitize=undefined,address,leak -g2 -O0
 EXAMPLE_CFLAGS       := $(EXAMPLE_COMMON_FLAGS) -std=c11
 EXAMPLE_CXXFLAGS     := $(EXAMPLE_COMMON_FLAGS) -std=c++17
 
-EXAMPLE_SRCS := $(wildcard $(EXAMPLE_DIR)/*.c $(EXAMPLE_DIR)/*.cc)
+EXAMPLE_SRCS := $(wildcard $(EXAMPLE_DIR)/*.[c|cc])
 EXAMPLE_OUTS := $(addsuffix .out, $(basename $(EXAMPLE_SRCS)))
 EXAMPLES     := $(addprefix $(BUILD_DIR)/, $(basename $(EXAMPLE_SRCS)))
 
@@ -40,6 +40,7 @@ install:
 uninstall:
 	rm $(includedir)/uprintf.h
 
+# ====================== Examples =========================
 
 examples: $(EXAMPLES)
 
@@ -101,6 +102,7 @@ $(LIB_DIR)/taskflow:
 	mv $(LIB_DIR)/taskflow_src/taskflow $@
 	rm -rf $(LIB_DIR)/taskflow_src
 
+# ===================== README ============================
 
 readme: README.md.in $(EXAMPLE_OUTS)
 	cp README.md.in README.md
@@ -111,23 +113,21 @@ readme: README.md.in $(EXAMPLE_OUTS)
 $(EXAMPLE_DIR)/%.out: $(BUILD_DIR)/$(EXAMPLE_DIR)/%
 	./$< > $@
 
+# ======================== Tests ==========================
 
 test: tests
 tests: $(foreach O,$(O_LEVELS),                                                               \
 			$(foreach C,$(C_COMPILERS),$(foreach T,$(C_TESTS),$(BUILD_DIR)/test/$T/$C-$O))    \
 			$(foreach C,$(CXX_COMPILERS),$(foreach T,$(CXX_TESTS),$(BUILD_DIR)/test/$T/$C-$O)))
 
-# Export all variables to subprocesses, i.e. test.sh
-export
-
 define C_TEST_TEMPLATE
-$(BUILD_DIR)/test/$1/$2-$3: $(TEST_DIR)/$1.c $(BUILD_DIR)/impl/$2.o test.sh
-	@./test.sh "$(CFLAGS)" $$< $1 $2 $3
+$(BUILD_DIR)/test/$1/$2-$3: $(TEST_DIR)/$1.c $(BUILD_DIR)/impl/$2.o
+	@./test.sh $1 "$1-$2-$3" $2 "$(CFLAGS) -$3" $$^ $$@ $(BASELINE_DIR)/$1.out
 endef
 
 define CXX_TEST_TEMPLATE
-$(BUILD_DIR)/test/$1/$2-$3: $(TEST_DIR)/$1.cc $(BUILD_DIR)/impl/$2.o test.sh
-	@./test.sh "$(CXXFLAGS)" $$< $1 $2 $3
+$(BUILD_DIR)/test/$1/$2-$3: $(TEST_DIR)/$1.cc $(BUILD_DIR)/impl/$2.o
+	@./test.sh $1 "$1-$2-$3" $2 "$(CXXFLAGS) -$3" $$^ $$@ $(BASELINE_DIR)/$1.out
 endef
 
 $(foreach O,$(O_LEVELS),                               \

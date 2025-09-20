@@ -5,18 +5,27 @@ RED="\e[1;31m"
 GREEN="\e[1;32m"
 YELLOW="\e[1;33m"
 
-if [ "$#" -ne 5 ]; then
-    echo "usage: $(basename $0) <compiler_flags> <src> <test> <compiler> <o_level>"
+if [ "$#" -ne 8 ]; then
+    echo "usage: $(basename $0) <test name> <test id> <compiler> <compiler flags> <src path> <impl path> <out path> <baseline path>"
     exit 1
 fi
 
-flags=$1
-src=$2
-test=$3
-compiler=$4
-o_level=$5
+test=$1
+test_id=$2
+compiler=$3
+flags=$4
+src_path=$5
+impl_path=$6
+bin_path=$7
+baseline_path=$8
 
-executables=(wdiff $compiler)
+log_path="$bin_path.log"
+out_path="$bin_path.out"
+diff_path="$bin_path.diff"
+is_clang=$( "$compiler" --version 2>&1 | grep -q 'clang' && echo true || echo false)
+
+
+executables=(wdiff $compiler awk sed)
 for executable in "${executables[@]}"; do
     if [ ! -x "$(command -v $executable)" ]; then
         echo -e "$RED[ERROR]$RESET $executable is not installed"
@@ -24,15 +33,6 @@ for executable in "${executables[@]}"; do
     fi
 done
 
-test_id="$test-$compiler-$o_level"
-dir="$BUILD_DIR/test/$test"
-bin="$dir/$compiler-$o_level"
-log="$bin.log"
-output="$bin.out"
-baseline="$BASELINE_DIR/$test.out"
-
-is_clang=false
-if [ $(echo "$compiler" | head -c 5) = "clang" ]; then is_clang=true; fi
 
 # Some tests fail on older versions of compilers
 function should_skip {
@@ -101,27 +101,19 @@ if [ $(should_skip) = true ]; then
 fi
 
 # Compiling
-mkdir -p $dir
+mkdir -p $(dirname $bin_path)
 if [ $(use_shared_implementation) = true ]; then
-    object="$bin.o"
-    implementation="$BUILD_DIR/impl/$compiler.o"
-
-    if [ ! -r $implementation ]; then
-        echo -e "$RED[COMPILATION FAILED]$RESET $test_id. \"$implementation\" doesn't exist.";
-        exit 1
-    fi
-
-    $compiler $flags -$o_level $src $implementation -o $bin > $log 2>&1
+    $compiler $flags $src_path $impl_path -o $bin_path > $log_path 2>&1
 else
-    $compiler $flags -$o_level -o $bin $src > $log 2>&1
+    $compiler $flags $src_path -o $bin_path > $log_path 2>&1
 fi
 
 if [ $? -ne 0 ]; then
     if [ $CI ]; then
         echo -e "$RED[COMPILATION FAILED]$RESET $test_id. Log:"
-        cat $log
+        cat $log_path
     else
-        echo -e "$RED[COMPILATION FAILED]$RESET $test_id. Log: $log"
+        echo -e "$RED[COMPILATION FAILED]$RESET $test_id. Log: $log_path"
     fi
     exit 1
 fi
@@ -130,44 +122,42 @@ if [ $(disable_asan) = true ]; then
     export ASAN_OPTIONS=detect_leaks=0
 fi
 
-./$bin > $output 2>&1
+./$bin_path > $out_path 2>&1
 ret=$?
-cat $output >> $log
+cat $out_path >> $log_path
 
 if [ $ret -ne 0 ]; then
-    if [ $CI ]; then
+    if [ -n "$CI" ]; then
         echo -e "$RED[TEST FAILED]$RESET $test_id. Log:"
-        cat $log
+        cat $log_path
     else
-        echo -e "$RED[TEST FAILED]$RESET $test_id. Log: $log. Binary: $bin."
+        echo -e "$RED[TEST FAILED]$RESET $test_id. Log: $log_path. Binary: $bin_path."
     fi
     exit 1
 fi
 
-if [ ! -r $baseline ] || [ ! -s $baseline ]; then
+if [ ! -r $baseline_path ] || [ ! -s $baseline_path ]; then
     echo -e "$YELLOW[WARNING]$RESET There is no $test baseline."
     echo -e "$GREEN[TEST PASSED]$RESET $test_id: ?";
     exit 0
 fi
 
 # Replace pointers with "POINTER" since they differ between every execution.
-sed -E "s/0x[0-9a-fA-F]{6,16}/POINTER/g" -i $baseline -i $output
+sed -i -E "s/0x[0-9a-fA-F]{6,16}/POINTER/g" $baseline_path $out_path
 
-diff=$(wdiff -123 --statistics $baseline $output)
-similarity=$(echo "$diff" | awk -F ':' '{print $NF}' | awk -F ' ' '{print $4}' | sed 's/%$//' | sort -g | head -n 1)
+similarity=$(wdiff -123 --statistics $baseline_path $out_path | awk -F ':' '{print $NF}' | awk -F ' ' '{print $4}' | sed 's/%$//' | sort -g | head -n 1)
 
-echo "Similarity is $similarity%" >> $log
+echo "Similarity is $similarity%" >> $log_path
 if [ $similarity -lt $(get_similarity) ]; then
-    diff="$bin.diff"
-    wdiff $baseline $output > $diff
+    wdiff $baseline_path $out_path > $diff_path
 
-    if [ $CI ]; then
+    if [ -n "$CI" ]; then
         echo -e "$RED[DIFF FAILED]$RESET $test_id. Similarity is $similarity%, required $(get_similarity)%. Log:"
-        cat $log
+        cat $log_path
         echo "Diff:"
-        cat $diff
+        cat $diff_path
     else
-        echo -e "$RED[DIFF FAILED]$RESET $test_id. Similarity is $similarity%, required $(get_similarity)%. Log: $log. Diff: $diff."
+        echo -e "$RED[DIFF FAILED]$RESET $test_id. Similarity is $similarity%, required $(get_similarity)%. Log: $log_path. Diff: $diff_path."
     fi
     exit 1
 fi

@@ -3120,6 +3120,9 @@ static _upf_type *_upf_parse_type_name(void) {
                     _UPF_VECTOR_PUSH(&ns_names, identifier);
                     identifier = _upf_expect_token(_UPF_TT_IDENTIFIER).string;
                 }
+                if (_upf_match_token(_UPF_TT_LESS_THAN)) {
+                    _UPF_ERROR("Cast to templated type is not supported at %s:%d.", _upf_state.file_path, _upf_state.line);
+                }
                 break;
             case _UPF_TT_CXX_DECLTYPE: _UPF_ERROR("decltype is not supported at %s:%d.", _upf_state.file_path, _upf_state.line);
             default:                   parsed_type = true; break;
@@ -3233,6 +3236,9 @@ static _upf_type *_upf_number(void) {
 static _upf_type *_upf_identifier(void) {
     bool leading_scope_op = _upf_match_token(_UPF_TT_CXX_SCOPE);
     const char *identifier = _upf_consume_token().string;
+    if (_upf_match_token(_UPF_TT_LESS_THAN)) {
+        _UPF_ERROR("Templated variables/functions are not supported at %s:%d.", _upf_state.file_path, _upf_state.line);
+    }
 
     _upf_cstr_vec ns_names = _UPF_ZERO_INIT;
     while (_upf_match_token(_UPF_TT_CXX_SCOPE)) {

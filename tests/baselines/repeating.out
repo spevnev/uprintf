@@ -1,4 +1,4 @@
-Circular struct: <#0> {
+Repeating struct: <#0> {
     int value = 1
     B *b = POINTER ({
         float value = 1.230000
