@@ -1,69 +1,144 @@
 uprintf's state: {
-    _upf_memory_region *allocator = 0x7f81d448b800 ({
-        _upf_memory_region *prev = 0x7f81d44ce800 ({
-            _upf_memory_region *prev = 0x7e91d2ff4800 ({
+    _upf_memory_region *allocator = 0x7efd4b8be800 ({
+        _upf_memory_region *prev = 0x7efd4c03e800 ({
+            _upf_memory_region *prev = 0x7e0d4a3f4800 ({
                 _upf_memory_region *prev = NULL
                 size_t capacity = 65535
                 size_t length = 65456
-                uint8_t *data = 0x7e91d2ff4820 (70)
+                uint8_t *data = 0x7e0d4a3f4820 (70)
             })
             size_t capacity = 131070
             size_t length = 131040
-            uint8_t *data = 0x7f81d44ce820 (4)
+            uint8_t *data = 0x7efd4c03e820 (4)
         })
         size_t capacity = 262140
-        size_t length = 161448
-        uint8_t *data = 0x7f81d448b820 (3)
+        size_t length = 169064
+        uint8_t *data = 0x7efd4b8be820 (67)
     })
     _upf_cstr_vec ignored_structs = {
         uint32_t capacity = 4
         uint32_t length = 3
-        const char **data = 0x7e91d2ff4848
+        const char **data = 0x7e0d4a3f4848
     }
     _Bool is_init = true
-    uint32_t map_index = 10
-    const uint8_t *base = 0x56293a8e1000 (127)
-    uint8_t *elf_file = 0x7b81d2e64000 (127)
-    off_t elf_file_size = 1547704
+    uint32_t map_index = 176
+    const uint8_t *base = 0x5649f6da5000 (127)
+    uint8_t *elf_file = 0x7afd4a260000 (127)
+    off_t elf_file_size = 1561848
     uint8_t offset_size = 4
     uint8_t address_size = 8
-    const uint8_t *die = 0x7b81d2fc63cb (240)
-    size_t die_size = 36852
-    const uint8_t *abbrev = 0x7b81d2fcf3bf (1)
-    const char *str = 0x7b81d2fd8641 ("__glibc_reserved")
-    const char *line_str = 0x7b81d2fda7a2 ("projects/uprintf")
+    const uint8_t *die = 0x7afd4a3c58ab (254)
+    size_t die_size = 37122
+    const uint8_t *abbrev = 0x7afd4a3ce9ad (1)
+    const char *str = 0x7afd4a3d7ce7 ("__glibc_reserved")
+    const char *line_str = 0x7afd4a3d9e71 ("/projects/uprintf")
     const uint8_t *str_offsets = NULL
     const uint8_t *addr = NULL
-    const uint8_t *rnglists = 0x7b81d2fda92e (224)
+    const uint8_t *rnglists = 0x7afd4a3d9ffd (254)
     _upf_die_type_map type_map = {
         uint32_t capacity = 192
         uint32_t size = 141
-        struct *data = 0x7f81d44acf70 ({
-            uint32_t hash = 0
-            const uint8_t *key = NULL
-            _upf_type *value = NULL
+        struct *data = 0x7efd4b8e0530 ({
+            uint32_t hash = 1906327296
+            const uint8_t *key = 0x7afd4a3c6830 (13)
+            _upf_type *value = 0x7efd4b8de4b0 ({
+                const char *name = 0x5649f6e66160 ("struct")
+                _upf_type_kind kind = _UPF_TK_STRUCT (0)
+                int modifiers = 0
+                size_t size = 16
+                union as = <union> {
+                    struct cstruct = {
+                        _Bool is_declaration = false
+                        _upf_member_vec members = {
+                            uint32_t capacity = 4
+                            uint32_t length = 3
+                            _upf_member *data = 0x7efd4b8de1f0 ({
+                                const char *name = 0x7afd4a3d8f87 ("capacity")
+                                _upf_type *type = 0x7efd4b8dcbb0 ({
+                                    const char *name = 0x7afd4a3d8d10 ("uint32_t")
+                                    _upf_type_kind kind = _UPF_TK_U4 (10)
+                                    int modifiers = 0
+                                    size_t size = 4
+                                    union as = <union> {
+                                        struct cstruct = {...}
+                                        struct cenum = {...}
+                                        struct array = {...}
+                                        struct pointer = {...}
+                                        struct reference = {...}
+                                        struct function = {...}
+                                    }
+                                })
+                                size_t offset = 0
+                                int bit_size = 0
+                                int inheritance = 0
+                            })
+                        }
+                        _upf_method_vec methods = {
+                            uint32_t capacity = 0
+                            uint32_t length = 0
+                            _upf_method *data = NULL
+                        }
+                    }
+                    struct cenum = {
+                        _upf_type *underlying_type = NULL
+                        _upf_enum_vec enums = {
+                            uint32_t capacity = 4
+                            uint32_t length = 3
+                            _upf_enum *data = 0x7efd4b8de1f0 ({
+                                const char *name = 0x7afd4a3d8f87 ("capacity")
+                                int64_t value = 139626359409584
+                            })
+                        }
+                    }
+                    struct array = {
+                        _upf_type *element_type = NULL
+                        _upf_size_t_vec lengths = {
+                            uint32_t capacity = 4
+                            uint32_t length = 3
+                            size_t *data = 0x7efd4b8de1f0 (135228290862983)
+                        }
+                    }
+                    struct pointer = {
+                        _upf_type *type = NULL
+                    }
+                    struct reference = {
+                        _upf_type *type = NULL
+                        _Bool is_rvalue = true
+                    }
+                    struct function = {
+                        _upf_type *return_type = NULL
+                        _upf_type_ptr_vec arg_types = {
+                            uint32_t capacity = 4
+                            uint32_t length = 3
+                            _upf_type **data = 0x7efd4b8de1f0
+                        }
+                        _Bool is_variadic = false
+                        const _upf_function *function_ptr = NULL
+                    }
+                }
+            })
         })
     }
     _upf_cu_vec cus = {
         uint32_t capacity = 4
         uint32_t length = 1
-        _upf_cu *data = 0x7f81d44a7a80 (<#0> {
+        _upf_cu *data = 0x7efd4b8db040 (<#0> {
             _Bool is_cxx = false
-            const uint8_t *base = 0x7b81d2fc63cb (240)
-            uint64_t base_address = 431433
+            const uint8_t *base = 0x7afd4a3c58ab (254)
+            uint64_t base_address = 435529
             uint64_t addr_base = 0
             uint64_t str_offsets_base = 18446744073709551615
             uint64_t rnglists_base = 18446744073709551615
             _upf_abbrev_vec abbrevs = {
                 uint32_t capacity = 64
                 uint32_t length = 63
-                _upf_abbrev *data = 0x7e91d2ff7598 ({
+                _upf_abbrev *data = 0x7e0d4a3f7598 ({
                     uint64_t tag = 52
                     _Bool has_children = false
                     _upf_attr_vec attrs = {
                         uint32_t capacity = 8
                         uint32_t length = 6
-                        _upf_attr *data = 0x7e91d2ff4a78 ({
+                        _upf_attr *data = 0x7e0d4a3f4a78 ({
                             uint64_t name = 3
                             uint64_t form = 14
                             int64_t implicit_const = 0
@@ -75,15 +150,15 @@ uprintf's state: {
                 _upf_range_vec ranges = {
                     uint32_t capacity = 4
                     uint32_t length = 1
-                    _upf_range *data = 0x7e91d2ffa3d8 ({
-                        uint64_t start = 431433
-                        uint64_t end = 772137
+                    _upf_range *data = 0x7e0d4a3fa3d8 ({
+                        uint64_t start = 435529
+                        uint64_t end = 778665
                     })
                 }
                 _upf_scope_vec scopes = {
                     uint32_t capacity = 256
-                    uint32_t length = 135
-                    _upf_scope **data = 0x7f81d44a64c0
+                    uint32_t length = 137
+                    _upf_scope **data = 0x7efd4b8d9640
                 }
                 _upf_name_type_map vars = {
                     uint32_t capacity = 0
@@ -98,31 +173,31 @@ uprintf's state: {
                 _upf_ns_vec nss = {
                     uint32_t capacity = 4
                     uint32_t length = 1
-                    _upf_ns **data = 0x7f81d44a7a60
+                    _upf_ns **data = 0x7efd4b8db020
                 }
             }
             _upf_name_function_map extern_functions = {
                 uint32_t capacity = 48
                 uint32_t size = 30
-                struct *data = 0x7e91d30029a0 ({
+                struct *data = 0x7e0d4a4029a0 ({
                     uint32_t hash = 2323452720
-                    const char *key = 0x7b81d2fda5f4 ("_upf_uprintf")
+                    const char *key = 0x7afd4a3d9cae ("_upf_uprintf")
                     _upf_function value = {
-                        const char *name = 0x7b81d2fda5f4 ("_upf_uprintf")
-                        const char *linkage_name = 0x7b81d2fda5f4 ("_upf_uprintf")
+                        const char *name = 0x7afd4a3d9cae ("_upf_uprintf")
+                        const char *linkage_name = 0x7afd4a3d9cae ("_upf_uprintf")
                         const uint8_t *return_type_die = NULL
                         const uint8_t *specification_die = NULL
                         _upf_named_type_vec args = {
                             uint32_t capacity = 4
                             uint32_t length = 4
-                            _upf_named_type *data = 0x7e91d3003cd0 ({
-                                const uint8_t *die = 0x7b81d2fc6d6d (7)
-                                const char *name = 0x7b81d2fd965c ("file_path")
+                            _upf_named_type *data = 0x7e0d4a403cd0 ({
+                                const uint8_t *die = 0x7afd4a3c624d (7)
+                                const char *name = 0x7afd4a3d8d28 ("file_path")
                             })
                         }
                         _Bool is_variadic = true
                         _Bool is_external = true
-                        uint64_t pc = 765018
+                        uint64_t pc = 771546
                     }
                 })
             }
@@ -131,49 +206,49 @@ uprintf's state: {
     _upf_pc_cstr_map extern_functions = {
         uint32_t capacity = 12
         uint32_t size = 7
-        struct *data = 0x7e91d2ff48f8 ({
-            uint32_t hash = 1048580676
-            uint64_t key = 1
-            const char *value = 0x56293a8e1c33 ("__asan_option_detect_stack_use_after_return")
+        struct *data = 0x7e0d4a3f48f8 ({
+            uint32_t hash = 2903970276
+            uint64_t key = 139626370237360
+            const char *value = 0x5649f6da5b4e ("__asan_init")
         })
     }
     int struct_id = 1
     _upf_range_vec addresses = {
         uint32_t capacity = 128
-        uint32_t length = 83
-        _upf_range *data = 0x7f81d44a84c0 ({
+        uint32_t length = 85
+        _upf_range *data = 0x7efd4b8dba80 ({
             uint64_t start = 2147446784
             uint64_t end = 2415882240
         })
     }
-    char *buffer = 0x7dd1d2fe0100 (<out-of-bounds>)
-    char *ptr = 0x7dd1d2fe1778 (<out-of-bounds>)
-    uint32_t size = 8192
-    uint32_t free = 2362
+    char *buffer = 0x7d8d4a3e0200 (<out-of-bounds>)
+    char *ptr = 0x7d8d4a3e267f (<out-of-bounds>)
+    uint32_t size = 16384
+    uint32_t free = 6962
     jmp_buf error_jmp_buf = [
         {
-            __jmp_buf __jmpbuf = [1, -4629852123479335697, 140734657206984, 1, 140195608006656, 94735076923432, -4629852123548541713, -1435612861752992529]
+            __jmp_buf __jmpbuf = [1, 3969433231574925655, 140732349255256, 1, 139626378383360, 94875674998824, 3969433231375696215, 7239594593855045975]
             int __mask_was_saved = 0
             __sigset_t __saved_mask = {
                 long unsigned int[] __val = [0 <repeats 16 times>]
             }
         }
     ]
-    const char *file_path = 0x56293a9a4260 ("examples/uprintf.c")
+    const char *file_path = 0x5649f6e6a380 ("examples/uprintf.c")
     int line = 7
     _upf_token_vec tokens = {
         uint32_t capacity = 4
         uint32_t length = 2
-        _upf_token *data = 0x7f81d44a8d10 ({
+        _upf_token *data = 0x7efd4b8dc2d0 ({
             _upf_token_type type = _UPF_TT_AMPERSAND (32)
-            const char *string = 0x56293a9a2d20 ("&")
+            const char *string = 0x5649f6e68e40 ("&")
         })
     }
     uint32_t tokens_idx = 2
-    _upf_cu *current_cu = 0x7f81d44a7a80 (<points to #0>)
+    _upf_cu *current_cu = 0x7efd4b8db040 (<points to #0>)
     _upf_scope_vec current_scopes = {
         uint32_t capacity = 4
         uint32_t length = 1
-        _upf_scope **data = 0x7f81d44a8cc0
+        _upf_scope **data = 0x7efd4b8dc280
     }
 }
