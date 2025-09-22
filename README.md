@@ -1,6 +1,6 @@
 # Universal printf
 
-*uprintf* is a header-only library for printing anything in C.
+*uprintf* is a header-only library for printing anything in C/C++.
 
 ## Examples
 
@@ -3358,71 +3358,146 @@ Miniaudio engine: <#0> {
 
 ```c
 uprintf's state: {
-    _upf_memory_region *allocator = 0x7f81d448b800 ({
-        _upf_memory_region *prev = 0x7f81d44ce800 ({
-            _upf_memory_region *prev = 0x7e91d2ff4800 ({
+    _upf_memory_region *allocator = 0x7efd4b8be800 ({
+        _upf_memory_region *prev = 0x7efd4c03e800 ({
+            _upf_memory_region *prev = 0x7e0d4a3f4800 ({
                 _upf_memory_region *prev = NULL
                 size_t capacity = 65535
                 size_t length = 65456
-                uint8_t *data = 0x7e91d2ff4820 (70)
+                uint8_t *data = 0x7e0d4a3f4820 (70)
             })
             size_t capacity = 131070
             size_t length = 131040
-            uint8_t *data = 0x7f81d44ce820 (4)
+            uint8_t *data = 0x7efd4c03e820 (4)
         })
         size_t capacity = 262140
-        size_t length = 161448
-        uint8_t *data = 0x7f81d448b820 (3)
+        size_t length = 169064
+        uint8_t *data = 0x7efd4b8be820 (67)
     })
     _upf_cstr_vec ignored_structs = {
         uint32_t capacity = 4
         uint32_t length = 3
-        const char **data = 0x7e91d2ff4848
+        const char **data = 0x7e0d4a3f4848
     }
     _Bool is_init = true
-    uint32_t map_index = 10
-    const uint8_t *base = 0x56293a8e1000 (127)
-    uint8_t *elf_file = 0x7b81d2e64000 (127)
-    off_t elf_file_size = 1547704
+    uint32_t map_index = 176
+    const uint8_t *base = 0x5649f6da5000 (127)
+    uint8_t *elf_file = 0x7afd4a260000 (127)
+    off_t elf_file_size = 1561848
     uint8_t offset_size = 4
     uint8_t address_size = 8
-    const uint8_t *die = 0x7b81d2fc63cb (240)
-    size_t die_size = 36852
-    const uint8_t *abbrev = 0x7b81d2fcf3bf (1)
-    const char *str = 0x7b81d2fd8641 ("__glibc_reserved")
-    const char *line_str = 0x7b81d2fda7a2 ("projects/uprintf")
+    const uint8_t *die = 0x7afd4a3c58ab (254)
+    size_t die_size = 37122
+    const uint8_t *abbrev = 0x7afd4a3ce9ad (1)
+    const char *str = 0x7afd4a3d7ce7 ("__glibc_reserved")
+    const char *line_str = 0x7afd4a3d9e71 ("/projects/uprintf")
     const uint8_t *str_offsets = NULL
     const uint8_t *addr = NULL
-    const uint8_t *rnglists = 0x7b81d2fda92e (224)
+    const uint8_t *rnglists = 0x7afd4a3d9ffd (254)
     _upf_die_type_map type_map = {
         uint32_t capacity = 192
         uint32_t size = 141
-        struct *data = 0x7f81d44acf70 ({
-            uint32_t hash = 0
-            const uint8_t *key = NULL
-            _upf_type *value = NULL
+        struct *data = 0x7efd4b8e0530 ({
+            uint32_t hash = 1906327296
+            const uint8_t *key = 0x7afd4a3c6830 (13)
+            _upf_type *value = 0x7efd4b8de4b0 ({
+                const char *name = 0x5649f6e66160 ("struct")
+                _upf_type_kind kind = _UPF_TK_STRUCT (0)
+                int modifiers = 0
+                size_t size = 16
+                union as = <union> {
+                    struct cstruct = {
+                        _Bool is_declaration = false
+                        _upf_member_vec members = {
+                            uint32_t capacity = 4
+                            uint32_t length = 3
+                            _upf_member *data = 0x7efd4b8de1f0 ({
+                                const char *name = 0x7afd4a3d8f87 ("capacity")
+                                _upf_type *type = 0x7efd4b8dcbb0 ({
+                                    const char *name = 0x7afd4a3d8d10 ("uint32_t")
+                                    _upf_type_kind kind = _UPF_TK_U4 (10)
+                                    int modifiers = 0
+                                    size_t size = 4
+                                    union as = <union> {
+                                        struct cstruct = {...}
+                                        struct cenum = {...}
+                                        struct array = {...}
+                                        struct pointer = {...}
+                                        struct reference = {...}
+                                        struct function = {...}
+                                    }
+                                })
+                                size_t offset = 0
+                                int bit_size = 0
+                                int inheritance = 0
+                            })
+                        }
+                        _upf_method_vec methods = {
+                            uint32_t capacity = 0
+                            uint32_t length = 0
+                            _upf_method *data = NULL
+                        }
+                    }
+                    struct cenum = {
+                        _upf_type *underlying_type = NULL
+                        _upf_enum_vec enums = {
+                            uint32_t capacity = 4
+                            uint32_t length = 3
+                            _upf_enum *data = 0x7efd4b8de1f0 ({
+                                const char *name = 0x7afd4a3d8f87 ("capacity")
+                                int64_t value = 139626359409584
+                            })
+                        }
+                    }
+                    struct array = {
+                        _upf_type *element_type = NULL
+                        _upf_size_t_vec lengths = {
+                            uint32_t capacity = 4
+                            uint32_t length = 3
+                            size_t *data = 0x7efd4b8de1f0 (135228290862983)
+                        }
+                    }
+                    struct pointer = {
+                        _upf_type *type = NULL
+                    }
+                    struct reference = {
+                        _upf_type *type = NULL
+                        _Bool is_rvalue = true
+                    }
+                    struct function = {
+                        _upf_type *return_type = NULL
+                        _upf_type_ptr_vec arg_types = {
+                            uint32_t capacity = 4
+                            uint32_t length = 3
+                            _upf_type **data = 0x7efd4b8de1f0
+                        }
+                        _Bool is_variadic = false
+                        const _upf_function *function_ptr = NULL
+                    }
+                }
+            })
         })
     }
     _upf_cu_vec cus = {
         uint32_t capacity = 4
         uint32_t length = 1
-        _upf_cu *data = 0x7f81d44a7a80 (<#0> {
+        _upf_cu *data = 0x7efd4b8db040 (<#0> {
             _Bool is_cxx = false
-            const uint8_t *base = 0x7b81d2fc63cb (240)
-            uint64_t base_address = 431433
+            const uint8_t *base = 0x7afd4a3c58ab (254)
+            uint64_t base_address = 435529
             uint64_t addr_base = 0
             uint64_t str_offsets_base = 18446744073709551615
             uint64_t rnglists_base = 18446744073709551615
             _upf_abbrev_vec abbrevs = {
                 uint32_t capacity = 64
                 uint32_t length = 63
-                _upf_abbrev *data = 0x7e91d2ff7598 ({
+                _upf_abbrev *data = 0x7e0d4a3f7598 ({
                     uint64_t tag = 52
                     _Bool has_children = false
                     _upf_attr_vec attrs = {
                         uint32_t capacity = 8
                         uint32_t length = 6
-                        _upf_attr *data = 0x7e91d2ff4a78 ({
+                        _upf_attr *data = 0x7e0d4a3f4a78 ({
                             uint64_t name = 3
                             uint64_t form = 14
                             int64_t implicit_const = 0
@@ -3434,15 +3509,15 @@ uprintf's state: {
                 _upf_range_vec ranges = {
                     uint32_t capacity = 4
                     uint32_t length = 1
-                    _upf_range *data = 0x7e91d2ffa3d8 ({
-                        uint64_t start = 431433
-                        uint64_t end = 772137
+                    _upf_range *data = 0x7e0d4a3fa3d8 ({
+                        uint64_t start = 435529
+                        uint64_t end = 778665
                     })
                 }
                 _upf_scope_vec scopes = {
                     uint32_t capacity = 256
-                    uint32_t length = 135
-                    _upf_scope **data = 0x7f81d44a64c0
+                    uint32_t length = 137
+                    _upf_scope **data = 0x7efd4b8d9640
                 }
                 _upf_name_type_map vars = {
                     uint32_t capacity = 0
@@ -3457,31 +3532,31 @@ uprintf's state: {
                 _upf_ns_vec nss = {
                     uint32_t capacity = 4
                     uint32_t length = 1
-                    _upf_ns **data = 0x7f81d44a7a60
+                    _upf_ns **data = 0x7efd4b8db020
                 }
             }
             _upf_name_function_map extern_functions = {
                 uint32_t capacity = 48
                 uint32_t size = 30
-                struct *data = 0x7e91d30029a0 ({
+                struct *data = 0x7e0d4a4029a0 ({
                     uint32_t hash = 2323452720
-                    const char *key = 0x7b81d2fda5f4 ("_upf_uprintf")
+                    const char *key = 0x7afd4a3d9cae ("_upf_uprintf")
                     _upf_function value = {
-                        const char *name = 0x7b81d2fda5f4 ("_upf_uprintf")
-                        const char *linkage_name = 0x7b81d2fda5f4 ("_upf_uprintf")
+                        const char *name = 0x7afd4a3d9cae ("_upf_uprintf")
+                        const char *linkage_name = 0x7afd4a3d9cae ("_upf_uprintf")
                         const uint8_t *return_type_die = NULL
                         const uint8_t *specification_die = NULL
                         _upf_named_type_vec args = {
                             uint32_t capacity = 4
                             uint32_t length = 4
-                            _upf_named_type *data = 0x7e91d3003cd0 ({
-                                const uint8_t *die = 0x7b81d2fc6d6d (7)
-                                const char *name = 0x7b81d2fd965c ("file_path")
+                            _upf_named_type *data = 0x7e0d4a403cd0 ({
+                                const uint8_t *die = 0x7afd4a3c624d (7)
+                                const char *name = 0x7afd4a3d8d28 ("file_path")
                             })
                         }
                         _Bool is_variadic = true
                         _Bool is_external = true
-                        uint64_t pc = 765018
+                        uint64_t pc = 771546
                     }
                 })
             }
@@ -3490,50 +3565,50 @@ uprintf's state: {
     _upf_pc_cstr_map extern_functions = {
         uint32_t capacity = 12
         uint32_t size = 7
-        struct *data = 0x7e91d2ff48f8 ({
-            uint32_t hash = 1048580676
-            uint64_t key = 1
-            const char *value = 0x56293a8e1c33 ("__asan_option_detect_stack_use_after_return")
+        struct *data = 0x7e0d4a3f48f8 ({
+            uint32_t hash = 2903970276
+            uint64_t key = 139626370237360
+            const char *value = 0x5649f6da5b4e ("__asan_init")
         })
     }
     int struct_id = 1
     _upf_range_vec addresses = {
         uint32_t capacity = 128
-        uint32_t length = 83
-        _upf_range *data = 0x7f81d44a84c0 ({
+        uint32_t length = 85
+        _upf_range *data = 0x7efd4b8dba80 ({
             uint64_t start = 2147446784
             uint64_t end = 2415882240
         })
     }
-    char *buffer = 0x7dd1d2fe0100 (<out-of-bounds>)
-    char *ptr = 0x7dd1d2fe1778 (<out-of-bounds>)
-    uint32_t size = 8192
-    uint32_t free = 2362
+    char *buffer = 0x7d8d4a3e0200 (<out-of-bounds>)
+    char *ptr = 0x7d8d4a3e267f (<out-of-bounds>)
+    uint32_t size = 16384
+    uint32_t free = 6962
     jmp_buf error_jmp_buf = [
         {
-            __jmp_buf __jmpbuf = [1, -4629852123479335697, 140734657206984, 1, 140195608006656, 94735076923432, -4629852123548541713, -1435612861752992529]
+            __jmp_buf __jmpbuf = [1, 3969433231574925655, 140732349255256, 1, 139626378383360, 94875674998824, 3969433231375696215, 7239594593855045975]
             int __mask_was_saved = 0
             __sigset_t __saved_mask = {
                 long unsigned int[] __val = [0 <repeats 16 times>]
             }
         }
     ]
-    const char *file_path = 0x56293a9a4260 ("examples/uprintf.c")
+    const char *file_path = 0x5649f6e6a380 ("examples/uprintf.c")
     int line = 7
     _upf_token_vec tokens = {
         uint32_t capacity = 4
         uint32_t length = 2
-        _upf_token *data = 0x7f81d44a8d10 ({
+        _upf_token *data = 0x7efd4b8dc2d0 ({
             _upf_token_type type = _UPF_TT_AMPERSAND (32)
-            const char *string = 0x56293a9a2d20 ("&")
+            const char *string = 0x5649f6e68e40 ("&")
         })
     }
     uint32_t tokens_idx = 2
-    _upf_cu *current_cu = 0x7f81d44a7a80 (<points to #0>)
+    _upf_cu *current_cu = 0x7efd4b8db040 (<points to #0>)
     _upf_scope_vec current_scopes = {
         uint32_t capacity = 4
         uint32_t length = 1
-        _upf_scope **data = 0x7f81d44a8cc0
+        _upf_scope **data = 0x7efd4b8dc280
     }
 }
 ```
@@ -3889,20 +3964,20 @@ executor: {
     }
     vector<tf::Worker, std::allocator<tf::Worker> > _workers = {
         _Vector_impl _M_impl = {
-            void *_M_start = 0x7e2551be0400
-            void *_M_finish = 0x7e2551be9c00
-            void *_M_end_of_storage = 0x7e2551be9c00
+            void *_M_start = 0x7e25b99e0400
+            void *_M_finish = 0x7e25b99e9c00
+            void *_M_end_of_storage = 0x7e25b99e9c00
         }
     }
     DefaultNotifier _notifier = {
         atomic<long unsigned int> _state = {
-            __int_type _M_i = 4398046511119
+            __int_type _M_i = 4398046511116
         }
         vector<tf::NonblockingNotifierV2::Waiter, std::allocator<tf::NonblockingNotifierV2::Waiter> > _waiters = {
             _Vector_impl _M_impl = {
-                Waiter *_M_start = 0x7d2551be0080 ({
+                Waiter *_M_start = 0x7d25b99e0080 ({
                     atomic<long unsigned int> next = {
-                        __int_type _M_i = 6
+                        __int_type _M_i = 4
                     }
                     uint64_t epoch = 4398046511104
                     mutex mu = {
@@ -3956,7 +4031,7 @@ executor: {
                     }
                     unsigned int state = 1
                 })
-                Waiter *_M_finish = 0x7d2551be0880 (<#0> {
+                Waiter *_M_finish = 0x7d25b99e0880 (<#0> {
                     atomic<long unsigned int> next = {
                         __int_type _M_i = 0
                     }
@@ -4012,7 +4087,7 @@ executor: {
                     }
                     unsigned int state = 0
                 })
-                Waiter *_M_end_of_storage = 0x7d2551be0880 (<points to #0>)
+                Waiter *_M_end_of_storage = 0x7d25b99e0880 (<points to #0>)
             }
         }
     }
@@ -4069,11 +4144,11 @@ executor: {
     list<tf::Taskflow, std::allocator<tf::Taskflow> > _taskflows = {
         _List_impl _M_impl = {
             _Node_header _M_node = {
-                _List_node_base *_M_next = 0x7b5550b006e0 (<#1> {
-                    _List_node_base *_M_next = 0x7b5550b006e0 (<points to #1>)
-                    _List_node_base *_M_prev = 0x7b5550b006e0 (<points to #1>)
+                _List_node_base *_M_next = 0x7b55b89006e0 (<#1> {
+                    _List_node_base *_M_next = 0x7b55b89006e0 (<points to #1>)
+                    _List_node_base *_M_prev = 0x7b55b89006e0 (<points to #1>)
                 })
-                _List_node_base *_M_prev = 0x7b5550b006e0 (<points to #1>)
+                _List_node_base *_M_prev = 0x7b55b89006e0 (<points to #1>)
                 size_t _M_size = 0
             }
         }
@@ -4081,7 +4156,7 @@ executor: {
     Freelist<tf::Node*> _buffers = {
         vector<tf::Freelist<tf::Node*>::Bucket, std::allocator<tf::Freelist<tf::Node*>::Bucket> > _buckets = {
             _Vector_impl _M_impl = {
-                Bucket *_M_start = 0x7d0551be0080 ({
+                Bucket *_M_start = 0x7d05b99e0080 ({
                     mutex mutex = {
                         __native_type _M_mutex = <union> {
                             __pthread_mutex_s __data = {
@@ -4110,10 +4185,10 @@ executor: {
                         }
                         atomic<tf::UnboundedTaskQueue<tf::Node*>::Array*> _array = {
                             __base_type _M_b = {
-                                Array *_M_p = 0x7b8551be0040 ({
+                                Array *_M_p = 0x7b85b99e0040 ({
                                     int64_t C = 1024
                                     int64_t M = 1023
-                                    atomic<tf::Node*> *S = 0x7da551be0100 ({
+                                    atomic<tf::Node*> *S = 0x7da5b99e0100 ({
                                         __base_type _M_b = {
                                             Node *_M_p = 0xbebebebebebebebe (<out-of-bounds>)
                                         }
@@ -4123,14 +4198,14 @@ executor: {
                         }
                         vector<tf::UnboundedTaskQueue<tf::Node*>::Array*, std::allocator<tf::UnboundedTaskQueue<tf::Node*>::Array*> > _garbage = {
                             _Vector_impl _M_impl = {
-                                Array **_M_start = 0x7c6551be0040
-                                Array **_M_finish = 0x7c6551be0040
-                                Array **_M_end_of_storage = 0x7c6551be0140
+                                Array **_M_start = 0x7c65b99e0040
+                                Array **_M_finish = 0x7c65b99e0040
+                                Array **_M_end_of_storage = 0x7c65b99e0140
                             }
                         }
                     }
                 })
-                Bucket *_M_finish = 0x7d0551be0680 (<#2> {
+                Bucket *_M_finish = 0x7d05b99e0680 (<#2> {
                     mutex mutex = {
                         __native_type _M_mutex = <union> {
                             __pthread_mutex_s __data = {
@@ -4171,7 +4246,7 @@ executor: {
                         }
                     }
                 })
-                Bucket *_M_end_of_storage = 0x7d0551be0680 (<points to #2>)
+                Bucket *_M_end_of_storage = 0x7d05b99e0680 (<points to #2>)
             }
         }
     }
@@ -4192,7 +4267,7 @@ executor: {
             _Hashtable_ebo_helper<std::allocator<std::__detail::_Hash_node<std::shared_ptr<tf::ObserverInterface>, false> >, true> _M_alloc = {
                 allocator<std::__detail::_Hash_node<std::shared_ptr<tf::ObserverInterface>, false> > _M_obj = {}
             }
-            __node_base **_M_buckets = 0x7b5550b00750
+            __node_base **_M_buckets = 0x7b55b8900750
             size_type _M_bucket_count = 1
             __node_base _M_before_begin = {
                 _Hash_node_base *_M_nxt = NULL
@@ -4209,18 +4284,18 @@ executor: {
 taskflow: <#0> {
     Graph &_graph = <#1> {
         _Vector_impl _M_impl = {
-            unique_ptr<tf::Node, std::default_delete<tf::Node> > *_M_start = 0x7b8551be0430 ({
+            unique_ptr<tf::Node, std::default_delete<tf::Node> > *_M_start = 0x7b85b99e0430 ({
                 __uniq_ptr_data<tf::Node, std::default_delete<tf::Node>, true, true> _M_t = {
                     tuple<tf::Node*, std::default_delete<tf::Node> > _M_t = {
                         default_delete<tf::Node> _M_head_impl = {}
-                        Node *_M_head_impl = 0x7c6551be0900 ({
+                        Node *_M_head_impl = 0x7c65b99e0900 ({
                             nstate_t _nstate = 0
                             atomic<int> _estate = {
                                 __int_type _M_i = 0
                             }
                             string _name = {
                                 _Alloc_hider _M_dataplus = {
-                                    char *_M_p = 0x7c6551be0918 ("")
+                                    char *_M_p = 0x7c65b99e0918 ("")
                                 }
                                 size_type _M_string_length = 0
                                 union <anonymous> = <union> {
@@ -4229,12 +4304,12 @@ taskflow: <#0> {
                                 }
                             }
                             void *_data = NULL
-                            Topology *_topology = 0x7c2551be0050 ({
+                            Topology *_topology = 0x7c25b99e0050 ({
                                 Taskflow &_taskflow = <points to #0>
                                 promise<void> _promise = {
                                     shared_ptr<std::__future_base::_State_baseV2> _M_future = {
-                                        element_type *_M_ptr = 0x7b9551be0020 ({
-                                            int(...) *_vptr._State_baseV2 = 0x55a13f8d59c0
+                                        element_type *_M_ptr = 0x7b95b99e0020 ({
+                                            int(...) *_vptr._State_baseV2 = 0x564c5aa489c0
                                             _Ptr_type _M_result = {
                                                 __uniq_ptr_data<std::__future_base::_Result_base, std::__future_base::_Result_base::_Deleter, true, true> _M_t = {
                                                     tuple<std::__future_base::_Result_base*, std::__future_base::_Result_base::_Deleter> _M_t = {
@@ -4256,8 +4331,8 @@ taskflow: <#0> {
                                             }
                                         })
                                         __shared_count<(__gnu_cxx::_Lock_policy)2> _M_refcount = {
-                                            _Sp_counted_base<(__gnu_cxx::_Lock_policy)2> *_M_pi = 0x7b9551be0010 ({
-                                                int(...) *_vptr._Sp_counted_base = 0x2b
+                                            _Sp_counted_base<(__gnu_cxx::_Lock_policy)2> *_M_pi = 0x7b95b99e0010 ({
+                                                int(...) *_vptr._Sp_counted_base = 0xd0000002b
                                                 _Atomic_word _M_use_count = 0
                                                 _Atomic_word _M_weak_count = 0
                                             })
@@ -4282,8 +4357,8 @@ taskflow: <#0> {
                                         }
                                         char[] _M_pod_data = [-1 <repeats 8 times>, 0 <repeats 8 times>]
                                     }
-                                    bool(_Any_data &, const _Any_data &, _Manager_operation) _M_manager = 0x55a13f85bd9d
-                                    bool(const _Any_data &) _M_invoker = 0x55a13f85bd4e
+                                    bool(_Any_data &, const _Any_data &, _Manager_operation) _M_manager = 0x564c5a9cf73f
+                                    bool(const _Any_data &) _M_invoker = 0x564c5a9cf6f0
                                 }
                                 function<void()> _call = {
                                     _Any_data _M_functor = <union> {
@@ -4295,8 +4370,8 @@ taskflow: <#0> {
                                         }
                                         char[] _M_pod_data = [0 <repeats 16 times>]
                                     }
-                                    bool(_Any_data &, const _Any_data &, _Manager_operation) _M_manager = 0x55a13f85bfbe
-                                    void(const _Any_data &) _M_invoker = 0x55a13f85bf7a
+                                    bool(_Any_data &, const _Any_data &, _Manager_operation) _M_manager = 0x564c5a9cf960
+                                    void(const _Any_data &) _M_invoker = 0x564c5a9cf91c
                                 }
                                 atomic<long unsigned int> _join_counter = {
                                     __int_type _M_i = 0
@@ -4311,16 +4386,16 @@ taskflow: <#0> {
                             Node *_parent = NULL
                             size_t _num_successors = 2
                             SmallVector<tf::Node*, 4> _edges = {
-                                void *BeginX = 0x7c6551be0960
-                                void *EndX = 0x7c6551be0970
-                                void *CapacityX = 0x7c6551be0980
+                                void *BeginX = 0x7c65b99e0960
+                                void *EndX = 0x7c65b99e0970
+                                void *CapacityX = 0x7c65b99e0980
                                 U FirstEl = {
-                                    byte[] buff = [<unknown> (192), <unknown> (7), <unknown> (190), <unknown> (81 ('Q')), <unknown> (101 ('e')), <unknown> (124 ('|')), <unknown> (0), <unknown> (0)]
+                                    byte[] buff = [<unknown> (192), <unknown> (7), <unknown> (158), <unknown> (185), <unknown> (101 ('e')), <unknown> (124 ('|')), <unknown> (0), <unknown> (0)]
                                 }
                                 SmallVectorStorage<tf::Node*, 4> Storage = {
                                     U[] InlineElts = [
                                         {
-                                            byte[] buff = [<unknown> (128), <unknown> (6), <unknown> (190), <unknown> (81 ('Q')), <unknown> (101 ('e')), <unknown> (124 ('|')), <unknown> (0), <unknown> (0)]
+                                            byte[] buff = [<unknown> (128), <unknown> (6), <unknown> (158), <unknown> (185), <unknown> (101 ('e')), <unknown> (124 ('|')), <unknown> (0), <unknown> (0)]
                                         },
                                         {
                                             byte[] buff = [<unknown> (190) <repeats 8 times>]
@@ -4342,31 +4417,31 @@ taskflow: <#0> {
                                     _Variadic_union<false, tf::Node::Static, tf::Node::Runtime, tf::Node::Subflow, tf::Node::Condition, tf::Node::MultiCondition, tf::Node::Module, tf::Node::Async, tf::Node::DependentAsync> _M_rest = <union> {
                                         _Uninitialized<tf::Node::Static, false> _M_first = {
                                             __aligned_membuf<tf::Node::Static> _M_storage = {
-                                                unsigned char[] _M_storage = [0 <repeats 16 times>, 81 ('Q'), 1, 122 ('z'), 63 ('?'), 161, 85 ('U'), 0, 0, 13, 1, 122 ('z'), 63 ('?'), 161, 85 ('U'), 0, 0]
+                                                unsigned char[] _M_storage = [0 <repeats 16 times>, 243, 58 (':'), 145, 90 ('Z'), 76 ('L'), 86 ('V'), 0, 0, 175, 58 (':'), 145, 90 ('Z'), 76 ('L'), 86 ('V'), 0, 0]
                                             }
                                         }
                                         _Variadic_union<false, tf::Node::Runtime, tf::Node::Subflow, tf::Node::Condition, tf::Node::MultiCondition, tf::Node::Module, tf::Node::Async, tf::Node::DependentAsync> _M_rest = <union> {
                                             _Uninitialized<tf::Node::Runtime, false> _M_first = {
                                                 __aligned_membuf<tf::Node::Runtime> _M_storage = {
-                                                    unsigned char[] _M_storage = [0 <repeats 16 times>, 81 ('Q'), 1, 122 ('z'), 63 ('?'), 161, 85 ('U'), 0, 0, 13, 1, 122 ('z'), 63 ('?'), 161, 85 ('U'), 0, 0]
+                                                    unsigned char[] _M_storage = [0 <repeats 16 times>, 243, 58 (':'), 145, 90 ('Z'), 76 ('L'), 86 ('V'), 0, 0, 175, 58 (':'), 145, 90 ('Z'), 76 ('L'), 86 ('V'), 0, 0]
                                                 }
                                             }
                                             _Variadic_union<false, tf::Node::Subflow, tf::Node::Condition, tf::Node::MultiCondition, tf::Node::Module, tf::Node::Async, tf::Node::DependentAsync> _M_rest = <union> {
                                                 _Uninitialized<tf::Node::Subflow, false> _M_first = {
                                                     __aligned_membuf<tf::Node::Subflow> _M_storage = {
-                                                        unsigned char[] _M_storage = [0 <repeats 16 times>, 81 ('Q'), 1, 122 ('z'), 63 ('?'), 161, 85 ('U'), 0, 0, 13, 1, 122 ('z'), 63 ('?'), 161, 85 ('U'), 0, 0, 190 <repeats 24 times>]
+                                                        unsigned char[] _M_storage = [0 <repeats 16 times>, 243, 58 (':'), 145, 90 ('Z'), 76 ('L'), 86 ('V'), 0, 0, 175, 58 (':'), 145, 90 ('Z'), 76 ('L'), 86 ('V'), 0, 0, 190 <repeats 24 times>]
                                                     }
                                                 }
                                                 _Variadic_union<false, tf::Node::Condition, tf::Node::MultiCondition, tf::Node::Module, tf::Node::Async, tf::Node::DependentAsync> _M_rest = <union> {
                                                     _Uninitialized<tf::Node::Condition, false> _M_first = {
                                                         __aligned_membuf<tf::Node::Condition> _M_storage = {
-                                                            unsigned char[] _M_storage = [0 <repeats 16 times>, 81 ('Q'), 1, 122 ('z'), 63 ('?'), 161, 85 ('U'), 0, 0, 13, 1, 122 ('z'), 63 ('?'), 161, 85 ('U'), 0, 0]
+                                                            unsigned char[] _M_storage = [0 <repeats 16 times>, 243, 58 (':'), 145, 90 ('Z'), 76 ('L'), 86 ('V'), 0, 0, 175, 58 (':'), 145, 90 ('Z'), 76 ('L'), 86 ('V'), 0, 0]
                                                         }
                                                     }
                                                     _Variadic_union<false, tf::Node::MultiCondition, tf::Node::Module, tf::Node::Async, tf::Node::DependentAsync> _M_rest = <union> {
                                                         _Uninitialized<tf::Node::MultiCondition, false> _M_first = {
                                                             __aligned_membuf<tf::Node::MultiCondition> _M_storage = {
-                                                                unsigned char[] _M_storage = [0 <repeats 16 times>, 81 ('Q'), 1, 122 ('z'), 63 ('?'), 161, 85 ('U'), 0, 0, 13, 1, 122 ('z'), 63 ('?'), 161, 85 ('U'), 0, 0]
+                                                                unsigned char[] _M_storage = [0 <repeats 16 times>, 243, 58 (':'), 145, 90 ('Z'), 76 ('L'), 86 ('V'), 0, 0, 175, 58 (':'), 145, 90 ('Z'), 76 ('L'), 86 ('V'), 0, 0]
                                                             }
                                                         }
                                                         _Variadic_union<false, tf::Node::Module, tf::Node::Async, tf::Node::DependentAsync> _M_rest = <union> {
@@ -4376,7 +4451,7 @@ taskflow: <#0> {
                                                                         _Vector_impl _M_impl = {
                                                                             unique_ptr<tf::Node, std::default_delete<tf::Node> > *_M_start = NULL
                                                                             unique_ptr<tf::Node, std::default_delete<tf::Node> > *_M_finish = NULL
-                                                                            unique_ptr<tf::Node, std::default_delete<tf::Node> > *_M_end_of_storage = 0x55a13f7a0151 ({
+                                                                            unique_ptr<tf::Node, std::default_delete<tf::Node> > *_M_end_of_storage = 0x564c5a913af3 ({
                                                                                 __uniq_ptr_data<tf::Node, std::default_delete<tf::Node>, true, true> _M_t = {
                                                                                     tuple<tf::Node*, std::default_delete<tf::Node> > _M_t = {
                                                                                         default_delete<tf::Node> _M_head_impl = {}
@@ -4391,13 +4466,13 @@ taskflow: <#0> {
                                                             _Variadic_union<false, tf::Node::Async, tf::Node::DependentAsync> _M_rest = <union> {
                                                                 _Uninitialized<tf::Node::Async, false> _M_first = {
                                                                     __aligned_membuf<tf::Node::Async> _M_storage = {
-                                                                        unsigned char[] _M_storage = [0 <repeats 16 times>, 81 ('Q'), 1, 122 ('z'), 63 ('?'), 161, 85 ('U'), 0, 0, 13, 1, 122 ('z'), 63 ('?'), 161, 85 ('U'), 0, 0, 190 <repeats 8 times>]
+                                                                        unsigned char[] _M_storage = [0 <repeats 16 times>, 243, 58 (':'), 145, 90 ('Z'), 76 ('L'), 86 ('V'), 0, 0, 175, 58 (':'), 145, 90 ('Z'), 76 ('L'), 86 ('V'), 0, 0, 190 <repeats 8 times>]
                                                                     }
                                                                 }
                                                                 _Variadic_union<false, tf::Node::DependentAsync> _M_rest = <union> {
                                                                     _Uninitialized<tf::Node::DependentAsync, false> _M_first = {
                                                                         __aligned_membuf<tf::Node::DependentAsync> _M_storage = {
-                                                                            unsigned char[] _M_storage = [0 <repeats 16 times>, 81 ('Q'), 1, 122 ('z'), 63 ('?'), 161, 85 ('U'), 0, 0, 13, 1, 122 ('z'), 63 ('?'), 161, 85 ('U'), 0, 0, 190 <repeats 24 times>]
+                                                                            unsigned char[] _M_storage = [0 <repeats 16 times>, 243, 58 (':'), 145, 90 ('Z'), 76 ('L'), 86 ('V'), 0, 0, 175, 58 (':'), 145, 90 ('Z'), 76 ('L'), 86 ('V'), 0, 0, 190 <repeats 24 times>]
                                                                         }
                                                                     }
                                                                     _Variadic_union<false> _M_rest = <union> {}
@@ -4427,7 +4502,7 @@ taskflow: <#0> {
                     }
                 }
             })
-            unique_ptr<tf::Node, std::default_delete<tf::Node> > *_M_finish = 0x7b8551be0450 (<#2> {
+            unique_ptr<tf::Node, std::default_delete<tf::Node> > *_M_finish = 0x7b85b99e0450 (<#2> {
                 __uniq_ptr_data<tf::Node, std::default_delete<tf::Node>, true, true> _M_t = {
                     tuple<tf::Node*, std::default_delete<tf::Node> > _M_t = {
                         default_delete<tf::Node> _M_head_impl = {}
@@ -4435,7 +4510,7 @@ taskflow: <#0> {
                     }
                 }
             })
-            unique_ptr<tf::Node, std::default_delete<tf::Node> > *_M_end_of_storage = 0x7b8551be0450 (<points to #2>)
+            unique_ptr<tf::Node, std::default_delete<tf::Node> > *_M_end_of_storage = 0x7b85b99e0450 (<points to #2>)
         }
     }
     mutex _mutex = {
@@ -4459,7 +4534,7 @@ taskflow: <#0> {
     }
     string _name = {
         _Alloc_hider _M_dataplus = {
-            char *_M_p = 0x7b5550b00550 ("")
+            char *_M_p = 0x7b55b8900550 ("")
         }
         size_type _M_string_length = 0
         union <anonymous> = <union> {
@@ -4471,19 +4546,38 @@ taskflow: <#0> {
     queue<std::shared_ptr<tf::Topology>, std::deque<std::shared_ptr<tf::Topology>, std::allocator<std::shared_ptr<tf::Topology> > > > _topologies = {
         deque<std::shared_ptr<tf::Topology>, std::allocator<std::shared_ptr<tf::Topology> > > c = {
             _Deque_impl _M_impl = {
-                void *_M_map = 0x7bb551be0080
+                shared_ptr<tf::Topology> **_M_map = 0x7bb5b99e0080
                 size_t _M_map_size = 8
                 iterator _M_start = {
-                    void *_M_cur = 0x7ca551be0310
-                    void *_M_first = 0x7ca551be0300
-                    void *_M_last = 0x7ca551be0500
-                    void *_M_node = 0x7bb551be0098
+                    shared_ptr<tf::Topology> *_M_cur = 0x7ca5b99e0310 (<#3> {
+                        element_type *_M_ptr = 0xbebebebebebebebe (<out-of-bounds>)
+                        __shared_count<(__gnu_cxx::_Lock_policy)2> _M_refcount = {
+                            _Sp_counted_base<(__gnu_cxx::_Lock_policy)2> *_M_pi = 0xbebebebebebebebe (<out-of-bounds>)
+                        }
+                    })
+                    shared_ptr<tf::Topology> *_M_first = 0x7ca5b99e0300 (<#4> {
+                        element_type *_M_ptr = NULL
+                        __shared_count<(__gnu_cxx::_Lock_policy)2> _M_refcount = {
+                            _Sp_counted_base<(__gnu_cxx::_Lock_policy)2> *_M_pi = NULL
+                        }
+                    })
+                    shared_ptr<tf::Topology> *_M_last = 0x7ca5b99e0500 (<#5> {
+                        element_type *_M_ptr = 0xcc6e96b9cc6e96b9 (<out-of-bounds>)
+                        __shared_count<(__gnu_cxx::_Lock_policy)2> _M_refcount = {
+                            _Sp_counted_base<(__gnu_cxx::_Lock_policy)2> *_M_pi = 0x7ca5b99e0570 ({
+                                int(...) *_vptr._Sp_counted_base = 0x1d800001103
+                                _Atomic_word _M_use_count = 41
+                                _Atomic_word _M_weak_count = 0
+                            })
+                        }
+                    })
+                    shared_ptr<tf::Topology> **_M_node = 0x7bb5b99e0098
                 }
                 iterator _M_finish = {
-                    void *_M_cur = 0x7ca551be0310
-                    void *_M_first = 0x7ca551be0300
-                    void *_M_last = 0x7ca551be0500
-                    void *_M_node = 0x7bb551be0098
+                    shared_ptr<tf::Topology> *_M_cur = 0x7ca5b99e0310 (<points to #3>)
+                    shared_ptr<tf::Topology> *_M_first = 0x7ca5b99e0300 (<points to #4>)
+                    shared_ptr<tf::Topology> *_M_last = 0x7ca5b99e0500 (<points to #5>)
+                    shared_ptr<tf::Topology> **_M_node = 0x7bb5b99e0098
                 }
             }
         }
@@ -4506,13 +4600,13 @@ taskflow: <#0> {
 ## Requirements
 
 - Works only on Linux
-- The oldest supported C version is c99 (tests require c11)
-- Executable must have debugging information (`-g2` or higher)
-- `elf.h` must be in the include path
+- Minimum C version is c99 (tests require c11)
+- Minimum C++ version is c++11
+- Executable must be compiled with debugging information (`-g2` or `-g3`)
 
 ## Usage
 
-1. [Download](https://raw.githubusercontent.com/spevnev/uprintf/refs/heads/main/uprintf.h) the library, or clone the repo
+1. Download the header file
 
 2. Define `UPRINTF_IMPLEMENTATION` in one of the files:
     ```c
@@ -4550,7 +4644,23 @@ option | description | default
 
 ## Limitations
 
-- Incorrect type deduction when printing variables that get shadowed *later* in the same scope.
+- Dynamic arrays can only be printed as pointers because there is no information about its length.
+    ```c
+    int *arr = malloc(sizeof(*arr) * 3);
+    arr[0] = 1;
+    arr[1] = 2;
+    arr[2] = 3;
+    uprintf("%S\n", &arr); // 0x12345678 (1)
+    ```
+
+- Printing information about function from a shared library only works with gcc:
+    ```c
+    uprintf("%S\n", printf);
+    // gcc  : 0x12345678 (int printf(const char *, ...))
+    // clang: 0x12345678
+    ```
+
+- Incorrect type deduction when printing variables that get shadowed **later in the same scope**.
     ```c
     char var = 'c';
     {
@@ -4560,38 +4670,78 @@ option | description | default
     }
     ```
 
-- Printing information about function from a shared library only works with gcc:
+- Casting to struct/union defined in arguments is not supported.
     ```c
-    uprintf("%S\n", printf);
-    // gcc  : 0x12345678 <void printf(const char *, ...)>
-    // clang: 0x12345678
+    uprintf("%S\n", &(struct { int i; float f; }) { 1, 2.3F }); // unsupported
     ```
 
-## How does it work?
+- Some functions and types may get inlined and have debugging information omitted by the compiler.
 
-The library uses debugging information to learn about the types.
+### C++
+
+- `typeid` is not supported.
+    ```cpp
+    int x = 10;
+    uprintf("%S\n", &typeid(x)); // unsupported
+    ```
+
+- `decltype` in arguments is not supported.
+    ```cpp
+    int x = 10;
+    int y = 20;
+    uprintf("%S\n", (decltype(x) *) &y); // unsupported
+    ```
+
+- Lambda definitions in arguments is not supported.
+    ```cpp
+    uprintf("%S\n", [&]() { ... }()); // unsupported
+    ```
+
+- Templated variable and functions in arguments are not supported.
+    ```cpp
+    template <typename T>
+    T var = T{};
+
+    template <typename T>
+    T foo(T a) { return a; }
+
+    uprintf("%S\n", &var<int>); // unsupported
+    uprintf("%S\n", &foo<int>); // unsupported
+    ```
+
+- Invoking overloaded operators in arguments is not supported.
+      ```cpp
+      T operator+(const T &a, const T &b);
+
+      T a, b;
+      // + expects integers ignoring the overloaded version.
+      uprintf("%S\n", a + b);
+      ```
+
+## How it works
+
+The library uses debugging information to get type information required for printing.
 
 On initialization:
 1. Read the current binary.
 2. Parse ELF and DWARF.
-3. Store information about scopes and types.
+3. Store metadata about scopes and types.
 
-On each invokation:
-1. Find scopes based on the PC.
+On each invocation:
+1. Identify current scope based on the PC.
 2. Parse the arguments string.
-3. Find types of arguments in the current scope.
-4. Print data using type definition.
+3. Look up arguments' types based on current scopes.
+4. Print the data using type information.
 
 ## Testing
 
-### Tested on
+### Tested compilers
 
-- x86_64
-- gcc: 11, 12, 13, 14
-- clang: 14, 15, 16, 17, 18
+- gcc & g++: 11, 12, 13, 14
+- clang & clang++: 14, 15, 16, 17, 18
 
 ### Running tests
 
 ```console
-$ make tests
+$ make test
 ```

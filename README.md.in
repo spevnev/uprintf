@@ -1,6 +1,6 @@
 # Universal printf
 
-*uprintf* is a header-only library for printing anything in C.
+*uprintf* is a header-only library for printing anything in C/C++.
 
 ## Examples
 
@@ -67,13 +67,13 @@ Examples and their outputs can be found in [examples](examples), and can be buil
 ## Requirements
 
 - Works only on Linux
-- The oldest supported C version is c99 (tests require c11)
-- Executable must have debugging information (`-g2` or higher)
-- `elf.h` must be in the include path
+- Minimum C version is c99 (tests require c11)
+- Minimum C++ version is c++11
+- Executable must be compiled with debugging information (`-g2` or `-g3`)
 
 ## Usage
 
-1. [Download](https://raw.githubusercontent.com/spevnev/uprintf/refs/heads/main/uprintf.h) the library, or clone the repo
+1. Download the header file
 
 2. Define `UPRINTF_IMPLEMENTATION` in one of the files:
     ```c
@@ -111,7 +111,23 @@ option | description | default
 
 ## Limitations
 
-- Incorrect type deduction when printing variables that get shadowed *later* in the same scope.
+- Dynamic arrays can only be printed as pointers because there is no information about its length.
+    ```c
+    int *arr = malloc(sizeof(*arr) * 3);
+    arr[0] = 1;
+    arr[1] = 2;
+    arr[2] = 3;
+    uprintf("%S\n", &arr); // 0x12345678 (1)
+    ```
+
+- Printing information about function from a shared library only works with gcc:
+    ```c
+    uprintf("%S\n", printf);
+    // gcc  : 0x12345678 (int printf(const char *, ...))
+    // clang: 0x12345678
+    ```
+
+- Incorrect type deduction when printing variables that get shadowed **later in the same scope**.
     ```c
     char var = 'c';
     {
@@ -121,38 +137,78 @@ option | description | default
     }
     ```
 
-- Printing information about function from a shared library only works with gcc:
+- Casting to struct/union defined in arguments is not supported.
     ```c
-    uprintf("%S\n", printf);
-    // gcc  : 0x12345678 <void printf(const char *, ...)>
-    // clang: 0x12345678
+    uprintf("%S\n", &(struct { int i; float f; }) { 1, 2.3F }); // unsupported
     ```
 
-## How does it work?
+- Some functions and types may get inlined and have debugging information omitted by the compiler.
 
-The library uses debugging information to learn about the types.
+### C++
+
+- `typeid` is not supported.
+    ```cpp
+    int x = 10;
+    uprintf("%S\n", &typeid(x)); // unsupported
+    ```
+
+- `decltype` in arguments is not supported.
+    ```cpp
+    int x = 10;
+    int y = 20;
+    uprintf("%S\n", (decltype(x) *) &y); // unsupported
+    ```
+
+- Lambda definitions in arguments is not supported.
+    ```cpp
+    uprintf("%S\n", [&]() { ... }()); // unsupported
+    ```
+
+- Templated variable and functions in arguments are not supported.
+    ```cpp
+    template <typename T>
+    T var = T{};
+
+    template <typename T>
+    T foo(T a) { return a; }
+
+    uprintf("%S\n", &var<int>); // unsupported
+    uprintf("%S\n", &foo<int>); // unsupported
+    ```
+
+- Invoking overloaded operators in arguments is not supported.
+      ```cpp
+      T operator+(const T &a, const T &b);
+
+      T a, b;
+      // + expects integers ignoring the overloaded version.
+      uprintf("%S\n", a + b);
+      ```
+
+## How it works
+
+The library uses debugging information to get type information required for printing.
 
 On initialization:
 1. Read the current binary.
 2. Parse ELF and DWARF.
-3. Store information about scopes and types.
+3. Store metadata about scopes and types.
 
-On each invokation:
-1. Find scopes based on the PC.
+On each invocation:
+1. Identify current scope based on the PC.
 2. Parse the arguments string.
-3. Find types of arguments in the current scope.
-4. Print data using type definition.
+3. Look up arguments' types based on current scopes.
+4. Print the data using type information.
 
 ## Testing
 
-### Tested on
+### Tested compilers
 
-- x86_64
-- gcc: 11, 12, 13, 14
-- clang: 14, 15, 16, 17, 18
+- gcc & g++: 11, 12, 13, 14
+- clang & clang++: 14, 15, 16, 17, 18
 
 ### Running tests
 
 ```console
-$ make tests
+$ make test
 ```
