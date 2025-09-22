@@ -24,7 +24,7 @@ EXAMPLE_COMMON_FLAGS := -Wall -Wextra -pedantic -I . -fsanitize=undefined,addres
 EXAMPLE_CFLAGS       := $(EXAMPLE_COMMON_FLAGS) -std=c11
 EXAMPLE_CXXFLAGS     := $(EXAMPLE_COMMON_FLAGS) -std=c++17
 
-EXAMPLE_SRCS := $(wildcard $(EXAMPLE_DIR)/*.[c|cc])
+EXAMPLE_SRCS := $(wildcard $(EXAMPLE_DIR)/*.c $(EXAMPLE_DIR)/*.cc)
 EXAMPLE_OUTS := $(addsuffix .out, $(basename $(EXAMPLE_SRCS)))
 EXAMPLES     := $(addprefix $(BUILD_DIR)/, $(basename $(EXAMPLE_SRCS)))
 
