@@ -140,6 +140,7 @@ extern Elf64_Dyn _DYNAMIC[];
 #define DW_TAG_class_type 0x02
 #define DW_TAG_enumeration_type 0x04
 #define DW_TAG_formal_parameter 0x05
+#define DW_TAG_imported_declaration 0x08
 #define DW_TAG_lexical_block 0x0b
 #define DW_TAG_member 0x0d
 #define DW_TAG_pointer_type 0x0f
@@ -1570,6 +1571,15 @@ static const char *_upf_get_type_name(const _upf_cu *cu, const uint8_t *die, con
     return NULL;
 }
 
+static const uint8_t *_upf_get_import_die(const _upf_cu *cu, const uint8_t *die, const _upf_abbrev *abbrev) {
+    for (uint32_t i = 0; i < abbrev->attrs.length; i++) {
+        _upf_attr attr = abbrev->attrs.data[i];
+        if (attr.name == DW_AT_import) return cu->base + _upf_get_ref(die, attr.form);
+        die += _upf_get_attr_size(die, attr.form);
+    }
+    _UPF_ERROR("Import entry must have DW_AT_import");
+}
+
 static _upf_function _upf_parse_subprogram(const _upf_cu *cu, const uint8_t *die, const _upf_abbrev *abbrev) {
     _UPF_ASSERT(cu != NULL && die != NULL && abbrev != NULL);
 
@@ -1642,7 +1652,7 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
 
     const char *name = NULL;
     uint64_t subtype_offset = UINT64_MAX;
-    uint64_t size = UINT64_MAX;
+    size_t size = SIZE_MAX;
     int64_t encoding = 0;
     bool is_declaration = false;
     for (uint32_t i = 0; i < abbrev->attrs.length; i++) {
@@ -1689,7 +1699,7 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                 }
                 _UPF_ASSERT(abbrev->tag == DW_TAG_subrange_type);
 
-                size_t length = UINT64_MAX;
+                size_t length = SIZE_MAX;
                 for (uint32_t i = 0; i < abbrev->attrs.length; i++) {
                     _upf_attr attr = abbrev->attrs.data[i];
                     switch (attr.name) {
@@ -1706,9 +1716,9 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                     die += _upf_get_attr_size(die, attr.form);
                 }
 
-                if (length == UINT64_MAX) {
+                if (length == SIZE_MAX) {
                     is_static = false;
-                    array_size = UINT64_MAX;
+                    array_size = SIZE_MAX;
                     type.as.array.lengths.length = 0;
                 }
 
@@ -1720,7 +1730,7 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                 if (generate_name) brackets++;
             }
 
-            if (element_type->size != UINT64_MAX && type.size == UINT64_MAX) {
+            if (element_type->size != SIZE_MAX && type.size == SIZE_MAX) {
                 type.size = array_size;
             }
 
@@ -1748,7 +1758,7 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
             type.name = name ? name : "enum";
             type.kind = _UPF_TK_ENUM;
             type.as.cenum.underlying_type = _upf_parse_type(cu, cu->base + subtype_offset);
-            type.size = size == UINT64_MAX ? type.as.cenum.underlying_type->size : size;
+            type.size = size == SIZE_MAX ? type.as.cenum.underlying_type->size : size;
 
             if (!abbrev->has_children) return _upf_new_type2(die_base, type);
             while (true) {
@@ -1781,8 +1791,6 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
             return _upf_new_type2(die_base, type);
         }
         case DW_TAG_pointer_type: {
-            _UPF_ASSERT(size == UINT64_MAX || size == sizeof(void *));
-
             _upf_type type = _UPF_ZERO_INIT;
             type.name = name;
             type.kind = _UPF_TK_POINTER;
@@ -1809,10 +1817,11 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
             type.name = name;
             type.kind = _UPF_TK_REFERENCE;
             type.size = 0;
-            type.as.reference.type = _upf_parse_type(cu, cu->base + subtype_offset);
             type.as.reference.is_rvalue = abbrev->tag == DW_TAG_rvalue_reference_type;
 
-            return _upf_new_type2(die_base, type);
+            _upf_type *type_ptr = _upf_new_type2(die_base, type);
+            type_ptr->as.reference.type = _upf_parse_type(cu, cu->base + subtype_offset);
+            return type_ptr;
         }
         case DW_TAG_structure_type:
         case DW_TAG_class_type:     {
@@ -1830,7 +1839,7 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                 switch (abbrev->tag) {
                     case DW_TAG_member: {
                         _upf_member member = _UPF_ZERO_INIT;
-                        member.offset = UINT64_MAX;
+                        member.offset = SIZE_MAX;
 
                         bool add_member = true;
                         for (uint32_t i = 0; i < abbrev->attrs.length; i++) {
@@ -1863,7 +1872,7 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                             die += _upf_get_attr_size(die, attr.form);
                         }
                         if (add_member) {
-                            _UPF_ASSERT(member.type != NULL && member.offset != UINT64_MAX);
+                            _UPF_ASSERT(member.type != NULL && member.offset != SIZE_MAX);
                             if (member.name == NULL) member.name = "<anonymous>";
                             _UPF_VECTOR_PUSH(&type.as.cstruct.members, member);
                         }
@@ -2017,7 +2026,7 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
             return _upf_new_type2(die_base, type);
         }
         case DW_TAG_base_type: {
-            _UPF_ASSERT(name != NULL && size != UINT64_MAX && encoding != 0);
+            _UPF_ASSERT(name != NULL && size != SIZE_MAX && encoding != 0);
 
             _upf_type type = _UPF_ZERO_INIT;
             type.name = name;
@@ -2072,21 +2081,6 @@ static _upf_type *_upf_get_function_type(const _upf_function *function) {
     return _upf_new_type(type);
 }
 
-static void _upf_parse_import(_upf_parsing_info *p, const uint8_t *die, const _upf_abbrev *abbrev, _upf_ns_vec *nss) {
-    _UPF_ASSERT(p != NULL && die != NULL && abbrev != NULL && nss != NULL);
-    _UPF_ASSERT(!abbrev->has_children);
-
-    _upf_ns_import import = _UPF_ZERO_INIT;
-    import.nss = nss;
-    for (uint32_t i = 0; i < abbrev->attrs.length; i++) {
-        _upf_attr attr = abbrev->attrs.data[i];
-        if (attr.name == DW_AT_import) import.die = p->cu->base + _upf_get_ref(die, attr.form);
-        die += _upf_get_attr_size(die, attr.form);
-    }
-    _UPF_ASSERT(import.die != NULL);
-    _UPF_VECTOR_PUSH(&p->ns_imports, import);
-}
-
 static void _upf_parse_inheritance(_upf_parsing_info *p, const uint8_t *die, const _upf_abbrev *abbrev, _upf_ns_vec *nss) {
     _UPF_ASSERT(p != NULL && die != NULL && abbrev != NULL && nss != NULL);
 
@@ -2135,6 +2129,59 @@ static _upf_range_vec _upf_get_die_ranges(const _upf_cu *cu, const uint8_t *low_
     return ranges;
 }
 
+static _upf_scope *_upf_parse_scope(_upf_parsing_info *p, const uint8_t *die, const _upf_abbrev *abbrev);
+
+static const uint8_t *_upf_parse_scope_die(_upf_parsing_info *p, _upf_scope *scope, const uint8_t *die) {
+    _UPF_ASSERT(p != NULL && scope != NULL && die != NULL);
+
+    const uint8_t *die_base = die;
+    const _upf_abbrev *abbrev;
+    die += _upf_get_abbrev(&abbrev, p->cu, die);
+    if (abbrev == NULL) return NULL;
+
+    switch (abbrev->tag) {
+        case DW_TAG_variable:
+        case DW_TAG_formal_parameter: {
+            _upf_named_type var = _upf_parse_variable(p->cu, die, abbrev);
+            if (var.name == NULL) break;
+            _UPF_ASSERT(var.die != NULL);
+            _UPF_MAP_STR_SET(&scope->vars, var.name, var.die);
+        } break;
+        case DW_TAG_array_type:
+        case DW_TAG_class_type:
+        case DW_TAG_enumeration_type:
+        case DW_TAG_pointer_type:
+        case DW_TAG_reference_type:
+        case DW_TAG_structure_type:
+        case DW_TAG_typedef:
+        case DW_TAG_union_type:
+        case DW_TAG_ptr_to_member_type:
+        case DW_TAG_subroutine_type:
+        case DW_TAG_const_type:
+        case DW_TAG_volatile_type:
+        case DW_TAG_restrict_type:
+        case DW_TAG_atomic_type:
+        case DW_TAG_base_type:
+        case DW_TAG_rvalue_reference_type: {
+            const char *type_name = _upf_get_type_name(p->cu, die, abbrev);
+            if (type_name != NULL) _UPF_MAP_STR_SET(&scope->types, type_name, die_base);
+        } break;
+        case DW_TAG_lexical_block:
+        case DW_TAG_inlined_subroutine: {
+            _upf_scope *sub_scope = _upf_parse_scope(p, die, abbrev);
+            if (sub_scope != NULL) _UPF_VECTOR_PUSH(&scope->scopes, sub_scope);
+        } break;
+        case DW_TAG_imported_module: {
+            _upf_ns_import import = _UPF_ZERO_INIT;
+            import.nss = &scope->nss;
+            import.die = _upf_get_import_die(p->cu, die, abbrev);
+            _UPF_VECTOR_PUSH(&p->ns_imports, import);
+        } break;
+        case DW_TAG_imported_declaration: _upf_parse_scope_die(p, scope, _upf_get_import_die(p->cu, die, abbrev)); break;
+    }
+    return _upf_skip_die(p->cu, die, abbrev);
+}
+
 static _upf_scope *_upf_parse_scope(_upf_parsing_info *p, const uint8_t *die, const _upf_abbrev *abbrev) {
     _UPF_ASSERT(p != NULL && die != NULL && abbrev != NULL);
 
@@ -2170,49 +2217,10 @@ static _upf_scope *_upf_parse_scope(_upf_parsing_info *p, const uint8_t *die, co
     memset(scope, 0, sizeof(*scope));
     scope->ranges = ranges;
 
-    if (!abbrev->has_children) return scope;
-
-    while (true) {
-        const uint8_t *die_base = die;
-        die += _upf_get_abbrev(&abbrev, p->cu, die);
-        if (abbrev == NULL) break;
-
-        switch (abbrev->tag) {
-            case DW_TAG_variable:
-            case DW_TAG_formal_parameter: {
-                _upf_named_type var = _upf_parse_variable(p->cu, die, abbrev);
-                if (var.name == NULL) break;
-                _UPF_ASSERT(var.die != NULL);
-                _UPF_MAP_STR_SET(&scope->vars, var.name, var.die);
-            } break;
-            case DW_TAG_array_type:
-            case DW_TAG_class_type:
-            case DW_TAG_enumeration_type:
-            case DW_TAG_pointer_type:
-            case DW_TAG_reference_type:
-            case DW_TAG_structure_type:
-            case DW_TAG_typedef:
-            case DW_TAG_union_type:
-            case DW_TAG_ptr_to_member_type:
-            case DW_TAG_subroutine_type:
-            case DW_TAG_const_type:
-            case DW_TAG_volatile_type:
-            case DW_TAG_restrict_type:
-            case DW_TAG_atomic_type:
-            case DW_TAG_base_type:
-            case DW_TAG_rvalue_reference_type: {
-                const char *type_name = _upf_get_type_name(p->cu, die, abbrev);
-                if (type_name != NULL) _UPF_MAP_STR_SET(&scope->types, type_name, die_base);
-            } break;
-            case DW_TAG_lexical_block:
-            case DW_TAG_inlined_subroutine: {
-                _upf_scope *sub_scope = _upf_parse_scope(p, die, abbrev);
-                if (sub_scope != NULL) _UPF_VECTOR_PUSH(&scope->scopes, sub_scope);
-            } break;
-            case DW_TAG_imported_module: _upf_parse_import(p, die, abbrev, &scope->nss); break;
-        }
-        die = _upf_skip_die(p->cu, die, abbrev);
+    if (abbrev->has_children) {
+        while (die != NULL) die = _upf_parse_scope_die(p, scope, die);
     }
+
     return scope;
 }
 
@@ -2291,6 +2299,75 @@ static void _upf_parse_ns(_upf_parsing_info *p, const uint8_t *die, _upf_ns *cur
     _UPF_MAP_SET(&p->nss, die_base, sub_ns);
 }
 
+static const uint8_t *_upf_parse_ns_die(_upf_parsing_info *p, _upf_ns *ns, const uint8_t *die) {
+    _UPF_ASSERT(p != NULL && ns != NULL && die != NULL);
+
+    const uint8_t *die_base = die;
+    const _upf_abbrev *abbrev;
+    die += _upf_get_abbrev(&abbrev, p->cu, die);
+    if (abbrev == NULL) return NULL;
+
+    switch (abbrev->tag) {
+        case DW_TAG_member:
+        case DW_TAG_variable: {
+            _upf_named_type var = _upf_parse_variable(p->cu, die, abbrev);
+            if (var.name == NULL) break;
+            _UPF_ASSERT(var.die != NULL);
+            _UPF_MAP_STR_SET(&ns->vars, var.name, var.die);
+        } break;
+        case DW_TAG_class_type:
+        case DW_TAG_structure_type:
+        case DW_TAG_union_type:     {
+            const char *type_name = _upf_get_type_name(p->cu, die, abbrev);
+            if (type_name == NULL) break;
+            _UPF_MAP_STR_SET(&ns->types, type_name, die_base);
+
+            // If class/struct has children, parse it as a namespace.
+            if (!abbrev->has_children) break;
+
+            _upf_ns *class_ns = _upf_parse_ns_body(p, _upf_skip_attrs(die, abbrev));
+            _UPF_MAP_STR_SET(&ns->sub_nss, type_name, class_ns);
+            _UPF_MAP_SET(&p->nss, die_base, class_ns);
+        } break;
+        // Treat inheritance as namespace import.
+        case DW_TAG_inheritance:           _upf_parse_inheritance(p, die, abbrev, &ns->imported_nss); break;
+        case DW_TAG_array_type:
+        case DW_TAG_enumeration_type:
+        case DW_TAG_pointer_type:
+        case DW_TAG_reference_type:
+        case DW_TAG_typedef:
+        case DW_TAG_ptr_to_member_type:
+        case DW_TAG_subroutine_type:
+        case DW_TAG_const_type:
+        case DW_TAG_volatile_type:
+        case DW_TAG_restrict_type:
+        case DW_TAG_atomic_type:
+        case DW_TAG_base_type:
+        case DW_TAG_rvalue_reference_type: {
+            const char *type_name = _upf_get_type_name(p->cu, die, abbrev);
+            if (type_name != NULL) _UPF_MAP_STR_SET(&ns->types, type_name, die_base);
+        } break;
+        case DW_TAG_subprogram: {
+            _upf_function function = _upf_parse_subprogram(p->cu, die, abbrev);
+            _upf_scope *scope = _upf_parse_scope(p, die, abbrev);
+            _upf_add_function_scope(p, die_base, function, scope);
+
+            if (function.name == NULL) break;
+            _UPF_MAP_STR_SET(&ns->functions, function.name, function);
+            if (function.is_external) _UPF_MAP_STR_SET(&p->cu->extern_functions, function.name, function);
+        } break;
+        case DW_TAG_namespace:       _upf_parse_ns(p, die_base, ns); break;
+        case DW_TAG_imported_module: {
+            _upf_ns_import import = _UPF_ZERO_INIT;
+            import.nss = &ns->imported_nss;
+            import.die = _upf_get_import_die(p->cu, die, abbrev);
+            _UPF_VECTOR_PUSH(&p->ns_imports, import);
+        } break;
+        case DW_TAG_imported_declaration: _upf_parse_ns_die(p, ns, _upf_get_import_die(p->cu, die, abbrev)); break;
+    }
+    return _upf_skip_die(p->cu, die, abbrev);
+}
+
 static _upf_ns *_upf_parse_ns_body(_upf_parsing_info *p, const uint8_t *die) {
     _UPF_ASSERT(p != NULL && die != NULL);
 
@@ -2298,66 +2375,7 @@ static _upf_ns *_upf_parse_ns_body(_upf_parsing_info *p, const uint8_t *die) {
     memset(ns, 0, sizeof(*ns));
     _UPF_VECTOR_PUSH(&p->ns_stack, ns);
 
-    const _upf_abbrev *abbrev;
-    while (true) {
-        const uint8_t *die_base = die;
-        die += _upf_get_abbrev(&abbrev, p->cu, die);
-        if (abbrev == NULL) break;
-
-        switch (abbrev->tag) {
-            case DW_TAG_member:
-            case DW_TAG_variable: {
-                _upf_named_type var = _upf_parse_variable(p->cu, die, abbrev);
-                if (var.name == NULL) break;
-                _UPF_ASSERT(var.die != NULL);
-                _UPF_MAP_STR_SET(&ns->vars, var.name, var.die);
-            } break;
-            case DW_TAG_class_type:
-            case DW_TAG_structure_type:
-            case DW_TAG_union_type:     {
-                const char *type_name = _upf_get_type_name(p->cu, die, abbrev);
-                if (type_name == NULL) break;
-                _UPF_MAP_STR_SET(&ns->types, type_name, die_base);
-
-                // If class/struct has children, parse it as a namespace.
-                if (!abbrev->has_children) break;
-
-                _upf_ns *class_ns = _upf_parse_ns_body(p, _upf_skip_attrs(die, abbrev));
-                _UPF_MAP_STR_SET(&ns->sub_nss, type_name, class_ns);
-                _UPF_MAP_SET(&p->nss, die_base, class_ns);
-            } break;
-            // Treat inheritance as namespace import.
-            case DW_TAG_inheritance:           _upf_parse_inheritance(p, die, abbrev, &ns->imported_nss); break;
-            case DW_TAG_array_type:
-            case DW_TAG_enumeration_type:
-            case DW_TAG_pointer_type:
-            case DW_TAG_reference_type:
-            case DW_TAG_typedef:
-            case DW_TAG_ptr_to_member_type:
-            case DW_TAG_subroutine_type:
-            case DW_TAG_const_type:
-            case DW_TAG_volatile_type:
-            case DW_TAG_restrict_type:
-            case DW_TAG_atomic_type:
-            case DW_TAG_base_type:
-            case DW_TAG_rvalue_reference_type: {
-                const char *type_name = _upf_get_type_name(p->cu, die, abbrev);
-                if (type_name != NULL) _UPF_MAP_STR_SET(&ns->types, type_name, die_base);
-            } break;
-            case DW_TAG_subprogram: {
-                _upf_function function = _upf_parse_subprogram(p->cu, die, abbrev);
-                _upf_scope *scope = _upf_parse_scope(p, die, abbrev);
-                _upf_add_function_scope(p, die_base, function, scope);
-
-                if (function.name == NULL) break;
-                _UPF_MAP_STR_SET(&ns->functions, function.name, function);
-                if (function.is_external) _UPF_MAP_STR_SET(&p->cu->extern_functions, function.name, function);
-            } break;
-            case DW_TAG_imported_module: _upf_parse_import(p, die, abbrev, &ns->imported_nss); break;
-            case DW_TAG_namespace:       _upf_parse_ns(p, die_base, ns); break;
-        }
-        die = _upf_skip_die(p->cu, die, abbrev);
-    }
+    while (die != NULL) die = _upf_parse_ns_die(p, ns, die);
 
     _UPF_ASSERT(p->ns_stack.length > 0);
     p->ns_stack.length--;
@@ -3574,10 +3592,10 @@ static const void *_upf_get_memory_region_end(const void *ptr) {
     return NULL;
 }
 
-static bool _upf_is_memory_readable(const uint8_t *ptr, uint64_t size) {
+static bool _upf_is_memory_readable(const uint8_t *ptr, size_t size) {
     _UPF_ASSERT(ptr != NULL);
     if (_upf_get_memory_region_end(ptr) == NULL) return false;
-    if (size == 0 || size == UINT64_MAX) return true;
+    if (size == 0 || size == SIZE_MAX) return true;
     return _upf_get_memory_region_end(ptr + size) != NULL;
 }
 
@@ -3766,7 +3784,7 @@ static void _upf_print_type_name(const _upf_type *type, bool trailing_whitespace
     }
 }
 
-static void _upf_print_bit_field(const uint8_t *data, int total_bit_offset, int bit_size) {
+__attribute__((no_sanitize_address)) static void _upf_print_bit_field(const uint8_t *data, int total_bit_offset, int bit_size) {
     _UPF_ASSERT(data != NULL);
 
     int byte_offset = total_bit_offset / 8;
@@ -3908,8 +3926,7 @@ __attribute__((no_sanitize_address)) static void _upf_print_type(_upf_struct_inf
         case _UPF_TK_ARRAY: {
             const _upf_type *element_type = type->as.array.element_type;
             size_t element_size = element_type->size;
-
-            if (element_size == UINT64_MAX) {
+            if (element_size == SIZE_MAX) {
                 _upf_bprintf("<unknown>");
                 return;
             }
@@ -3918,6 +3935,7 @@ __attribute__((no_sanitize_address)) static void _upf_print_type(_upf_struct_inf
                 _upf_bprintf("<non-static array>");
                 return;
             }
+            uint32_t length = type->as.array.lengths.data[0];
 
             _upf_type subarray;
             if (type->as.array.lengths.length > 1) {
@@ -3931,7 +3949,7 @@ __attribute__((no_sanitize_address)) static void _upf_print_type(_upf_struct_inf
 
             bool is_primitive = _upf_is_primitive(element_type);
             _upf_bprintf(is_primitive ? "[" : "[\n");
-            for (size_t i = 0; i < type->as.array.lengths.data[0]; i++) {
+            for (size_t i = 0; i < length; i++) {
                 if (i > 0) _upf_bprintf(is_primitive ? ", " : ",\n");
                 if (!is_primitive) _upf_bprintf("%*s", UPRINTF_INDENTATION_WIDTH * (depth + 1), "");
 
@@ -3941,7 +3959,7 @@ __attribute__((no_sanitize_address)) static void _upf_print_type(_upf_struct_inf
 #if UPRINTF_ARRAY_COMPRESSION_THRESHOLD > 0
                 size_t j = i;
                 // Advance while element at `j` is same as at `i`.
-                while (j < type->as.array.lengths.data[0]) {
+                while (j < length) {
                     const uint8_t *next = data + element_size * j;
 
                     // Use a loop instead of memcmp to avoid triggering libasan
@@ -3966,7 +3984,7 @@ __attribute__((no_sanitize_address)) static void _upf_print_type(_upf_struct_inf
                     _upf_bprintf(" <repeats %d times>", count);
                     i = j - 1;
                 }
-#endif
+#endif  // UPRINTF_ARRAY_COMPRESSION_THRESHOLD
             }
 
             if (is_primitive) {
