@@ -114,14 +114,6 @@ extern int _upf_test_status;
 
 // ===================== INCLUDES =========================
 
-#ifndef __USE_XOPEN_EXTENDED
-#define __USE_XOPEN_EXTENDED
-#endif
-
-#ifndef _GNU_SOURCE
-#define _GNU_SOURCE
-#endif
-
 #include <dlfcn.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -143,7 +135,6 @@ extern int _upf_test_status;
 // Feature test macros might not work since the header could have already been
 // included and expanded without them, so the functions must be declared here.
 
-ssize_t readlink(const char *path, char *buf, size_t bufsiz);
 ssize_t getline(char **lineptr, size_t *n, FILE *stream);
 
 // Partial redefinition of dl_phdr_info.
@@ -4351,8 +4342,6 @@ __attribute__((noinline)) void _upf_uprintf(const char *file_path, int line, con
 
 // ====================== UNDEF ===========================
 
-#undef __USE_XOPEN_EXTENDED
-#undef _GNU_SOURCE
 #undef _UPF_SET_TEST_STATUS
 #undef _UPF_LOG
 #undef _UPF_WARN
