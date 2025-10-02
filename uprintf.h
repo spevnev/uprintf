@@ -833,18 +833,24 @@ static char *_upf_copy_string(const char *str) { return _upf_new_string(str, str
 
 #define _UPF_INITIAL_VECTOR_CAPACITY 4
 
+#ifdef __cplusplus
+#define _UPF_VOID_CAST(T) (decltype(T))
+#else
+#define _UPF_VOID_CAST(T)
+#endif
+
 #define _UPF_VECTOR_PUSH(vec, element)                                  \
     do {                                                                \
         if ((vec)->capacity == 0) {                                     \
             (vec)->capacity = _UPF_INITIAL_VECTOR_CAPACITY;             \
             uint32_t size = (vec)->capacity * sizeof(*(vec)->data);     \
-            *((void **) &(vec)->data) = _upf_alloc(size);               \
+            (vec)->data = _UPF_VOID_CAST((vec)->data) _upf_alloc(size); \
         } else if ((vec)->capacity == (vec)->length) {                  \
             uint32_t old_size = (vec)->capacity * sizeof(*(vec)->data); \
             (vec)->capacity *= 2;                                       \
             void *new_data = _upf_alloc(old_size * 2);                  \
             memcpy(new_data, (vec)->data, old_size);                    \
-            *((void **) &(vec)->data) = new_data;                       \
+            (vec)->data = _UPF_VOID_CAST((vec)->data) new_data;         \
         }                                                               \
         (vec)->data[(vec)->length++] = element;                         \
     } while (0)
