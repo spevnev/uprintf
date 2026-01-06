@@ -140,7 +140,7 @@ ssize_t getline(char **lineptr, size_t *n, FILE *stream);
 
 // Partial redefinition of dl_phdr_info.
 typedef struct {
-    Elf64_Addr dlpi_addr;
+    ElfW(Addr) dlpi_addr;
     const char *dlpi_name;
 } _upf_dl_phdr_info;
 
@@ -148,7 +148,7 @@ struct dl_phdr_info;
 int dl_iterate_phdr(int (*callback)(struct dl_phdr_info *info, size_t size, void *data), void *data);
 
 // Linker-generated entry to the dynamic section of ELF.
-extern Elf64_Dyn _DYNAMIC[];
+extern ElfW(Dyn) _DYNAMIC[];
 
 // ===================== dwarf.h ==========================
 
@@ -2562,16 +2562,16 @@ static void _upf_parse_extern_functions(void) {
     _UPF_ASSERT(_DYNAMIC != NULL);
 
     const char *string_table = NULL;
-    const Elf64_Sym *symbol_table = NULL;
-    const Elf64_Rela *rela_table = NULL;
+    const ElfW(Sym) *symbol_table = NULL;
+    const ElfW(Rela) *rela_table = NULL;
     int rela_size = -1;
-    for (const Elf64_Dyn *dyn = _DYNAMIC; dyn->d_tag != DT_NULL; dyn++) {
+    for (const ElfW(Dyn) *dyn = _DYNAMIC; dyn->d_tag != DT_NULL; dyn++) {
         switch (dyn->d_tag) {
             case DT_STRTAB:  string_table = (char *) dyn->d_un.d_ptr; break;
-            case DT_SYMTAB:  symbol_table = (Elf64_Sym *) dyn->d_un.d_ptr; break;
-            case DT_RELA:    rela_table = (Elf64_Rela *) dyn->d_un.d_ptr; break;
-            case DT_RELASZ:  rela_size = dyn->d_un.d_val / sizeof(Elf64_Rela); break;
-            case DT_RELAENT: _UPF_ASSERT(dyn->d_un.d_val == sizeof(Elf64_Rela)); break;
+            case DT_SYMTAB:  symbol_table = (ElfW(Sym) *) dyn->d_un.d_ptr; break;
+            case DT_RELA:    rela_table = (ElfW(Rela) *) dyn->d_un.d_ptr; break;
+            case DT_RELASZ:  rela_size = dyn->d_un.d_val / sizeof(ElfW(Rela)); break;
+            case DT_RELAENT: _UPF_ASSERT(dyn->d_un.d_val == sizeof(ElfW(Rela))); break;
         }
     }
     if (string_table == NULL || symbol_table == NULL || rela_table == NULL || rela_size == -1) {
@@ -2580,12 +2580,12 @@ static void _upf_parse_extern_functions(void) {
     }
 
     for (int i = 0; i < rela_size; i++) {
-        Elf64_Rela rela = rela_table[i];
+        ElfW(Rela) rela = rela_table[i];
 
         int symbol_idx = ELF64_R_SYM(rela.r_info);
         if (symbol_idx == STN_UNDEF) continue;
 
-        Elf64_Sym symbol = symbol_table[symbol_idx];
+        ElfW(Sym) symbol = symbol_table[symbol_idx];
         uint64_t symbol_address = *((uint64_t *) (_upf_state.base + rela.r_offset));
         const char *symbol_name = string_table + symbol.st_name;
         _UPF_MAP_SET(&_upf_state.extern_functions, symbol_address, symbol_name);
@@ -2619,21 +2619,21 @@ static void _upf_parse_elf(void) {
 
     close(fd);
 
-    const Elf64_Ehdr *header = (Elf64_Ehdr *) file;
+    const ElfW(Ehdr) *header = (ElfW(Ehdr) *) file;
 
     if (memcmp(header->e_ident, ELFMAG, SELFMAG) != 0 ||  //
         header->e_ident[EI_CLASS] != ELFCLASS64 ||        //
         header->e_ident[EI_VERSION] != 1 ||               //
         header->e_machine != EM_X86_64 ||                 //
         header->e_version != 1 ||                         //
-        header->e_shentsize != sizeof(Elf64_Shdr)) {
+        header->e_shentsize != sizeof(ElfW(Shdr))) {
         _UPF_ERROR("Unsupported or invalid ELF file.");
     }
 
-    const Elf64_Shdr *string_section = (Elf64_Shdr *) (file + header->e_shoff + header->e_shstrndx * header->e_shentsize);
+    const ElfW(Shdr) *string_section = (ElfW(Shdr) *) (file + header->e_shoff + header->e_shstrndx * header->e_shentsize);
     const char *string_table = (char *) (file + string_section->sh_offset);
 
-    const Elf64_Shdr *section = (Elf64_Shdr *) (file + header->e_shoff);
+    const ElfW(Shdr) *section = (ElfW(Shdr) *) (file + header->e_shoff);
     for (size_t i = 0; i < header->e_shnum; i++) {
         const char *name = string_table + section->sh_name;
 
