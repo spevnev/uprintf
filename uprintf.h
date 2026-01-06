@@ -115,6 +115,7 @@ extern int _upf_test_status;
 // ===================== INCLUDES =========================
 
 #include <dlfcn.h>
+#include <elf.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
@@ -970,6 +971,7 @@ static void _upf_map_impl_set(uint8_t **data, uint32_t *size, uint32_t *capacity
 #define _UPF_MAP_GET(map, search_key) _UPF_MAP_IMPL_GET(map, search_key, false)
 #define _UPF_MAP_STR_GET(map, search_key) _UPF_MAP_IMPL_GET(map, search_key, true)
 
+// Disable warning to allow storing pointers as values.
 // NOLINTNEXTLINE(bugprone-sizeof-expression)
 #define _UPF_MAP_SET(map, entry_key, entry_value) _UPF_MAP_IMPL_SET(map, entry_key, false, entry_value)
 // NOLINTNEXTLINE(bugprone-sizeof-expression)
@@ -3375,7 +3377,7 @@ static _upf_type *_upf_cxx_noexcept(void) {
 
 static _upf_type *_upf_cxx_typeid(void) { _UPF_ERROR("typeid is not supported at %s:%d.", _upf_state.file_path, _upf_state.line); }
 
-static _upf_type *_upf_cxx_lambda(void) { _UPF_ERROR("lambdas are not supported at %s:%d.", _upf_state.file_path, _upf_state.line); }
+static _upf_type *_upf_cxx_lambda(void) { _UPF_ERROR("Lambdas are not supported at %s:%d.", _upf_state.file_path, _upf_state.line); }
 
 static _upf_type *_upf_unary(void) {
     _upf_token unop = _upf_consume_token();
