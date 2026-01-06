@@ -28,8 +28,8 @@ int main(void) {
     float f32 = 0.123;
     double f64 = -0.321;
 
-    signed char uch = 'c';
-    unsigned char sch = -'c';
+    signed char sch = 'c';
+    unsigned char uch = -'c';
 
     void *void_ptr = &i;
     int *int_ptr = &i;
@@ -55,8 +55,8 @@ int main(void) {
     uprintf("f32: %S\n", &f32);
     uprintf("f64: %S\n", &f64);
 
-    uprintf("uch: %S\n", &uch);
     uprintf("sch: %S\n", &sch);
+    uprintf("uch: %S\n", &uch);
 
     uprintf("void_ptr: %S\n", &void_ptr);
     uprintf("int_ptr: %S\n", &int_ptr);

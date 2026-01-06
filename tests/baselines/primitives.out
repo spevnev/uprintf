@@ -8,8 +8,8 @@ i32: -2147483648
 i64: -9223372036854775807
 f32: 0.123000
 f64: -0.321000
-uch: 99 ('c')
-sch: 157
+sch: 99 ('c')
+uch: 157
 void_ptr: POINTER
 int_ptr: POINTER (1)
 null_ptr: NULL

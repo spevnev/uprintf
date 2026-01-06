@@ -118,11 +118,13 @@ extern int _upf_test_status;
 #include <elf.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <inttypes.h>
 #include <limits.h>
 #include <link.h>
 #include <setjmp.h>
 #include <stdarg.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -1116,7 +1118,7 @@ static size_t _upf_get_attr_size(const uint8_t *die, uint64_t form) {
         case DW_FORM_flag_present:
         case DW_FORM_implicit_const: return 0;
     }
-    _UPF_ERROR("Invalid DWARF attribute type: 0x%lx.", form);
+    _UPF_ERROR("Invalid DWARF attribute type: 0x%" PRIx64 ".", form);
 }
 
 static uint64_t _upf_get_x_offset(const uint8_t *die, uint64_t form) {
@@ -1134,7 +1136,7 @@ static uint64_t _upf_get_x_offset(const uint8_t *die, uint64_t form) {
         case DW_FORM_addrx:
         case DW_FORM_strx:   _upf_uLEB_to_uint64(die, &offset); return offset;
     }
-    _UPF_ERROR("Invalid DWARF addrx/strx type: 0x%lx.", form);
+    _UPF_ERROR("Invalid DWARF addrx/strx type: 0x%" PRIx64 ".", form);
 }
 
 static const char *_upf_get_str(const _upf_cu *cu, const uint8_t *die, uint64_t form) {
@@ -1153,7 +1155,7 @@ static const char *_upf_get_str(const _upf_cu *cu, const uint8_t *die, uint64_t 
             return _upf_state.str + _upf_offset_cast(_upf_state.str_offsets + cu->str_offsets_base + offset);
         }
     }
-    _UPF_ERROR("Invalid DWARF string type: 0x%lx.", form);
+    _UPF_ERROR("Invalid DWARF string type: 0x%" PRIx64 ".", form);
 }
 
 static uint64_t _upf_get_ref(const uint8_t *die, uint64_t form) {
@@ -1207,7 +1209,7 @@ static int64_t _upf_get_data(const uint8_t *die, _upf_attr attr) {
             return data;
         } break;
     }
-    _UPF_ERROR("Invalid DWARF data type: 0x%lx.", attr.form);
+    _UPF_ERROR("Invalid DWARF data type: 0x%" PRIx64 ".", attr.form);
 }
 
 static bool _upf_is_addr(uint64_t form) {
@@ -1236,13 +1238,13 @@ static uint64_t _upf_get_addr(const _upf_cu *cu, const uint8_t *die, uint64_t fo
             return _upf_address_cast(_upf_state.addr + offset);
         }
     }
-    _UPF_ERROR("Invalid DWARF address type: 0x%lx.", form);
+    _UPF_ERROR("Invalid DWARF address type: 0x%" PRIx64 ".", form);
 }
 
 static bool _upf_get_flag(const uint8_t *die, uint64_t form) {
     if (form == DW_FORM_flag_present) return true;
     if (form == DW_FORM_flag) return *die;
-    _UPF_ERROR("Invalid DWARF flag type: 0x%lx.", form);
+    _UPF_ERROR("Invalid DWARF flag type: 0x%" PRIx64 ".", form);
 }
 
 static size_t _upf_get_abbrev(const _upf_abbrev **abbrev, const _upf_cu *cu, const uint8_t *die) {
@@ -1446,7 +1448,7 @@ static _upf_type_kind _upf_get_base_type_kind(int64_t encoding, int64_t size) {
         case DW_ATE_packed_decimal:  _UPF_WARN("C shouldn't have packed decimals. Ignoring this type."); return _UPF_TK_UNKNOWN;
         case DW_ATE_numeric_string:  _UPF_WARN("C shouldn't have numeric strings. Ignoring this type."); return _UPF_TK_UNKNOWN;
         case DW_ATE_edited:          _UPF_WARN("C shouldn't have edited strings. Ignoring this type."); return _UPF_TK_UNKNOWN;
-        default:                     _UPF_WARN("Skipping unknown DWARF type encoding (0x%02lx)", encoding); return _UPF_TK_UNKNOWN;
+        default:                     _UPF_WARN("Skipping unknown DWARF type encoding (0x%02" PRIx64 ")", encoding); return _UPF_TK_UNKNOWN;
     }
 }
 
@@ -1457,7 +1459,7 @@ static int _upf_get_type_modifier(uint64_t tag) {
         case DW_TAG_restrict_type: return _UPF_MOD_RESTRICT;
         case DW_TAG_atomic_type:   return _UPF_MOD_ATOMIC;
     }
-    _UPF_ERROR("Invalid DWARF type modifier: 0x%lx.", tag);
+    _UPF_ERROR("Invalid DWARF type modifier: 0x%" PRIx64 ".", tag);
 }
 
 static _upf_type *_upf_new_type(_upf_type type) {
@@ -2082,7 +2084,7 @@ static _upf_type *_upf_parse_type(const _upf_cu *cu, const uint8_t *die) {
                 return _upf_new_type2(die_base, type);
             }
         }
-        default: _UPF_WARN("Found unsupported type (0x%lx). Ignoring it.", abbrev->tag); break;
+        default: _UPF_WARN("Found unsupported type (0x%" PRIx64 "). Ignoring it.", abbrev->tag); break;
     }
 
     _upf_type type;
@@ -3589,21 +3591,29 @@ static _upf_range_vec _upf_get_readable_addresses(void) {
 
     _upf_range_vec ranges = _UPF_ZERO_INIT;
     _upf_range range = _UPF_ZERO_INIT;
-    char read_bit = '-';
     size_t length = 0;
     char *line = NULL;
     ssize_t read;
     while ((read = getline(&line, &length, file)) != -1) {
         if (read == 0) continue;
-        if (line[read - 1] == '\n') line[read - 1] = '\0';
 
-        if (sscanf(line, "%lx-%lx %c%*s %*x %*x:%*x %*u", &range.start, &range.end, &read_bit) != 3) {
-            free(line);
-            fclose(file);
-            _UPF_ERROR("Failed to parse \"/proc/self/maps\": invalid format.");
-        }
+        char *cur = line;
+        char *cur_end = NULL;
+        errno = 0;
+        uintmax_t start = strtoumax(cur, &cur_end, 16);
+        if (*cur_end != '-' || errno != 0) _UPF_ERROR("Failed to parse \"/proc/self/maps\": invalid format.");
+        cur = cur_end + 1;
 
-        if (read_bit == 'r') _UPF_VECTOR_PUSH(&ranges, range);
+        uintmax_t end = strtoumax(cur, &cur_end, 16);
+        if (*cur_end != ' ' || errno != 0) _UPF_ERROR("Failed to parse \"/proc/self/maps\": invalid format.");
+        cur = cur_end + 1;
+
+        if (*cur != 'r') continue;
+
+        if (start > UINTPTR_MAX || end > UINTPTR_MAX) _UPF_ERROR("Failed to parse \"/proc/self/maps\": address is too long.");
+        range.start = start;
+        range.end = end;
+        _UPF_VECTOR_PUSH(&ranges, range);
     }
     free(line);
     fclose(file);
@@ -3819,7 +3829,7 @@ __attribute__((no_sanitize_address)) static void _upf_print_bit_field(const uint
     int bit_offset = total_bit_offset % 8;
     uint8_t value = (data[byte_offset] >> bit_offset) & ((1 << bit_size) - 1);
 
-    _upf_bprintf("%hhu <%d bit%s>", value, bit_size, bit_size > 1 ? "s" : "");
+    _upf_bprintf("%" PRIu8 " <%d bit%s>", value, bit_size, bit_size > 1 ? "s" : "");
 }
 
 __attribute__((no_sanitize_address)) static void _upf_print_char_ptr(const char *str) {
@@ -3905,13 +3915,13 @@ __attribute__((no_sanitize_address)) static void _upf_print_type(_upf_struct_inf
             _upf_struct_info *opt_info = _UPF_MAP_GET(structs, key);
             if (opt_info != NULL && opt_info->is_repeating) {
                 if (opt_info->is_visited) {
-                    _upf_bprintf("<points to #%d>", opt_info->id);
+                    _upf_bprintf("<points to #%" PRIu32 ">", opt_info->id);
                     return;
                 }
 
                 opt_info->is_visited = true;
                 opt_info->id = _upf_state.struct_id++;
-                _upf_bprintf("<#%d> ", opt_info->id);
+                _upf_bprintf("<#%" PRIu32 "> ", opt_info->id);
             }
 
             _upf_bprintf("{\n");
@@ -4099,37 +4109,37 @@ __attribute__((no_sanitize_address)) static void _upf_print_type(_upf_struct_inf
             }
             _upf_bprintf("))");
         } break;
-        case _UPF_TK_U1: _upf_bprintf("%hhu", *data); break;
+        case _UPF_TK_U1: _upf_bprintf("%" PRIu8, *data); break;
         case _UPF_TK_U2: {
             uint16_t temp;
             memcpy(&temp, data, sizeof(temp));
-            _upf_bprintf("%hu", temp);
+            _upf_bprintf("%" PRIu16, temp);
         } break;
         case _UPF_TK_U4: {
             uint32_t temp;
             memcpy(&temp, data, sizeof(temp));
-            _upf_bprintf("%u", temp);
+            _upf_bprintf("%" PRIu32, temp);
         } break;
         case _UPF_TK_U8: {
             uint64_t temp;
             memcpy(&temp, data, sizeof(temp));
-            _upf_bprintf("%lu", temp);
+            _upf_bprintf("%" PRIu64, temp);
         } break;
-        case _UPF_TK_S1: _upf_bprintf("%hhd", *((const int8_t *) data)); break;
+        case _UPF_TK_S1: _upf_bprintf("%" PRIi8, *((const int8_t *) data)); break;
         case _UPF_TK_S2: {
             int16_t temp;
             memcpy(&temp, data, sizeof(temp));
-            _upf_bprintf("%hd", temp);
+            _upf_bprintf("%" PRIi16, temp);
         } break;
         case _UPF_TK_S4: {
             int32_t temp;
             memcpy(&temp, data, sizeof(temp));
-            _upf_bprintf("%d", temp);
+            _upf_bprintf("%" PRIi32, temp);
         } break;
         case _UPF_TK_S8: {
             int64_t temp;
             memcpy(&temp, data, sizeof(temp));
-            _upf_bprintf("%ld", temp);
+            _upf_bprintf("%" PRIi64, temp);
         } break;
         case _UPF_TK_F4: {
             float temp;
@@ -4144,12 +4154,12 @@ __attribute__((no_sanitize_address)) static void _upf_print_type(_upf_struct_inf
         case _UPF_TK_BOOL:  _upf_bprintf("%s", *data ? "true" : "false"); break;
         case _UPF_TK_SCHAR: {
             char ch = *((char *) data);
-            _upf_bprintf("%hhd", ch);
+            _upf_bprintf("%" PRIi8, (int8_t) ch);
             if (_upf_is_printable(ch)) _upf_bprintf(" ('%s')", _upf_escape_char(ch));
         } break;
         case _UPF_TK_UCHAR: {
             char ch = *((char *) data);
-            _upf_bprintf("%hhu", ch);
+            _upf_bprintf("%" PRIu8, (uint8_t) ch);
             if (_upf_is_printable(ch)) _upf_bprintf(" ('%s')", _upf_escape_char(ch));
         } break;
         case _UPF_TK_VOID:    _UPF_WARN("Void must be a pointer. Ignoring this type."); break;
