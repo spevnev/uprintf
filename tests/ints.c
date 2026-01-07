@@ -3,7 +3,7 @@
 #include "uprintf.h"
 
 int main(void) {
-    unsigned long i = UINT64_MAX;
+    uintmax_t i = UINTMAX_MAX;
 
     // int16_t
     uprintf("%S\n", (short *) &i);

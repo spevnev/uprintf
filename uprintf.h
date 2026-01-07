@@ -133,6 +133,22 @@ extern int _upf_test_status;
 #include <sys/stat.h>
 #include <unistd.h>
 
+// ===================== BITNESS ==========================
+
+#if UPRINTF_WORD_SIZE == 32 || UINTPTR_MAX == UINT32_MAX
+#define _UPF_64BIT false
+#elif UPRINTF_WORD_SIZE == 64 || UINTPTR_MAX == UINT64_MAX
+#define _UPF_64BIT true
+#else
+#error Unknown or invalid word size, it must be 32 or 64 bits, it can be set using `#define UPRINTF_WORD_SIZE`
+#endif
+
+#if _UPF_64BIT
+#define _UPF_ELFW(x) ELF64_##x
+#else
+#define _UPF_ELFW(x) ELF32_##x
+#endif
+
 // =================== DECLARATIONS =======================
 
 // Feature test macros might not work since the header could have already been
@@ -456,7 +472,7 @@ typedef struct {
     _upf_named_type_vec args;
     bool is_variadic;
     bool is_external;
-    uint64_t pc;
+    uintptr_t pc;
 } _upf_function;
 
 _UPF_VECTOR_TYPEDEF(_upf_function_vec, _upf_function);
@@ -536,8 +552,8 @@ struct _upf_type {
 _UPF_VECTOR_TYPEDEF(_upf_type_vec, _upf_type *);
 
 typedef struct {
-    uint64_t start;
-    uint64_t end;
+    uintptr_t start;
+    uintptr_t end;
 } _upf_range;
 
 _UPF_VECTOR_TYPEDEF(_upf_range_vec, _upf_range);
@@ -1614,7 +1630,7 @@ static _upf_function _upf_parse_subprogram(const _upf_cu *cu, const uint8_t *die
     _UPF_ASSERT(cu != NULL && die != NULL && abbrev != NULL);
 
     _upf_function function = _UPF_ZERO_INIT;
-    function.pc = UINT64_MAX;
+    function.pc = UINTPTR_MAX;
     for (uint32_t i = 0; i < abbrev->attrs.length; i++) {
         _upf_attr attr = abbrev->attrs.data[i];
         switch (attr.name) {
@@ -2584,7 +2600,7 @@ static void _upf_parse_extern_functions(void) {
     for (int i = 0; i < rela_size; i++) {
         ElfW(Rela) rela = rela_table[i];
 
-        int symbol_idx = ELF64_R_SYM(rela.r_info);
+        ElfW(Word) symbol_idx = _UPF_ELFW(R_SYM)(rela.r_info);
         if (symbol_idx == STN_UNDEF) continue;
 
         ElfW(Sym) symbol = symbol_table[symbol_idx];
@@ -2594,7 +2610,7 @@ static void _upf_parse_extern_functions(void) {
     }
 }
 
-static _upf_function *_upf_get_extern_function(uint64_t absolute_pc) {
+static _upf_function *_upf_get_extern_function(uintptr_t absolute_pc) {
     const char **opt_function_name = _UPF_MAP_GET(&_upf_state.extern_functions, absolute_pc);
     if (opt_function_name == NULL) return NULL;
     return _UPF_MAP_STR_GET(&_upf_state.current_cu->extern_functions, *opt_function_name);
@@ -2624,13 +2640,17 @@ static void _upf_parse_elf(void) {
     const ElfW(Ehdr) *header = (ElfW(Ehdr) *) file;
 
     if (memcmp(header->e_ident, ELFMAG, SELFMAG) != 0 ||  //
-        header->e_ident[EI_CLASS] != ELFCLASS64 ||        //
         header->e_ident[EI_VERSION] != 1 ||               //
-        header->e_machine != EM_X86_64 ||                 //
         header->e_version != 1 ||                         //
         header->e_shentsize != sizeof(ElfW(Shdr))) {
         _UPF_ERROR("Unsupported or invalid ELF file.");
     }
+
+#if _UPF_64BIT
+    if (header->e_ident[EI_CLASS] != ELFCLASS64) _UPF_ERROR("ELF must be 64-bit");
+#else
+    if (header->e_ident[EI_CLASS] != ELFCLASS32) _UPF_ERROR("ELF must be 32-bit");
+#endif
 
     const ElfW(Shdr) *string_section = (ElfW(Shdr) *) (file + header->e_shoff + header->e_shstrndx * header->e_shentsize);
     const char *string_table = (char *) (file + string_section->sh_offset);
@@ -3037,7 +3057,7 @@ static void *_upf_scope_get_type_cb(const _upf_scope *scope, const void *data) {
 
 static void *_upf_ns_get_function_by_pc_cb(const _upf_ns *ns, const void *data) {
     _UPF_ASSERT(ns != NULL && data != NULL);
-    uint64_t pc = *((const uint64_t *) data);
+    uintptr_t pc = *((const uintptr_t *) data);
     for (uint32_t i = 0; i < ns->functions.capacity; i++) {
         if (ns->functions.data[i].hash == 0) continue;
         if (ns->functions.data[i].value.pc == pc) return &ns->functions.data[i].value;
@@ -3045,7 +3065,7 @@ static void *_upf_ns_get_function_by_pc_cb(const _upf_ns *ns, const void *data) 
     return NULL;
 }
 
-static _upf_function *_upf_get_function_by_pc(uint64_t pc) {
+static _upf_function *_upf_get_function_by_pc(uintptr_t pc) {
     for (uint32_t i = 0; i < _upf_state.current_scopes.length; i++) {
         _upf_scope *scope = _upf_state.current_scopes.data[i];
         for (uint32_t j = 0; j < scope->nss.length; j++) {
@@ -4078,11 +4098,11 @@ __attribute__((no_sanitize_address)) static void _upf_print_type(_upf_struct_inf
         case _UPF_TK_FUNCTION:       {
             const _upf_function *function = type->as.function.function_ptr;
             if (function == NULL) {
-                uint64_t relative_function_pc = data - _upf_state.base;
+                ptrdiff_t relative_function_pc = data - _upf_state.base;
                 function = _upf_get_function_by_pc(relative_function_pc);
             }
             if (function == NULL) {
-                uint64_t absolute_function_pc = (uint64_t) data;
+                uintptr_t absolute_function_pc = (uintptr_t) data;
                 function = _upf_get_extern_function(absolute_function_pc);
             }
 
@@ -4197,14 +4217,14 @@ static bool _upf_is_in_range(uint64_t addr, _upf_range_vec ranges) {
     return false;
 }
 
-static _upf_cu *_upf_find_cu(uint64_t pc) {
+static _upf_cu *_upf_find_cu(uintptr_t pc) {
     for (uint32_t i = 0; i < _upf_state.cus.length; i++) {
         if (_upf_is_in_range(pc, _upf_state.cus.data[i].scope.ranges)) return &_upf_state.cus.data[i];
     }
     return NULL;
 }
 
-static void _upf_find_scopes(uint64_t pc, _upf_scope *scope, _upf_scope_vec *result) {
+static void _upf_find_scopes(uintptr_t pc, _upf_scope *scope, _upf_scope_vec *result) {
     for (uint32_t i = 0; i < scope->scopes.length; i++) {
         if (!_upf_is_in_range(pc, scope->scopes.data[i]->ranges)) continue;
         _upf_find_scopes(pc, scope->scopes.data[i], result);
@@ -4299,7 +4319,7 @@ __attribute__((noinline)) void _upf_uprintf(const char *file_path, int line, con
 
     uint8_t *pc_ptr = (uint8_t *) __builtin_extract_return_addr(__builtin_return_address(0));
     _UPF_ASSERT(pc_ptr != NULL);
-    uint64_t pc = pc_ptr - _upf_state.base;
+    ptrdiff_t pc = pc_ptr - _upf_state.base;
 
     _upf_state.current_cu = _upf_find_cu(pc);
     _UPF_ASSERT(_upf_state.current_cu != NULL);
@@ -4354,6 +4374,8 @@ __attribute__((noinline)) void _upf_uprintf(const char *file_path, int line, con
 
 // ====================== UNDEF ===========================
 
+#undef _UPF_64BIT
+#undef _UPF_ELFW
 #undef _UPF_SET_TEST_STATUS
 #undef _UPF_LOG
 #undef _UPF_WARN

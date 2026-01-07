@@ -16,7 +16,7 @@ typedef struct {
     i8_t i8;
     short int i16;
     int32_t i32;
-    signed long int i64;
+    signed long int long i64;
 
     signed char sch;
     unsigned char uch;

@@ -6,7 +6,7 @@ Struct containing all types: {
     i8_t i8 = -128
     short int i16 = -32768
     int32_t i32 = -2147483648
-    long int i64 = -9223372036854775807
+    long long int i64 = -9223372036854775807
     signed char sch = -99
     unsigned char uch = 99 ('c')
     float f32 = 0.123000
