@@ -2550,6 +2550,10 @@ static void _upf_parse_dwarf(void) {
         }
         _upf_state.offset_size = is64bit ? 8 : 4;
 
+#if !_UPF_64BIT
+        if (is64bit) _UPF_ERROR("DWARF must be 32-bit");
+#endif
+
         const uint8_t *next = die + length;
 
         uint16_t version = 0;
@@ -2646,9 +2650,7 @@ static void _upf_parse_elf(void) {
         _UPF_ERROR("Unsupported or invalid ELF file.");
     }
 
-#if _UPF_64BIT
-    if (header->e_ident[EI_CLASS] != ELFCLASS64) _UPF_ERROR("ELF must be 64-bit");
-#else
+#if !_UPF_64BIT
     if (header->e_ident[EI_CLASS] != ELFCLASS32) _UPF_ERROR("ELF must be 32-bit");
 #endif
 
