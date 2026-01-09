@@ -143,10 +143,36 @@ extern int _upf_test_status;
 #error Unknown or invalid word size, it must be 32 or 64 bits, it can be set using `#define UPRINTF_WORD_SIZE`
 #endif
 
+// ======================= ELF ============================
+
 #if _UPF_64BIT
 #define _UPF_ELFW(x) ELF64_##x
 #else
 #define _UPF_ELFW(x) ELF32_##x
+#endif
+
+#if defined(__x86_64__)
+#define _UPF_ELF_GLOB_DAT R_X86_64_GLOB_DAT
+#elif defined(__i386__)
+#define _UPF_ELF_GLOB_DAT R_386_GLOB_DAT
+#elif defined(__aarch64__)
+#define _UPF_ELF_GLOB_DAT R_AARCH64_GLOB_DAT
+#elif defined(__arm__)
+#define _UPF_ELF_GLOB_DAT R_ARM_GLOB_DAT
+#elif defined(__riscv)
+#define _UPF_ELF_GLOB_DAT R_RISCV_64
+#elif defined(__powerpc64__)
+#define _UPF_ELF_GLOB_DAT R_PPC64_GLOB_DAT
+#elif defined(__powerpc__)
+#define _UPF_ELF_GLOB_DAT R_PPC_GLOB_DAT
+#elif defined(__s390x__)
+#define _UPF_ELF_GLOB_DAT R_390_GLOB_DAT
+#elif defined(__mips__)
+#define _UPF_ELF_GLOB_DAT R_MIPS_GLOB_DAT
+#elif defined(__sparc__)
+#define _UPF_ELF_GLOB_DAT R_SPARC_GLOB_DAT
+#else
+#error "Unsupported architecture"
 #endif
 
 // =================== DECLARATIONS =======================
@@ -725,7 +751,7 @@ typedef struct {
 
 _UPF_MAP_TYPEDEF(_upf_struct_info_map, _upf_struct_key, _upf_struct_info);
 
-_UPF_MAP_TYPEDEF(_upf_pc_cstr_map, uint64_t, const char *);
+_UPF_MAP_TYPEDEF(_upf_pc_cstr_map, uintptr_t, const char *);
 _UPF_MAP_TYPEDEF(_upf_die_type_map, const uint8_t *, _upf_type *);
 
 // =================== GLOBAL STATE =======================
@@ -2579,6 +2605,17 @@ static void _upf_parse_dwarf(void) {
 
 // ================= EXTERN FUNCTIONS =====================
 
+static void _upf_process_relocation(const ElfW(Sym) * symbol_table, const char *string_table, ElfW(Xword) info, ElfW(Addr) offset) {
+    ElfW(Word) symbol_idx = _UPF_ELFW(R_SYM)(info);
+    ElfW(Word) rel_type = _UPF_ELFW(R_TYPE)(info);
+    if (symbol_idx == STN_UNDEF || rel_type != _UPF_ELF_GLOB_DAT) return;
+
+    ElfW(Sym) symbol = symbol_table[symbol_idx];
+    uintptr_t symbol_address = *((uintptr_t *) (_upf_state.base + offset));
+    const char *symbol_name = string_table + symbol.st_name;
+    _UPF_MAP_SET(&_upf_state.extern_functions, symbol_address, symbol_name);
+}
+
 // Extern function mapping: function pointer -> GOT -> RELA -> symbol -> name -> DIE.
 static void _upf_parse_extern_functions(void) {
     _UPF_ASSERT(_DYNAMIC != NULL);
@@ -2587,6 +2624,8 @@ static void _upf_parse_extern_functions(void) {
     const ElfW(Sym) *symbol_table = NULL;
     const ElfW(Rela) *rela_table = NULL;
     int rela_size = -1;
+    const ElfW(Rel) *rel_table = NULL;
+    int rel_size = -1;
     for (const ElfW(Dyn) *dyn = _DYNAMIC; dyn->d_tag != DT_NULL; dyn++) {
         switch (dyn->d_tag) {
             case DT_STRTAB:  string_table = (char *) dyn->d_un.d_ptr; break;
@@ -2594,23 +2633,30 @@ static void _upf_parse_extern_functions(void) {
             case DT_RELA:    rela_table = (ElfW(Rela) *) dyn->d_un.d_ptr; break;
             case DT_RELASZ:  rela_size = dyn->d_un.d_val / sizeof(ElfW(Rela)); break;
             case DT_RELAENT: _UPF_ASSERT(dyn->d_un.d_val == sizeof(ElfW(Rela))); break;
+            case DT_REL:     rel_table = (ElfW(Rel) *) dyn->d_un.d_ptr; break;
+            case DT_RELSZ:   rel_size = dyn->d_un.d_val / sizeof(ElfW(Rel)); break;
+            case DT_RELENT:  _UPF_ASSERT(dyn->d_un.d_val == sizeof(ElfW(Rel))); break;
         }
     }
-    if (string_table == NULL || symbol_table == NULL || rela_table == NULL || rela_size == -1) {
+    if (string_table == NULL || symbol_table == NULL
+        || ((rela_table == NULL || rela_size == -1) && (rel_table == NULL || rel_size == -1))) {
         _UPF_WARN("Failed to find all required ELF sections. Ignoring extern functions.");
         return;
     }
+    _UPF_ASSERT(rela_table == NULL || rel_table == NULL);
 
-    for (int i = 0; i < rela_size; i++) {
-        ElfW(Rela) rela = rela_table[i];
+    if (rela_table != NULL && rela_size != -1) {
+        for (int i = 0; i < rela_size; i++) {
+            ElfW(Rela) rela = rela_table[i];
+            _upf_process_relocation(symbol_table, string_table, _UPF_ELFW(R_SYM)(rela.r_info), rela.r_offset);
+        }
+    }
 
-        ElfW(Word) symbol_idx = _UPF_ELFW(R_SYM)(rela.r_info);
-        if (symbol_idx == STN_UNDEF) continue;
-
-        ElfW(Sym) symbol = symbol_table[symbol_idx];
-        uint64_t symbol_address = *((uint64_t *) (_upf_state.base + rela.r_offset));
-        const char *symbol_name = string_table + symbol.st_name;
-        _UPF_MAP_SET(&_upf_state.extern_functions, symbol_address, symbol_name);
+    if (rel_table != NULL && rel_size != -1) {
+        for (int i = 0; i < rel_size; i++) {
+            ElfW(Rel) rel = rel_table[i];
+            _upf_process_relocation(symbol_table, string_table, _UPF_ELFW(R_SYM)(rel.r_info), rel.r_offset);
+        }
     }
 }
 
@@ -4378,6 +4424,7 @@ __attribute__((noinline)) void _upf_uprintf(const char *file_path, int line, con
 
 #undef _UPF_64BIT
 #undef _UPF_ELFW
+#undef _UPF_ELF_GLOB_DAT
 #undef _UPF_SET_TEST_STATUS
 #undef _UPF_LOG
 #undef _UPF_WARN
