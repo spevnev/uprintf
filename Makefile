@@ -98,7 +98,7 @@ $(BUILD_DIR)/$(EXAMPLE_DIR)/taskflow: $(EXAMPLE_DIR)/taskflow.cc $(LIB_DIR)/task
 
 $(LIB_DIR)/taskflow:
 	@mkdir -p $(@D)
-	git clone --depth 1 https://github.com/taskflow/taskflow $(LIB_DIR)/taskflow_src
+	git clone --depth 1 --branch v3.11.0 https://github.com/taskflow/taskflow $(LIB_DIR)/taskflow_src
 	mv $(LIB_DIR)/taskflow_src/taskflow $@
 	rm -rf $(LIB_DIR)/taskflow_src
 
