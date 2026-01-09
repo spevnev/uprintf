@@ -39,7 +39,7 @@ int main(void) {
     uprintf("%S\n", (unsigned int *) &i);
     uprintf("%S\n", (int unsigned *) &i);
 
-    // int64_t
+    // 64-bit ? int64_t : int32_t
     uprintf("%S\n", (long *) &i);
     uprintf("%S\n", (int long *) &i);
     uprintf("%S\n", (long int *) &i);
@@ -52,7 +52,7 @@ int main(void) {
     uprintf("%S\n", (signed long int *) &i);
     uprintf("%S\n", (long signed int *) &i);
 
-    // uint64_t
+    // 64-bit ? uint64_t : uint32_t
     uprintf("%S\n", (unsigned long *) &i);
     uprintf("%S\n", (long unsigned *) &i);
     uprintf("%S\n", (int unsigned long *) &i);

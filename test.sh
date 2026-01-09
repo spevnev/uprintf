@@ -22,7 +22,8 @@ baseline_path=$8
 log_path="$bin_path.log"
 out_path="$bin_path.out"
 diff_path="$bin_path.diff"
-is_clang=$( "$compiler" --version 2>&1 | grep -q 'clang' && echo true || echo false)
+is_clang=$("$compiler" --version 2>&1 | grep -q 'clang' && echo true || echo false)
+is_64bit=$([ "$(getconf LONG_BIT)" = "64" ] && echo true || echo false)
 
 
 executables=(wdiff $compiler awk sed)
@@ -80,6 +81,11 @@ function get_similarity {
     else
         # GCC doesn't output the information about the second function.
         if [ "$test" = "reference" ]; then result=85; fi
+    fi
+
+    if [ $is_64bit = false ]; then
+        # `(unsigned) long int` has different size depending on architecture.
+        if [ "$test" = "ints" ]; then result=90; fi
     fi
 
     # FILE has different implementation depending on stdio.h and it often has pointers

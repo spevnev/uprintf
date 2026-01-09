@@ -1,12 +1,12 @@
 Struct containing all types: {
     uint8_t u8 = 255
-    short unsigned int u16 = 65535
-    unsigned int u32 = 4294967295
-    long long unsigned int u64 = 18446744073709551615
+    uint16_t u16 = 65535
+    uint32_t u32 = 4294967295
+    uint64_t u64 = 18446744073709551615
     i8_t i8 = -128
-    short int i16 = -32768
+    int16_t i16 = -32768
     int32_t i32 = -2147483648
-    long long int i64 = -9223372036854775807
+    int64_t i64 = -9223372036854775807
     signed char sch = -99
     unsigned char uch = 99 ('c')
     float f32 = 0.123000

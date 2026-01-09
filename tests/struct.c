@@ -9,14 +9,14 @@ typedef double long_float;
 
 typedef struct {
     uint8_t u8;
-    unsigned short u16;
-    unsigned u32;
-    long unsigned long int u64;
+    uint16_t u16;
+    uint32_t u32;
+    uint64_t u64;
 
     i8_t i8;
-    short int i16;
+    int16_t i16;
     int32_t i32;
-    signed long int long i64;
+    int64_t i64;
 
     signed char sch;
     unsigned char uch;
