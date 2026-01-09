@@ -7,7 +7,7 @@ on:
     branches:
       - main
 jobs:
-  run_tests:
+  test:
     runs-on: ubuntu-24.04
     strategy:
       matrix:
@@ -40,11 +40,17 @@ jobs:
             cc: gcc-11
             cxx: g++-11
     steps:
-    - uses: actions/checkout@v4
-    - name: Install dependencies
-      run: sudo apt update && sudo apt install -y wdiff ${{ matrix.packages }}
-    - name: Run tests
-      env:
-        C_COMPILERS: ${{ matrix.cc }}
-        CXX_COMPILERS: ${{ matrix.cxx }}
-      run: make tests
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: sudo apt update && sudo apt install -y wdiff ${{ matrix.packages }}
+      - name: Run tests
+        env:
+          C_COMPILERS: ${{ matrix.cc }}
+          CXX_COMPILERS: ${{ matrix.cxx }}
+        run: make tests
+  test_32bit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run tests
+        run: docker run -v $PWD:/app --platform linux/386 i386/debian sh -c "apt update && apt install -y wdiff gcc g++ clang make && cd /app && make tests"
