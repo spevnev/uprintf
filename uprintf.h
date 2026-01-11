@@ -1661,6 +1661,7 @@ static const char *_upf_get_type_name(const _upf_cu *cu, const uint8_t *die, con
 }
 
 static const uint8_t *_upf_get_import_die(const _upf_cu *cu, const uint8_t *die, const _upf_abbrev *abbrev) {
+    _UPF_ASSERT(cu != NULL && die != NULL && abbrev != NULL);
     for (uint32_t i = 0; i < abbrev->attrs.length; i++) {
         _upf_attr attr = abbrev->attrs.data[i];
         if (attr.name == DW_AT_import) return cu->base + _upf_get_ref(die, attr.form);
