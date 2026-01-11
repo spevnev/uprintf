@@ -114,7 +114,6 @@ extern int _upf_test_status;
 
 // ===================== INCLUDES =========================
 
-#include <dlfcn.h>
 #include <elf.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -145,6 +144,9 @@ extern int _upf_test_status;
 
 // ======================= ELF ============================
 
+// Linker-generated entry to the dynamic section of ELF.
+extern ElfW(Dyn) _DYNAMIC[];
+
 #if _UPF_64BIT
 #define _UPF_ELFW(x) ELF64_##x
 #else
@@ -174,25 +176,6 @@ extern int _upf_test_status;
 #else
 #error "Unsupported architecture"
 #endif
-
-// =================== DECLARATIONS =======================
-
-// Feature test macros might not work since the header could have already been
-// included and expanded without them, so the functions must be declared here.
-
-ssize_t getline(char **lineptr, size_t *n, FILE *stream);
-
-// Partial redefinition of dl_phdr_info.
-typedef struct {
-    ElfW(Addr) dlpi_addr;
-    const char *dlpi_name;
-} _upf_dl_phdr_info;
-
-struct dl_phdr_info;
-int dl_iterate_phdr(int (*callback)(struct dl_phdr_info *info, size_t size, void *data), void *data);
-
-// Linker-generated entry to the dynamic section of ELF.
-extern ElfW(Dyn) _DYNAMIC[];
 
 // ===================== dwarf.h ==========================
 
@@ -394,8 +377,6 @@ int _upf_test_status = EXIT_SUCCESS;
     } while (0)
 
 #define _UPF_OUT_OF_MEMORY() _UPF_ERROR("Process ran out of memory.")
-
-#define _UPF_NO_DEBUG_INFO_ERROR "Ensure that the executable contains debugging information of at least 2nd level (-g2 or -g3)."
 
 // ======================= C++ ============================
 
@@ -2668,13 +2649,15 @@ static _upf_function *_upf_get_extern_function(uintptr_t absolute_pc) {
 
 // ======================= ELF ============================
 
-static void _upf_parse_elf(void) {
+static void _upf_parse_elf(const char *object_path) {
+    _UPF_ASSERT(object_path != NULL && object_path[0] == '/');
+
     struct stat file_info;
-    if (stat("/proc/self/exe", &file_info) == -1) _UPF_ERROR("Failed to stat \"/proc/self/exe\": %s.", strerror(errno));
+    if (stat(object_path, &file_info) == -1) _UPF_ERROR("Failed to stat \"%s\": %s.", object_path, strerror(errno));
     size_t size = file_info.st_size;
 
-    int fd = open("/proc/self/exe", O_RDONLY);
-    if (fd == -1) _UPF_ERROR("Failed to open \"/proc/self/exe\": %s.", strerror(errno));
+    int fd = open(object_path, O_RDONLY);
+    if (fd == -1) _UPF_ERROR("Failed to open \"%s\": %s.", object_path, strerror(errno));
 
     // A new instance of file must be mmap-ed because the one loaded in memory
     // only contains information needed at runtime, and doesn't include debug
@@ -2728,7 +2711,7 @@ static void _upf_parse_elf(void) {
     }
 
     if (_upf_state.die == NULL || _upf_state.abbrev == NULL || _upf_state.str == NULL) {
-        _UPF_ERROR("Failed to find the debugging information. %s", _UPF_NO_DEBUG_INFO_ERROR);
+        _UPF_ERROR("Failed to find the debugging information. Make sure that the executable is compiled with -g2 or -g3.");
     }
 }
 
@@ -3653,39 +3636,77 @@ static void _upf_init_parsing_rules(void) {
 
 // ================== /proc/pid/maps ======================
 
-static _upf_range_vec _upf_get_readable_addresses(void) {
+typedef bool (*_upf_iterate_maps_cb)(uintptr_t start, uintptr_t end, bool readable, bool executable, uintmax_t offset, const char *path,
+                                     void *data);
+
+static void _upf_iterate_maps(_upf_iterate_maps_cb callback, void *data) {
+    _UPF_ASSERT(callback != NULL && data != NULL);
+
     FILE *file = fopen("/proc/self/maps", "r");
     if (file == NULL) _UPF_ERROR("Failed to open \"/proc/self/maps\": %s.", strerror(errno));
 
-    _upf_range_vec ranges = _UPF_ZERO_INIT;
-    _upf_range range = _UPF_ZERO_INIT;
-    size_t length = 0;
-    char *line = NULL;
-    ssize_t read;
-    while ((read = getline(&line, &length, file)) != -1) {
-        if (read == 0) continue;
+    char line[8192];
+    uintptr_t start, end;
+    char r, x;
+    uintmax_t offset;
+    int n;
+    while (fgets(line, sizeof(line), file) != NULL) {
+        size_t length = strlen(line);
+        if (length + 1 == sizeof(line)) _UPF_ERROR("Failed to parse \"/proc/self/maps\": line is too long.");
 
-        char *cur = line;
-        char *cur_end = NULL;
-        errno = 0;
-        uintmax_t start = strtoumax(cur, &cur_end, 16);
-        if (*cur_end != '-' || errno != 0) _UPF_ERROR("Failed to parse \"/proc/self/maps\": invalid format.");
-        cur = cur_end + 1;
+        if (sscanf(line, "%" SCNxPTR "-%" SCNxPTR " %c%*c%c%*c %" SCNxMAX " %*s %*s %n", &start, &end, &r, &x, &offset, &n) != 5) {
+            _UPF_ERROR("Failed to parse \"/proc/self/maps\": invalid format.");
+        }
 
-        uintmax_t end = strtoumax(cur, &cur_end, 16);
-        if (*cur_end != ' ' || errno != 0) _UPF_ERROR("Failed to parse \"/proc/self/maps\": invalid format.");
-        cur = cur_end + 1;
+        // Remove the trialing newline.
+        if (line[length - 1] == '\n') line[length - 1] = '\0';
+        if (callback(start, end, r == 'r', x == 'x', offset, line + n, data)) break;
+    }
+    if (ferror(file)) _UPF_ERROR("Failed to read \"/proc/self/maps\": %s.", strerror(errno));
+    fclose(file);
+}
 
-        if (*cur != 'r') continue;
+typedef struct {
+    const void **address;
+    const char **path;
+} _upf_get_this_object_cb_data;
 
-        if (start > UINTPTR_MAX || end > UINTPTR_MAX) _UPF_ERROR("Failed to parse \"/proc/self/maps\": address is too long.");
+static bool _upf_get_this_object_cb(uintptr_t start, uintptr_t end, bool readable, bool executable, uintmax_t offset, const char *path,
+                                    void *raw_data) {
+    const uintptr_t function_address = (uintptr_t) _upf_get_this_object_cb;
+    if (!(start <= function_address && function_address <= end && readable && executable)) return false;
+
+    _upf_get_this_object_cb_data *data = (_upf_get_this_object_cb_data *) raw_data;
+    *data->path = _upf_copy_string(path);
+    *data->address = (void *) (start - offset);
+    return true;
+}
+
+// Finds address and path of the current object (executable or shared library).
+static void _upf_get_this_object(const char **path, const void **address) {
+    _UPF_ASSERT(path != NULL && address != NULL);
+    _upf_get_this_object_cb_data data = _UPF_ZERO_INIT;
+    data.path = path;
+    data.address = address;
+    _upf_iterate_maps(_upf_get_this_object_cb, (void *) &data);
+    if (*path == NULL || *address == NULL) _UPF_ERROR("Failed to find information about the current object.");
+}
+
+static bool _upf_get_readable_addresses_cb(uintptr_t start, uintptr_t end, bool readable, __attribute__((unused)) bool executable,
+                                           __attribute__((unused)) uintmax_t offset, __attribute__((unused)) const char *path,
+                                           void *raw_data) {
+    if (readable) {
+        _upf_range range = _UPF_ZERO_INIT;
         range.start = start;
         range.end = end;
-        _UPF_VECTOR_PUSH(&ranges, range);
+        _UPF_VECTOR_PUSH((_upf_range_vec *) raw_data, range);
     }
-    free(line);
-    fclose(file);
+    return false;
+}
 
+static _upf_range_vec _upf_get_readable_addresses(void) {
+    _upf_range_vec ranges = _UPF_ZERO_INIT;
+    _upf_iterate_maps(_upf_get_readable_addresses_cb, (void *) &ranges);
     return ranges;
 }
 
@@ -4237,27 +4258,6 @@ __attribute__((no_sanitize_address)) static void _upf_print_type(_upf_struct_inf
 
 // ======================== PC ============================
 
-static int _upf_phdr_callback(struct dl_phdr_info *raw_info, __attribute__((unused)) size_t size, void *raw_data) {
-    _upf_dl_phdr_info *info = (_upf_dl_phdr_info *) raw_info;
-    void **data = (void **) raw_data;
-
-    // Empty name indicates the current executable.
-    if (info->dlpi_name[0] == '\0') {
-        *data = (void *) info->dlpi_addr;
-        // Return non-zero value to exit early.
-        return 1;
-    }
-    return 0;
-}
-
-// Returns address at which the current executable is loaded in memory.
-static void *_upf_get_this_executable_address(void) {
-    void *base = NULL;
-    dl_iterate_phdr(&_upf_phdr_callback, &base);
-    _UPF_ASSERT(base != NULL);
-    return base;
-}
-
 static bool _upf_is_in_range(uint64_t addr, _upf_range_vec ranges) {
     for (uint32_t i = 0; i < ranges.length; i++) {
         if (ranges.data[i].start <= addr && addr < ranges.data[i].end) return true;
@@ -4322,11 +4322,13 @@ static void _upf_add_ignored_types(void) {
 __attribute__((constructor)) static void _upf_init(void) {
     if (setjmp(_upf_state.error_jmp_buf) != 0) return;
 
-    _upf_state.base = (const uint8_t *) _upf_get_this_executable_address();
+    const char *object_path = NULL;
+    _upf_get_this_object(&object_path, (const void **) &_upf_state.base);
+
     _upf_init_parsing_rules();
     _upf_add_ignored_types();
 
-    _upf_parse_elf();
+    _upf_parse_elf(object_path);
     _upf_parse_extern_functions();
     _upf_parse_dwarf();
 
@@ -4431,7 +4433,6 @@ __attribute__((noinline)) void _upf_uprintf(const char *file_path, int line, con
 #undef _UPF_ERROR
 #undef _UPF_ASSERT
 #undef _UPF_OUT_OF_MEMORY
-#undef _UPF_NO_DEBUG_INFO_ERROR
 #undef _UPF_ZERO_INIT
 #undef _UPF_VECTOR_TYPEDEF
 #undef _UPF_MAP_TYPEDEF
