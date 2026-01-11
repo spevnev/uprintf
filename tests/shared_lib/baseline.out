@@ -1,0 +1,7 @@
+Common: {
+    int a = 1
+}
+LibPrivate: {
+    int b = 2
+}
+BinPrivate: {} <opaque>

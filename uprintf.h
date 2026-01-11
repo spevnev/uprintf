@@ -3746,7 +3746,8 @@ static bool _upf_get_this_object_cb(
 
     _upf_get_this_object_cb_data *data = (_upf_get_this_object_cb_data *) raw_data;
     *data->path = _upf_copy_string(path);
-    *data->address = (void *) (start - offset);
+    _UPF_ASSERT(offset < UINTPTR_MAX);
+    *data->address = (void *) (start - (uintptr_t) offset);
     return true;
 }
 

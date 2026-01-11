@@ -1,11 +1,12 @@
 prefix     := /usr/local
 includedir := $(prefix)/include
 
-BUILD_DIR    := build
-LIB_DIR      := libs
-EXAMPLE_DIR  := examples
-TEST_DIR     := tests
-BASELINE_DIR := tests/baselines
+BUILD_DIR      := build
+LIB_DIR        := libs
+EXAMPLE_DIR    := examples
+TEST_DIR       := tests
+BASELINE_DIR   := tests/baselines
+SHARED_LIB_DIR := tests/shared_lib
 
 # Test flags
 COMMON_FLAGS := -Wall -Wextra -Werror -pedantic -I . -DUPRINTF_TEST -fsanitize=undefined,address,leak -g2
@@ -116,17 +117,28 @@ $(EXAMPLE_DIR)/%.out: $(BUILD_DIR)/$(EXAMPLE_DIR)/%
 # ======================== Tests ==========================
 
 test: tests
-tests: $(foreach O,$(O_LEVELS),                                                               \
-			$(foreach C,$(C_COMPILERS),$(foreach T,$(C_TESTS),$(BUILD_DIR)/test/$T/$C-$O))    \
-			$(foreach C,$(CXX_COMPILERS),$(foreach T,$(CXX_TESTS),$(BUILD_DIR)/test/$T/$C-$O)))
+tests: $(BUILD_DIR)/$(SHARED_LIB_DIR)/bin                                                      \
+		$(foreach O,$(O_LEVELS),                                                               \
+			$(foreach C,$(C_COMPILERS),$(foreach T,$(C_TESTS),$(BUILD_DIR)/tests/$T/$C-$O))    \
+			$(foreach C,$(CXX_COMPILERS),$(foreach T,$(CXX_TESTS),$(BUILD_DIR)/tests/$T/$C-$O)))
+
+$(BUILD_DIR)/$(SHARED_LIB_DIR)/bin: $(SHARED_LIB_DIR)/bin.c $(BUILD_DIR)/$(SHARED_LIB_DIR)/libtest.so
+	@mkdir -p $(@D)
+	$(CC) $(CFLAGS) $< -o $@ -L$(BUILD_DIR)/$(SHARED_LIB_DIR) -ltest -Wl,-rpath=$(BUILD_DIR)/$(SHARED_LIB_DIR)
+	./$@ > $(BUILD_DIR)/$(SHARED_LIB_DIR)/out
+	diff $(BUILD_DIR)/$(SHARED_LIB_DIR)/out $(SHARED_LIB_DIR)/baseline.out
+
+$(BUILD_DIR)/$(SHARED_LIB_DIR)/libtest.so: $(SHARED_LIB_DIR)/lib.c
+	@mkdir -p $(@D)
+	$(CC) $(CFLAGS) -fPIC -shared $< -o $@
 
 define C_TEST_TEMPLATE
-$(BUILD_DIR)/test/$1/$2-$3: $(TEST_DIR)/$1.c $(BUILD_DIR)/impl/$2.o
+$(BUILD_DIR)/tests/$1/$2-$3: $(TEST_DIR)/$1.c $(BUILD_DIR)/impl/$2.o
 	@./test.sh $1 "$1-$2-$3" $2 "$(CFLAGS) -$3" $$^ $$@ $(BASELINE_DIR)/$1.out
 endef
 
 define CXX_TEST_TEMPLATE
-$(BUILD_DIR)/test/$1/$2-$3: $(TEST_DIR)/$1.cc $(BUILD_DIR)/impl/$2.o
+$(BUILD_DIR)/tests/$1/$2-$3: $(TEST_DIR)/$1.cc $(BUILD_DIR)/impl/$2.o
 	@./test.sh $1 "$1-$2-$3" $2 "$(CXXFLAGS) -$3" $$^ $$@ $(BASELINE_DIR)/$1.out
 endef
 
