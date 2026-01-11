@@ -3743,7 +3743,7 @@ static bool _upf_get_this_object_cb(
     void *raw_data
 ) {
     const uintptr_t function_address = (uintptr_t) _upf_get_this_object_cb;
-    if (!(start <= function_address && function_address <= end && readable && executable)) return false;
+    if (!(start <= function_address && function_address < end && readable && executable)) return false;
 
     _upf_get_this_object_cb_data *data = (_upf_get_this_object_cb_data *) raw_data;
     *data->path = _upf_copy_string(path);
@@ -3790,7 +3790,7 @@ static const void *_upf_get_memory_region_end(const void *ptr) {
     _UPF_ASSERT(ptr != NULL);
     for (uint32_t i = 0; i < _upf_state.addresses.length; i++) {
         _upf_range range = _upf_state.addresses.data[i];
-        if ((void *) range.start <= ptr && ptr <= (void *) range.end) return (void *) range.end;
+        if ((void *) range.start <= ptr && ptr < (void *) range.end) return (void *) range.end;
     }
     return NULL;
 }
@@ -3799,7 +3799,7 @@ static bool _upf_is_memory_readable(const uint8_t *ptr, size_t size) {
     _UPF_ASSERT(ptr != NULL);
     if (_upf_get_memory_region_end(ptr) == NULL) return false;
     if (size == 0 || size == SIZE_MAX) return true;
-    return _upf_get_memory_region_end(ptr + size) != NULL;
+    return _upf_get_memory_region_end(ptr + (size - 1)) != NULL;
 }
 
 // ===================== PRINTING =========================
@@ -4342,7 +4342,7 @@ __attribute__((no_sanitize_address)) static void _upf_print_type(
 
 // ======================== PC ============================
 
-static bool _upf_is_in_range(uint64_t addr, _upf_range_vec ranges) {
+static bool _upf_is_in_ranges(uint64_t addr, _upf_range_vec ranges) {
     for (uint32_t i = 0; i < ranges.length; i++) {
         if (ranges.data[i].start <= addr && addr < ranges.data[i].end) return true;
     }
@@ -4351,14 +4351,14 @@ static bool _upf_is_in_range(uint64_t addr, _upf_range_vec ranges) {
 
 static _upf_cu *_upf_find_cu(uintptr_t pc) {
     for (uint32_t i = 0; i < _upf_state.cus.length; i++) {
-        if (_upf_is_in_range(pc, _upf_state.cus.data[i].scope.ranges)) return &_upf_state.cus.data[i];
+        if (_upf_is_in_ranges(pc, _upf_state.cus.data[i].scope.ranges)) return &_upf_state.cus.data[i];
     }
     return NULL;
 }
 
 static void _upf_find_scopes(uintptr_t pc, _upf_scope *scope, _upf_scope_vec *result) {
     for (uint32_t i = 0; i < scope->scopes.length; i++) {
-        if (!_upf_is_in_range(pc, scope->scopes.data[i]->ranges)) continue;
+        if (!_upf_is_in_ranges(pc, scope->scopes.data[i]->ranges)) continue;
         _upf_find_scopes(pc, scope->scopes.data[i], result);
         _UPF_VECTOR_PUSH(result, scope->scopes.data[i]);
         break;
