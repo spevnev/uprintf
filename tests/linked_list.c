@@ -17,7 +17,7 @@ int main(void) {
     Node *cur = &head;
     for (int i = 1; i < NODES; i++) {
         Node *node = (Node *) malloc(sizeof(*node));
-        if (node == NULL) return 1;
+        if (node == NULL) return EXIT_FAILURE;
         node->value = i * 2;
         node->next = NULL;
 

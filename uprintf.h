@@ -76,8 +76,8 @@ extern int _upf_test_status;
 // them to get expanded before stringification.
 #define _upf_stringify_va_args(...) #__VA_ARGS__
 
-// The noop instruction is required to keep the return PC within the scope of the
-// caller function. Otherwise, it might be optimized to return outside of it.
+// The noop instruction is required to prevent tail call optimization
+// and keep the return PC within the scope of the caller function.
 #define uprintf(fmt, ...)                                                                        \
     do {                                                                                         \
         _upf_uprintf(__FILE__, __LINE__, fmt, _upf_stringify_va_args(__VA_ARGS__), __VA_ARGS__); \
@@ -86,7 +86,7 @@ extern int _upf_test_status;
 
 #endif  // UPRINTF_H
 
-// ====================== SOURCE ==========================
+// ================== IMPLEMENTATION ======================
 
 #ifdef UPRINTF_IMPLEMENTATION
 
@@ -4458,7 +4458,7 @@ __attribute__((noinline)) void _upf_uprintf(const char *file_path, int line, con
     ptrdiff_t pc = pc_ptr - _upf_state.base;
 
     _upf_state.current_cu = _upf_find_cu(pc);
-    _UPF_ASSERT(_upf_state.current_cu != NULL);
+    if (_upf_state.current_cu == NULL) _UPF_ERROR("Failed to find the current compilation unit.");
 
     _upf_state.current_scopes.length = 0;
     _upf_find_scopes(pc, &_upf_state.current_cu->scope, &_upf_state.current_scopes);

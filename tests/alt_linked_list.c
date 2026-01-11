@@ -26,7 +26,7 @@ int main(void) {
         if (i % 2 == 0) {
             NodeB *cur = (NodeB *) _cur;
             NodeA *node = (NodeA *) malloc(sizeof(*node));
-            if (node == NULL) return 1;
+            if (node == NULL) return EXIT_FAILURE;
             node->value = i * 2;
             node->next = NULL;
 
@@ -35,7 +35,7 @@ int main(void) {
         } else {
             NodeA *cur = (NodeA *) _cur;
             NodeB *node = (NodeB *) malloc(sizeof(*node));
-            if (node == NULL) return 1;
+            if (node == NULL) return EXIT_FAILURE;
             node->value = i * -1.23;
             node->next = NULL;
 
