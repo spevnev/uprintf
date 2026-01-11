@@ -22,11 +22,9 @@ baseline_path=$8
 log_path="$bin_path.log"
 out_path="$bin_path.out"
 diff_path="$bin_path.diff"
-is_clang=$("$compiler" --version 2>&1 | grep -q 'clang' && echo true || echo false)
-is_64bit=$([ "$(getconf LONG_BIT)" = "64" ] && echo true || echo false)
 
 
-executables=(wdiff $compiler awk sed)
+executables=(wdiff $compiler awk sed getconf)
 for executable in "${executables[@]}"; do
     if [ ! -x "$(command -v $executable)" ]; then
         echo -e "$RED[ERROR]$RESET $executable is not installed"
@@ -34,6 +32,9 @@ for executable in "${executables[@]}"; do
     fi
 done
 
+
+is_clang=$("$compiler" --version 2>&1 | grep -q 'clang' && echo true || echo false)
+is_64bit=$([ "$(getconf LONG_BIT)" = "64" ] && echo true || echo false)
 
 # Some tests fail on older versions of compilers
 function should_skip {
@@ -53,13 +54,13 @@ function should_skip {
     echo $result
 }
 
-# Disable asan for tests that are known to leak memory.
+# Disable address sanitizer for tests that are expected to leak memory.
 function disable_asan {
     if   [ "$test" = "new" ]; then echo true;
     else echo false; fi
 }
 
-# Regular tests share single uprintf implementation, but option tests need their own.
+# Tests that #define options need to recompile the implementation.
 function use_shared_implementation {
     if   [ "$test" = "depth_option" ];       then echo false;
     elif [ "$test" = "indentation_option" ]; then echo false;
@@ -68,7 +69,6 @@ function use_shared_implementation {
     else echo true; fi
 }
 
-# Some tests may not match baseline exactly, so they get custom target similarity percentage.
 function get_similarity {
     result=100
 
@@ -106,7 +106,6 @@ if [ $(should_skip) = true ]; then
     exit 0
 fi
 
-# Compiling
 mkdir -p $(dirname $bin_path)
 if [ $(use_shared_implementation) = true ]; then
     $compiler $flags $src_path $impl_path -o $bin_path > $log_path 2>&1
