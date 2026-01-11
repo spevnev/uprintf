@@ -1,35 +1,3 @@
-// uprintf v1.1.0
-// Documentation, examples and issues: https://github.com/spevnev/uprintf
-
-// Minimal example:
-/*
-#define UPRINTF_IMPLEMENTATION
-#include "uprintf.h"
-
-typedef struct {
-    int i;
-    float f;
-    const char *str;
-} S;
-
-int main(void) {
-    S s = {1, 2.3F, "string"};
-    uprintf("structure: %S\n", &s);
-    return 0;
-}
-*/
-
-// Building and running:
-/*
-$ gcc -g2 example.c
-$ ./a.out
-structure: {
-    int i = 1
-    float f = 2.300000
-    const char *str = 0x559467793d83 ("string")
-}
-*/
-
 // MIT License
 //
 // Copyright (c) 2024 Serhii Pievniev
@@ -51,6 +19,41 @@ structure: {
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
+
+/*
+
+uprintf v1.2.0
+Documentation, examples and issues: https://github.com/spevnev/uprintf
+
+Minimal example:
+```
+#define UPRINTF_IMPLEMENTATION
+#include "uprintf.h"
+
+typedef struct {
+    int i;
+    float f;
+    const char *str;
+} S;
+
+int main(void) {
+    S s = {1, 2.3F, "string"};
+    uprintf("structure: %S\n", &s);
+    return 0;
+}
+```
+
+Building and running:
+```
+$ gcc -g2 example.c
+$ ./a.out
+structure: {
+    int i = 1
+    float f = 2.300000
+    const char *str = 0x559467793d83 ("string")
+}
+```
+*/
 
 // ====================== HEADER ==========================
 
