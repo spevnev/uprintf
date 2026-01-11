@@ -923,8 +923,16 @@ static bool _upf_map_impl_keys_equal(const void *a, const void *b, bool is_key_s
 #define _UPF_MAP_GET_HASH(data, index, entry_size) (*((uint32_t *) _UPF_MAP_GET_ENTRY(data, index, entry_size)))
 
 // Find an element by the key, return whether it exists and write index to `result`.
-static bool _upf_map_impl_find(const uint8_t *data, uint32_t capacity, size_t entry_size, void *key, bool is_key_str, size_t key_size,
-                               size_t key_offset, uint32_t *result) {
+static bool _upf_map_impl_find(
+    const uint8_t *data,
+    uint32_t capacity,
+    size_t entry_size,
+    void *key,
+    bool is_key_str,
+    size_t key_size,
+    size_t key_offset,
+    uint32_t *result
+) {
     if (capacity == 0) return false;
 
     uint32_t index = _upf_map_impl_hash_key(key, is_key_str, key_size) % capacity;
@@ -940,8 +948,19 @@ static bool _upf_map_impl_find(const uint8_t *data, uint32_t capacity, size_t en
     return false;
 }
 
-static void _upf_map_impl_set(uint8_t **data, uint32_t *size, uint32_t *capacity, size_t entry_size, void *key, bool is_key_str,
-                              size_t key_size, size_t key_offset, void *value, size_t value_size, size_t value_offset) {
+static void _upf_map_impl_set(
+    uint8_t **data,
+    uint32_t *size,
+    uint32_t *capacity,
+    size_t entry_size,
+    void *key,
+    bool is_key_str,
+    size_t key_size,
+    size_t key_offset,
+    void *value,
+    size_t value_size,
+    size_t value_offset
+) {
     _UPF_ASSERT(data != NULL && size != NULL && capacity != NULL && key != NULL && value != NULL);
 
     if (*size >= *capacity * _UPF_MAP_LOAD_FACTOR) {
@@ -978,20 +997,37 @@ static void _upf_map_impl_set(uint8_t **data, uint32_t *size, uint32_t *capacity
 #undef _UPF_MAP_GET_HASH
 
 // Returns pointer to the value if it exists, or NULL if it doesn't.
-#define _UPF_MAP_IMPL_GET(map, search_key, is_key_str)                                                                            \
-    ((map)->capacity > 0                                                                                                          \
-         ? _upf_map_impl_find((uint8_t *) (map)->data, (map)->capacity, sizeof(*(map)->data), (void *) &(search_key), is_key_str, \
-                              sizeof((map)->data->key), _UPF_OFFSET_OF((map)->data, key), &_upf_state.map_index)                  \
-               ? &(map)->data[_upf_state.map_index].value                                                                         \
-               : NULL                                                                                                             \
-         : NULL)
+#define _UPF_MAP_IMPL_GET(map, search_key, is_key_str)                    \
+    ((map)->capacity > 0 ? _upf_map_impl_find(                            \
+                               (uint8_t *) (map)->data,                   \
+                               (map)->capacity,                           \
+                               sizeof(*(map)->data),                      \
+                               (void *) &(search_key),                    \
+                               is_key_str,                                \
+                               sizeof((map)->data->key),                  \
+                               _UPF_OFFSET_OF((map)->data, key),          \
+                               &_upf_state.map_index                      \
+                           )                                              \
+                               ? &(map)->data[_upf_state.map_index].value \
+                               : NULL                                     \
+                         : NULL)
 
 // Initialize map before calling OFFSET_OF since it has a UB when container is NULL.
-#define _UPF_MAP_IMPL_SET(map, entry_key, is_key_str, entry_value)                                                                         \
-    (_upf_map_impl_init((uint8_t **) &(map)->data, &(map)->capacity, sizeof(*(map)->data)),                                                \
-     _upf_map_impl_set((uint8_t **) &(map)->data, &(map)->size, &(map)->capacity, sizeof(*(map)->data), (void *) &(entry_key), is_key_str, \
-                       sizeof((map)->data->key), _UPF_OFFSET_OF((map)->data, key), (void *) &(entry_value), sizeof((map)->data->value),    \
-                       _UPF_OFFSET_OF((map)->data, value)))
+#define _UPF_MAP_IMPL_SET(map, entry_key, is_key_str, entry_value)                          \
+    (_upf_map_impl_init((uint8_t **) &(map)->data, &(map)->capacity, sizeof(*(map)->data)), \
+     _upf_map_impl_set(                                                                     \
+         (uint8_t **) &(map)->data,                                                         \
+         &(map)->size,                                                                      \
+         &(map)->capacity,                                                                  \
+         sizeof(*(map)->data),                                                              \
+         (void *) &(entry_key),                                                             \
+         is_key_str,                                                                        \
+         sizeof((map)->data->key),                                                          \
+         _UPF_OFFSET_OF((map)->data, key),                                                  \
+         (void *) &(entry_value),                                                           \
+         sizeof((map)->data->value),                                                        \
+         _UPF_OFFSET_OF((map)->data, value)                                                 \
+     ))
 
 #define _UPF_MAP_GET(map, search_key) _UPF_MAP_IMPL_GET(map, search_key, false)
 #define _UPF_MAP_STR_GET(map, search_key) _UPF_MAP_IMPL_GET(map, search_key, true)
@@ -2161,8 +2197,15 @@ static void _upf_parse_inheritance(_upf_parsing_info *p, const uint8_t *die, con
     _UPF_VECTOR_PUSH(&p->ns_imports, import);
 }
 
-static _upf_range_vec _upf_get_die_ranges(const _upf_cu *cu, const uint8_t *low_pc_die, _upf_attr low_pc_attr, const uint8_t *high_pc_die,
-                                          _upf_attr high_pc_attr, const uint8_t *ranges_die, _upf_attr ranges_attr) {
+static _upf_range_vec _upf_get_die_ranges(
+    const _upf_cu *cu,
+    const uint8_t *low_pc_die,
+    _upf_attr low_pc_attr,
+    const uint8_t *high_pc_die,
+    _upf_attr high_pc_attr,
+    const uint8_t *ranges_die,
+    _upf_attr ranges_attr
+) {
     _UPF_ASSERT(cu != NULL);
 
     if (ranges_die != NULL) return _upf_get_ranges(cu, ranges_die, ranges_attr.form);
@@ -2774,22 +2817,23 @@ static void _upf_tokenize(const char *string) {
 
     // Signs must be ordered from longest to shortest to prevent multicharacter
     // sign from being tokenized as multiple single character ones.
-    static const _upf_token signs[]
-        = {{_UPF_TT_ASSIGNMENT, "<<="}, {_UPF_TT_ASSIGNMENT, ">>="}, {_UPF_TT_ARROW_STAR, "->*"},
+    static const _upf_token signs[] = {
+        {_UPF_TT_ASSIGNMENT, "<<="}, {_UPF_TT_ASSIGNMENT, ">>="}, {_UPF_TT_ARROW_STAR, "->*"},
 
-           {_UPF_TT_ARROW, "->"},       {_UPF_TT_INCREMENT, "++"},   {_UPF_TT_INCREMENT, "--"},   {_UPF_TT_LOGICAL, "<="},
-           {_UPF_TT_LOGICAL, ">="},     {_UPF_TT_LOGICAL, "=="},     {_UPF_TT_LOGICAL, "!="},     {_UPF_TT_DOUBLE_AMPERSAND, "&&"},
-           {_UPF_TT_LOGICAL, "||"},     {_UPF_TT_LOGICAL, "<<"},     {_UPF_TT_LOGICAL, ">>"},     {_UPF_TT_ASSIGNMENT, "*="},
-           {_UPF_TT_ASSIGNMENT, "/="},  {_UPF_TT_ASSIGNMENT, "%="},  {_UPF_TT_ASSIGNMENT, "+="},  {_UPF_TT_ASSIGNMENT, "-="},
-           {_UPF_TT_ASSIGNMENT, "&="},  {_UPF_TT_ASSIGNMENT, "^="},  {_UPF_TT_ASSIGNMENT, "|="},  {_UPF_TT_DOT_STAR, ".*"},
-           {_UPF_TT_CXX_SCOPE, "::"},
+        {_UPF_TT_ARROW, "->"},       {_UPF_TT_INCREMENT, "++"},   {_UPF_TT_INCREMENT, "--"},   {_UPF_TT_LOGICAL, "<="},
+        {_UPF_TT_LOGICAL, ">="},     {_UPF_TT_LOGICAL, "=="},     {_UPF_TT_LOGICAL, "!="},     {_UPF_TT_DOUBLE_AMPERSAND, "&&"},
+        {_UPF_TT_LOGICAL, "||"},     {_UPF_TT_LOGICAL, "<<"},     {_UPF_TT_LOGICAL, ">>"},     {_UPF_TT_ASSIGNMENT, "*="},
+        {_UPF_TT_ASSIGNMENT, "/="},  {_UPF_TT_ASSIGNMENT, "%="},  {_UPF_TT_ASSIGNMENT, "+="},  {_UPF_TT_ASSIGNMENT, "-="},
+        {_UPF_TT_ASSIGNMENT, "&="},  {_UPF_TT_ASSIGNMENT, "^="},  {_UPF_TT_ASSIGNMENT, "|="},  {_UPF_TT_DOT_STAR, ".*"},
+        {_UPF_TT_CXX_SCOPE, "::"},
 
-           {_UPF_TT_COMMA, ","},        {_UPF_TT_AMPERSAND, "&"},    {_UPF_TT_STAR, "*"},         {_UPF_TT_OPEN_PAREN, "("},
-           {_UPF_TT_CLOSE_PAREN, ")"},  {_UPF_TT_DOT, "."},          {_UPF_TT_OPEN_BRACKET, "["}, {_UPF_TT_CLOSE_BRACKET, "]"},
-           {_UPF_TT_OPEN_BRACE, "{"},   {_UPF_TT_CLOSE_BRACE, "}"},  {_UPF_TT_QUESTION, "?"},     {_UPF_TT_COLON, ":"},
-           {_UPF_TT_LESS_THAN, "<"},    {_UPF_TT_GREATER_THAN, ">"}, {_UPF_TT_UNARY, "!"},        {_UPF_TT_PLUS, "+"},
-           {_UPF_TT_MINUS, "-"},        {_UPF_TT_UNARY, "~"},        {_UPF_TT_FACTOR, "/"},       {_UPF_TT_FACTOR, "%"},
-           {_UPF_TT_LOGICAL, "^"},      {_UPF_TT_LOGICAL, "|"},      {_UPF_TT_ASSIGNMENT, "="}};
+        {_UPF_TT_COMMA, ","},        {_UPF_TT_AMPERSAND, "&"},    {_UPF_TT_STAR, "*"},         {_UPF_TT_OPEN_PAREN, "("},
+        {_UPF_TT_CLOSE_PAREN, ")"},  {_UPF_TT_DOT, "."},          {_UPF_TT_OPEN_BRACKET, "["}, {_UPF_TT_CLOSE_BRACKET, "]"},
+        {_UPF_TT_OPEN_BRACE, "{"},   {_UPF_TT_CLOSE_BRACE, "}"},  {_UPF_TT_QUESTION, "?"},     {_UPF_TT_COLON, ":"},
+        {_UPF_TT_LESS_THAN, "<"},    {_UPF_TT_GREATER_THAN, ">"}, {_UPF_TT_UNARY, "!"},        {_UPF_TT_PLUS, "+"},
+        {_UPF_TT_MINUS, "-"},        {_UPF_TT_UNARY, "~"},        {_UPF_TT_FACTOR, "/"},       {_UPF_TT_FACTOR, "%"},
+        {_UPF_TT_LOGICAL, "^"},      {_UPF_TT_LOGICAL, "|"},      {_UPF_TT_ASSIGNMENT, "="}
+    };
 
 
     static const _upf_token keywords[] = {
@@ -2817,11 +2861,16 @@ static void _upf_tokenize(const char *string) {
     };
 
     static const _upf_token cxx_keywords[] = {
-        {_UPF_TT_STRUCT, "class"},          {_UPF_TT_ALIGNOF, "alignas"},
-        {_UPF_TT_CXX_CAST, "static_cast"},  {_UPF_TT_CXX_CAST, "reinterpret_cast"},
-        {_UPF_TT_CXX_CAST, "dynamic_cast"}, {_UPF_TT_CXX_CAST, "const_cast"},
-        {_UPF_TT_CXX_NEW, "new"},           {_UPF_TT_CXX_DECLTYPE, "decltype"},
-        {_UPF_TT_CXX_NOEXCEPT, "noexcept"}, {_UPF_TT_CXX_TYPEID, "typeid"},
+        {_UPF_TT_STRUCT, "class"},
+        {_UPF_TT_ALIGNOF, "alignas"},
+        {_UPF_TT_CXX_CAST, "static_cast"},
+        {_UPF_TT_CXX_CAST, "reinterpret_cast"},
+        {_UPF_TT_CXX_CAST, "dynamic_cast"},
+        {_UPF_TT_CXX_CAST, "const_cast"},
+        {_UPF_TT_CXX_NEW, "new"},
+        {_UPF_TT_CXX_DECLTYPE, "decltype"},
+        {_UPF_TT_CXX_NOEXCEPT, "noexcept"},
+        {_UPF_TT_CXX_TYPEID, "typeid"},
     };
 
     const char *ch = string;
@@ -3023,8 +3072,13 @@ static void *_upf_ns_bfs(_upf_ns *ns, _upf_ns_cb callback, const void *data) {
     return result;
 }
 
-static void *_upf_scope_search(bool search_global_scope, const _upf_cstr_vec *ns_names, _upf_ns_cb ns_callback,
-                               _upf_scope_cb scope_callback, const void *data) {
+static void *_upf_scope_search(
+    bool search_global_scope,
+    const _upf_cstr_vec *ns_names,
+    _upf_ns_cb ns_callback,
+    _upf_scope_cb scope_callback,
+    const void *data
+) {
     if (search_global_scope) {
         _upf_ns *ns = _upf_scope_resolve_ns(ns_names, &_upf_state.current_cu->scope);
         return _upf_ns_bfs(ns, ns_callback, data);
@@ -3345,8 +3399,8 @@ static _upf_type *_upf_identifier(void) {
         identifier = _upf_expect_token(_UPF_TT_IDENTIFIER).string;
     }
 
-    return (_upf_type *) _upf_scope_search(leading_scope_op, &ns_names, _upf_ns_get_identifier_cb, _upf_scope_get_identifier_cb,
-                                           identifier);
+    void *type = _upf_scope_search(leading_scope_op, &ns_names, _upf_ns_get_identifier_cb, _upf_scope_get_identifier_cb, identifier);
+    return (_upf_type *) type;
 }
 
 static _upf_type *_upf_generic(void) { _UPF_ERROR("Generics are not supported at %s:%d.", _upf_state.file_path, _upf_state.line); }
@@ -3636,8 +3690,15 @@ static void _upf_init_parsing_rules(void) {
 
 // ================== /proc/pid/maps ======================
 
-typedef bool (*_upf_iterate_maps_cb)(uintptr_t start, uintptr_t end, bool readable, bool executable, uintmax_t offset, const char *path,
-                                     void *data);
+typedef bool (*_upf_iterate_maps_cb)(
+    uintptr_t start,
+    uintptr_t end,
+    bool readable,
+    bool executable,
+    uintmax_t offset,
+    const char *path,
+    void *data
+);
 
 static void _upf_iterate_maps(_upf_iterate_maps_cb callback, void *data) {
     _UPF_ASSERT(callback != NULL && data != NULL);
@@ -3671,8 +3732,15 @@ typedef struct {
     const char **path;
 } _upf_get_this_object_cb_data;
 
-static bool _upf_get_this_object_cb(uintptr_t start, uintptr_t end, bool readable, bool executable, uintmax_t offset, const char *path,
-                                    void *raw_data) {
+static bool _upf_get_this_object_cb(
+    uintptr_t start,
+    uintptr_t end,
+    bool readable,
+    bool executable,
+    uintmax_t offset,
+    const char *path,
+    void *raw_data
+) {
     const uintptr_t function_address = (uintptr_t) _upf_get_this_object_cb;
     if (!(start <= function_address && function_address <= end && readable && executable)) return false;
 
@@ -3692,9 +3760,15 @@ static void _upf_get_this_object(const char **path, const void **address) {
     if (*path == NULL || *address == NULL) _UPF_ERROR("Failed to find information about the current object.");
 }
 
-static bool _upf_get_readable_addresses_cb(uintptr_t start, uintptr_t end, bool readable, __attribute__((unused)) bool executable,
-                                           __attribute__((unused)) uintmax_t offset, __attribute__((unused)) const char *path,
-                                           void *raw_data) {
+static bool _upf_get_readable_addresses_cb(
+    uintptr_t start,
+    uintptr_t end,
+    bool readable,
+    __attribute__((unused)) bool executable,
+    __attribute__((unused)) uintmax_t offset,
+    __attribute__((unused)) const char *path,
+    void *raw_data
+) {
     if (readable) {
         _upf_range range = _UPF_ZERO_INIT;
         range.start = start;
@@ -3798,8 +3872,12 @@ static bool _upf_is_primitive(const _upf_type *type) {
     _UPF_ASSERT(false && "Unreachable");
 }
 
-__attribute__((no_sanitize_address)) static void _upf_find_repeating_structs(_upf_struct_info_map *structs, const uint8_t *data,
-                                                                             const _upf_type *type, int depth) {
+__attribute__((no_sanitize_address)) static void _upf_find_repeating_structs(
+    _upf_struct_info_map *structs,
+    const uint8_t *data,
+    const _upf_type *type,
+    int depth
+) {
     _UPF_ASSERT(structs != NULL && type != NULL);
 
     if (UPRINTF_MAX_DEPTH >= 0 && depth >= UPRINTF_MAX_DEPTH) return;
@@ -3953,8 +4031,12 @@ __attribute__((no_sanitize_address)) static void _upf_print_char_ptr(const char 
 // [] -> arrays
 // {} -> structs/unions
 // <> -> meta information, e.g. unnamed, unknown, invalid, out of bounds, truncated, etc.
-__attribute__((no_sanitize_address)) static void _upf_print_type(_upf_struct_info_map *structs, const uint8_t *data, const _upf_type *type,
-                                                                 int depth) {
+__attribute__((no_sanitize_address)) static void _upf_print_type(
+    _upf_struct_info_map *structs,
+    const uint8_t *data,
+    const _upf_type *type,
+    int depth
+) {
     _UPF_ASSERT(structs != NULL && type != NULL);
 
     if (UPRINTF_MAX_DEPTH >= 0 && depth >= UPRINTF_MAX_DEPTH) {
@@ -4300,8 +4382,12 @@ static const _upf_type *_upf_get_arg_type(const char *arg) {
 
     if (type == NULL) _UPF_ERROR("Failed to find the type of \"%s\" at %s:%d.", arg, _upf_state.file_path, _upf_state.line);
     if (type->kind == _UPF_TK_VOID) {
-        _UPF_ERROR("Cannot print type void. To print the void pointer itself, get a pointer to \"%s\" at %s:%d.", arg, _upf_state.file_path,
-                   _upf_state.line);
+        _UPF_ERROR(
+            "Cannot print type void. To print the void pointer itself, get a pointer to \"%s\" at %s:%d.",
+            arg,
+            _upf_state.file_path,
+            _upf_state.line
+        );
     }
     return type;
 }

@@ -15,3 +15,10 @@ AllowShortCaseLabelsOnASingleLine: true
 AlignConsecutiveShortCaseStatements:
   Enabled: true
 AccessModifierOffset: -4
+BinPackParameters: OnePerLine
+AllowAllParametersOfDeclarationOnNextLine: false
+AlignAfterOpenBracket: BlockIndent
+PenaltyReturnTypeOnItsOwnLine: 10000
+BinPackArguments: false
+AllowAllArgumentsOnNextLine: false
+PenaltyBreakAssignment: 10000
